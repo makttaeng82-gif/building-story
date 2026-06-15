@@ -36,6 +36,10 @@ public class Loan {
         return principal;
     }
 
+    public Long getId() {
+        return id;
+    }
+
     public long getTotalRepayment() {
         return totalRepayment;
     }

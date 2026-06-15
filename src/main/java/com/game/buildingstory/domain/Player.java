@@ -26,7 +26,11 @@ public class Player {
     private Boolean paused = false;
     private String currentCity = "청주";
     private int reputation = 0;
-    private String title = "무직";
+    private String title = "회사의 최하급노예";
+    private Boolean employed = true;
+    private Boolean firstSecretaryHired = false;
+    private Integer elapsedDays = 1;
+    private Integer nextOfferRefreshDay = 6;
     @Column(name = "game_month")
     private int month = 1;
 
@@ -34,6 +38,7 @@ public class Player {
     private int day = 1;
     private long monthlyRentIncome;
     private long monthlySideIncome;
+    private Long monthlySalaryIncome = 0L;
     private long monthlyAdCost;
     private long monthlySecretarySalary;
     private long monthlyLoanPayment;
@@ -80,13 +85,14 @@ public class Player {
 
     public void completeStory() {
         this.storySeen = true;
-        this.cash = 30_000_000L;
-        this.title = "초보 임대인";
-        this.reputation = 12;
+        this.cash = 2_000_000L;
+        this.title = "회사의 최하급노예";
+        this.reputation = 0;
     }
 
     public void advanceDay() {
         day++;
+        elapsedDays = getElapsedDays() + 1;
         if (day > 31) {
             day = 1;
             month++;
@@ -120,12 +126,55 @@ public class Player {
         return currentCity;
     }
 
+    public void changeCity(String city) {
+        this.currentCity = city;
+    }
+
     public int getReputation() {
         return reputation;
     }
 
     public String getTitle() {
         return title;
+    }
+
+    public void updateTitle(String title) {
+        this.title = title;
+    }
+
+    public boolean isEmployed() {
+        return !Boolean.FALSE.equals(employed);
+    }
+
+    public void resign() {
+        if (isEmployed()) {
+            employed = false;
+            cash += 30_000_000L;
+        }
+    }
+
+    public boolean isFirstSecretaryHired() {
+        return Boolean.TRUE.equals(firstSecretaryHired);
+    }
+
+    public void hireFirstSecretary() {
+        this.firstSecretaryHired = true;
+    }
+
+    public int getElapsedDays() {
+        return elapsedDays == null ? 1 : elapsedDays;
+    }
+
+    public int getNextOfferRefreshDay() {
+        return nextOfferRefreshDay == null ? getElapsedDays() + 5 : nextOfferRefreshDay;
+    }
+
+    public void scheduleNextOfferRefresh() {
+        this.nextOfferRefreshDay = getElapsedDays() + 5;
+    }
+
+    public int offerRefreshDday() {
+        return Math.max(0, nextOfferRefreshDay - elapsedDays);
     }
 
     public int getMonth() {
@@ -142,6 +191,7 @@ public class Player {
 
     public void addMonthlyRentIncome(long amount) {
         monthlyRentIncome += amount;
+        cash += amount;
     }
 
     public long getMonthlySideIncome() {
@@ -151,6 +201,24 @@ public class Player {
     public void addSideIncome(long amount) {
         monthlySideIncome += amount;
         cash += amount;
+    }
+
+    public long getMonthlySalaryIncome() {
+        return monthlySalaryIncome == null ? 0L : monthlySalaryIncome;
+    }
+
+    public void addSalaryIncome(long amount) {
+        monthlySalaryIncome = getMonthlySalaryIncome() + amount;
+        cash += amount;
+    }
+
+    public void addReputation(int amount) {
+        reputation += amount;
+    }
+
+    public void addSecretarySalaryCost(long amount) {
+        monthlySecretarySalary += amount;
+        cash -= amount;
     }
 
     public long getMonthlyAdCost() {
@@ -166,6 +234,6 @@ public class Player {
     }
 
     public long monthlyNetIncome() {
-        return monthlyRentIncome + monthlySideIncome - monthlyAdCost - monthlySecretarySalary - monthlyLoanPayment;
+        return monthlyRentIncome + monthlySideIncome + getMonthlySalaryIncome() - monthlyAdCost - monthlySecretarySalary - monthlyLoanPayment;
     }
 }

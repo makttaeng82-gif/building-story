@@ -22,8 +22,11 @@ public class OwnedBuilding {
     private long marketPrice;
     private long purchasePrice;
     private long monthlyRent;
+    private Integer purchaseDayCount;
+    private Integer tradeCooldownDays;
     private boolean occupied;
     private boolean repairRequested;
+    private Boolean protectedTenant;
 
     protected OwnedBuilding() {
     }
@@ -36,11 +39,14 @@ public class OwnedBuilding {
         this.marketPrice = offer.getMarketPrice();
         this.purchasePrice = offer.getOfferPrice();
         this.monthlyRent = offer.getMonthlyRent();
+        this.purchaseDayCount = player.getElapsedDays();
+        this.tradeCooldownDays = offer.getTradeCooldownDays();
         this.occupied = false;
         this.repairRequested = false;
+        this.protectedTenant = false;
     }
 
-    public OwnedBuilding(Player player, String city, String typeName, String name, long marketPrice, long purchasePrice, long monthlyRent) {
+    public OwnedBuilding(Player player, String city, String typeName, String name, long marketPrice, long purchasePrice, long monthlyRent, int tradeCooldownDays) {
         this.player = player;
         this.city = city;
         this.typeName = typeName;
@@ -48,12 +54,19 @@ public class OwnedBuilding {
         this.marketPrice = marketPrice;
         this.purchasePrice = purchasePrice;
         this.monthlyRent = monthlyRent;
+        this.purchaseDayCount = player.getElapsedDays();
+        this.tradeCooldownDays = tradeCooldownDays;
         this.occupied = false;
         this.repairRequested = false;
+        this.protectedTenant = false;
     }
 
     public Long getId() {
         return id;
+    }
+
+    public Player getPlayer() {
+        return player;
     }
 
     public String getCity() {
@@ -80,6 +93,23 @@ public class OwnedBuilding {
         return monthlyRent;
     }
 
+    public int getTradeCooldownDays() {
+        return tradeCooldownDays == null ? 15 : tradeCooldownDays;
+    }
+
+    public int daysUntilSellable(int currentDayCount) {
+        int purchaseDay = purchaseDayCount == null ? currentDayCount : purchaseDayCount;
+        return Math.max(0, purchaseDay + getTradeCooldownDays() - currentDayCount);
+    }
+
+    public boolean isSellable(int currentDayCount) {
+        return daysUntilSellable(currentDayCount) == 0;
+    }
+
+    public boolean canSell(int currentDayCount) {
+        return isSellable(currentDayCount) && !isProtectedTenant();
+    }
+
     public boolean isOccupied() {
         return occupied;
     }
@@ -90,5 +120,19 @@ public class OwnedBuilding {
 
     public void moveIn() {
         this.occupied = true;
+    }
+
+    public boolean isProtectedTenant() {
+        return Boolean.TRUE.equals(protectedTenant);
+    }
+
+    public void moveInProtectedTenant() {
+        this.occupied = true;
+        this.protectedTenant = true;
+    }
+
+    public void moveOut() {
+        this.occupied = false;
+        this.protectedTenant = false;
     }
 }

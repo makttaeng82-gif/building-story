@@ -24,6 +24,8 @@ public class BuildingOffer {
     private long marketPrice;
     private long offerPrice;
     private long monthlyRent;
+    private Integer buildingSlot;
+    private Integer tradeCooldownDays;
 
     @Enumerated(EnumType.STRING)
     private ValuationStatus valuationStatus;
@@ -31,13 +33,15 @@ public class BuildingOffer {
     protected BuildingOffer() {
     }
 
-    public BuildingOffer(Player player, String city, String typeName, String name, long marketPrice, long monthlyRent, ValuationStatus valuationStatus) {
+    public BuildingOffer(Player player, String city, int buildingSlot, String typeName, String name, long marketPrice, long monthlyRent, int tradeCooldownDays, ValuationStatus valuationStatus) {
         this.player = player;
         this.city = city;
+        this.buildingSlot = buildingSlot;
         this.typeName = typeName;
         this.name = name;
         this.marketPrice = marketPrice;
         this.monthlyRent = monthlyRent;
+        this.tradeCooldownDays = tradeCooldownDays;
         this.valuationStatus = valuationStatus;
         this.offerPrice = marketPrice * valuationStatus.rate() / 100;
     }
@@ -72,6 +76,14 @@ public class BuildingOffer {
 
     public long getMonthlyRent() {
         return monthlyRent;
+    }
+
+    public int getBuildingSlot() {
+        return buildingSlot == null ? 1 : buildingSlot;
+    }
+
+    public int getTradeCooldownDays() {
+        return tradeCooldownDays == null ? 15 : tradeCooldownDays;
     }
 
     public ValuationStatus getValuationStatus() {

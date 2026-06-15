@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>건물주이야기 정보</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app">
+    <header class="topbar">
+        <div class="brand">
+            <span class="logo">B</span>
+            <div>
+                <h1>정보</h1>
+                <p>정보 확인 중에는 시간이 흐르지 않음</p>
+            </div>
+        </div>
+
+        <div class="status-grid">
+            <div class="status-card">
+                <span>현금</span>
+                <strong class="money" th:text="${@moneyText.format(player.cash)}">0원</strong>
+            </div>
+            <div class="status-card">
+                <span>월 순수익</span>
+                <strong class="money" th:text="${@moneyText.format(player.monthlyNetIncome())}">0원</strong>
+            </div>
+            <div class="status-card">
+                <span>직장</span>
+                <strong th:text="${player.employed ? '재직중' : '퇴사'}">재직중</strong>
+            </div>
+            <div class="status-card">
+                <span>평판</span>
+                <strong th:text="${player.reputation}">0</strong>
+            </div>
+            <div class="status-card">
+                <span>칭호</span>
+                <strong th:text="${player.title}">칭호</strong>
+            </div>
+            <div class="status-card date-card">
+                <span>날짜</span>
+                <strong th:text="${player.month} + '월 ' + ${player.day} + '일'">1월 1일</strong>
+                <small>정보 확인 중 정지</small>
+            </div>
+        </div>
+    </header>
+
+    <nav class="city-tabs" aria-label="도시 선택">
+        <form method="post" action="/city" th:each="city : ${cities}">
+            <input type="hidden" name="city" th:value="${city}">
+            <button type="submit"
+                    th:disabled="${cityUnlocks.get(city) != true}"
+                    th:classappend="${city == player.currentCity} ? ' active' : (${cityUnlocks.get(city) != true} ? ' locked' : '')">
+                <span th:text="${city}">도시</span>
+                <span th:if="${cityUnlocks.get(city) != true}">잠김</span>
+            </button>
+        </form>
+        <a class="info-tab active" href="/info">정보</a>
+    </nav>
+
+    <main class="info-page">
+        <section class="panel">
+            <div class="section-head">
+                <div>
+                    <h2>비서 목록</h2>
+                    <p>숙련도 범위 1~30 · 최종 강화 시 성능 격차 축소 예정</p>
+                </div>
+            </div>
+            <div class="secretary-list">
+                <article class="secretary-card" th:each="secretary : ${secretarySpecs}">
+                    <button class="image-open-button" type="button" th:attr="data-full-image=${secretary.imagePath()}, data-image-title=${secretary.name()} + ' - ' + ${secretary.origin()}">
+                        <img class="secretary-thumb" th:src="${secretary.imagePath()}" th:alt="${secretary.name()} + ' 비서 이미지'">
+                    </button>
+                    <div>
+                        <span class="badge" th:text="'기본 숙련도 ' + ${secretary.baseProficiency()} + '/30'">숙련도</span>
+                        <h3 th:text="${secretary.name()} + ' - ' + ${secretary.origin()}">비서명</h3>
+                        <dl>
+                            <div><dt>고용 조건</dt><dd th:text="'평판 ' + ${#numbers.formatInteger(secretary.requiredReputation(), 0, 'COMMA')} + ' 이상'">조건</dd></div>
+                            <div><dt>월급</dt><dd th:text="${@moneyText.format(secretary.monthlySalary())}">월급</dd></div>
+                            <div><dt>기본 효과</dt><dd th:text="${secretary.effect()}">효과</dd></div>
+                            <div><dt>숙련도 상승</dt><dd th:text="${secretary.growthBonus()}">성장</dd></div>
+                            <div><dt>해금 메모</dt><dd th:text="${secretary.unlockNote()}">메모</dd></div>
+                        </dl>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="section-head">
+                <div>
+                    <h2>칭호와 해금 조건</h2>
+                    <p>평판 달성 시 칭호와 매물 해금이 진행됨</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>칭호</th>
+                        <th>필요 평판</th>
+                        <th>추가 조건</th>
+                        <th>해금</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="tier : ${reputationTiers}">
+                        <td th:text="${tier.title()}">칭호</td>
+                        <td th:text="${#numbers.formatInteger(tier.requiredReputation(), 0, 'COMMA')}">0</td>
+                        <td th:text="${tier.requiresResignation() ? '퇴사 필요' : '-'}">-</td>
+                        <td th:text="${tier.unlockLabel().isEmpty() ? '-' : tier.unlockLabel()}">해금</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="section-head">
+                <div>
+                    <h2>건물 가격과 월세</h2>
+                    <p>월세는 매물 평가와 무관하게 고정 · 판매가는 판매 시점 평가 기준</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>도시</th>
+                        <th>순번</th>
+                        <th>건물</th>
+                        <th>시장가</th>
+                        <th>월세</th>
+                        <th>거래 쿨타임</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="building : ${buildingSpecs}">
+                        <td th:text="${building.city()}">도시</td>
+                        <td th:text="${building.slot()}">1</td>
+                        <td th:text="${building.name()}">건물</td>
+                        <td th:text="${@moneyText.format(building.marketPrice())}">시장가</td>
+                        <td th:text="${@moneyText.format(building.monthlyRent())}">월세</td>
+                        <td th:text="${building.tradeCooldownDays()} + '일'">쿨타임</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div class="image-modal-backdrop" id="imageModal" hidden>
+        <section class="image-modal">
+            <div class="section-head compact">
+                <h2 id="imageModalTitle">이미지</h2>
+                <button class="secondary" id="imageModalClose" type="button">닫기</button>
+            </div>
+            <img id="imageModalImg" src="" alt="원본 이미지">
+        </section>
+    </div>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

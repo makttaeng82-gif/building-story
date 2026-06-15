@@ -57,6 +57,10 @@ input {
     box-shadow: none;
 }
 
+.danger-button {
+    background: var(--red);
+}
+
 .app {
     width: min(1480px, 100%);
     margin: 0 auto;
@@ -64,11 +68,17 @@ input {
 }
 
 .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
     display: grid;
     grid-template-columns: minmax(240px, 0.8fr) minmax(600px, 1.4fr);
     gap: 18px;
     align-items: center;
     margin-bottom: 14px;
+    padding: 10px 0;
+    background: rgba(238, 246, 251, 0.94);
+    backdrop-filter: blur(10px);
 }
 
 .brand, .story-head {
@@ -97,7 +107,7 @@ p, span, dt, li, small { color: var(--muted); }
 
 .status-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 10px;
 }
 
@@ -112,6 +122,29 @@ p, span, dt, li, small { color: var(--muted); }
 .status-card span, .status-card strong { display: block; }
 .status-card strong { margin-top: 4px; font-size: 18px; }
 .date-card strong { color: var(--blue); }
+
+.tick-progress {
+    overflow: hidden;
+    width: 100%;
+    height: 8px;
+    margin-top: 8px;
+    border-radius: 999px;
+    background: #dbe8f0;
+}
+
+.tick-progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+}
+
+.date-card small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+}
 
 .money {
     display: block;
@@ -138,15 +171,23 @@ p, span, dt, li, small { color: var(--muted); }
     padding-bottom: 3px;
 }
 
-.city-tabs button {
+.city-tabs form { margin: 0; }
+.city-tabs button, .info-tab {
+    display: grid;
+    place-items: center;
     min-width: 92px;
+    min-height: 38px;
     background: white;
     color: var(--ink);
     border: 1px solid var(--line);
+    border-radius: 8px;
     box-shadow: none;
+    padding: 0 14px;
+    font-weight: 700;
+    text-decoration: none;
 }
 
-.city-tabs .active { background: var(--blue); color: white; }
+.city-tabs .active, .info-tab.active { background: var(--blue); color: white; }
 .city-tabs .locked {
     background: linear-gradient(135deg, #6b7280, #374151);
     color: #e5e7eb;
@@ -197,7 +238,6 @@ p, span, dt, li, small { color: var(--muted); }
     border-radius: 50%;
     background: #ffd166;
     box-shadow: 0 0 34px rgba(255, 209, 102, 0.75);
-    animation: sunMoonCycle 10s linear infinite;
     z-index: 2;
 }
 
@@ -207,7 +247,6 @@ p, span, dt, li, small { color: var(--muted); }
     height: 34px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.82);
-    animation: cloudCycle 10s linear infinite;
     z-index: 2;
 }
 
@@ -222,34 +261,6 @@ p, span, dt, li, small { color: var(--muted); }
 .cloud::after { width: 54px; height: 54px; left: 48px; top: -28px; }
 .cloud-a { top: 42px; left: 90px; }
 .cloud-b { top: 88px; left: 360px; transform: scale(0.75); }
-
-.skyline::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-        radial-gradient(circle at 16% 22%, rgba(255,255,255,0.9) 0 1px, transparent 2px),
-        radial-gradient(circle at 34% 15%, rgba(255,255,255,0.9) 0 1px, transparent 2px),
-        radial-gradient(circle at 63% 18%, rgba(255,255,255,0.8) 0 1px, transparent 2px),
-        radial-gradient(circle at 78% 26%, rgba(255,255,255,0.9) 0 1px, transparent 2px);
-    opacity: 0;
-    animation: starCycle 10s linear infinite;
-    z-index: 2;
-}
-
-.skyline::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-        linear-gradient(180deg, rgba(7, 19, 46, 0.42), rgba(9, 24, 48, 0.66)),
-        linear-gradient(180deg, #132747, #263c62 82%, #355b46 82%);
-    opacity: 0;
-    animation: nightOverlayCycle 10s ease-in-out infinite;
-    z-index: 1;
-}
 
 .skyline .building-slot {
     z-index: 3;
@@ -268,7 +279,6 @@ p, span, dt, li, small { color: var(--muted); }
     text-align: center;
     color: var(--ink);
     box-shadow: none;
-    animation: buildingSlotCycle 10s linear infinite;
 }
 
 .building-slot.selected {
@@ -285,78 +295,6 @@ p, span, dt, li, small { color: var(--muted); }
     color: #597083;
     background: rgba(255, 255, 255, 0.62);
     font-weight: 800;
-    animation: placeholderCycle 10s linear infinite;
-}
-
-@keyframes nightOverlayCycle {
-    0%, 100% { opacity: 0; }
-    50% { opacity: 1; }
-}
-
-@keyframes sunMoonCycle {
-    0%, 100% {
-        top: 30px;
-        right: 70px;
-        background: #ffd166;
-        box-shadow: 0 0 34px rgba(255, 209, 102, 0.75);
-    }
-    45%, 55% {
-        top: 44px;
-        right: 74px;
-        background: #f5f3ce;
-        box-shadow: 0 0 26px rgba(245, 243, 206, 0.55);
-    }
-}
-
-.game-paused .skyline::before,
-.game-paused .skyline::after,
-.game-paused .sun,
-.game-paused .cloud,
-.game-paused .building-slot,
-.game-paused .image-placeholder {
-    animation-play-state: paused;
-}
-
-@keyframes cloudCycle {
-    0%, 100% {
-        background: rgba(255, 255, 255, 0.82);
-        filter: none;
-    }
-    45%, 55% {
-        background: rgba(120, 137, 160, 0.42);
-        filter: brightness(0.8);
-    }
-}
-
-@keyframes starCycle {
-    0%, 25%, 75%, 100% {
-        opacity: 0;
-    }
-    45%, 55% {
-        opacity: 1;
-    }
-}
-
-@keyframes buildingSlotCycle {
-    0%, 100% {
-        background: rgba(255, 255, 255, 0.5);
-        border-color: rgba(255, 255, 255, 0.8);
-    }
-    45%, 55% {
-        background: rgba(255, 255, 255, 0.72);
-        border-color: rgba(210, 220, 235, 0.9);
-    }
-}
-
-@keyframes placeholderCycle {
-    0%, 100% {
-        color: #597083;
-        background: rgba(255, 255, 255, 0.62);
-    }
-    45%, 55% {
-        color: #3f5366;
-        background: rgba(255, 255, 255, 0.82);
-    }
 }
 
 .building-image { width: 104px; height: 104px; border-radius: 18px; }
@@ -406,7 +344,34 @@ p, span, dt, li, small { color: var(--muted); }
     background: rgba(255,255,255,0.42);
 }
 
-.secretary-image { font-size: 24px; }
+img.story-image,
+img.secretary-thumb,
+img.secretary-image,
+img.event-image {
+    display: block;
+    object-fit: cover;
+    border-style: solid;
+}
+
+img.story-image {
+    border: 0;
+}
+
+img.secretary-thumb,
+img.secretary-image,
+img.event-image {
+    border: 1px solid var(--line);
+}
+
+.secretary-image {
+    width: 100%;
+    height: 100%;
+    min-height: 440px;
+    border-radius: 16px;
+    font-size: 24px;
+    object-fit: cover;
+    object-position: top center;
+}
 .secretary-info { display: grid; gap: 8px; }
 .skill-meter { overflow: hidden; height: 12px; border-radius: 999px; background: #edf2f7; }
 .skill-meter span { display: block; height: 100%; background: linear-gradient(90deg, #68d391, #2f80ed); }
@@ -428,7 +393,7 @@ p, span, dt, li, small { color: var(--muted); }
 .badge.good { background: #e4f8ec; color: #197a45; }
 .badge.danger { background: #ffe9e6; color: #b93d32; }
 
-.market-panel, .info-grid { margin-top: 16px; }
+.market-panel, .info-grid, .info-page { margin-top: 16px; }
 .market-list {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -460,6 +425,14 @@ p, span, dt, li, small { color: var(--muted); }
     gap: 16px;
 }
 
+.building-detail {
+    display: none;
+}
+
+.building-detail.active {
+    display: block;
+}
+
 dl { display: grid; gap: 10px; margin: 14px 0; }
 dl div, .loan-box div {
     display: flex;
@@ -471,11 +444,161 @@ dl div, .loan-box div {
 
 dd { margin: 0; font-weight: 800; }
 .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.button-row form { margin: 0; }
+.button-row button { width: 100%; }
 .wide { width: 100%; }
 .event-list { display: grid; gap: 10px; margin: 14px 0 0; padding-left: 18px; }
 .event-list b { color: var(--blue); }
 .loan-box { display: grid; gap: 10px; margin: 16px 0; }
+.loan-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.loan-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 0.8fr 1fr;
+    gap: 8px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fbfdff;
+    padding: 10px;
+}
+
+.loan-row span {
+    overflow-wrap: anywhere;
+}
 .logout-form { margin-top: 16px; text-align: right; }
+
+.info-page {
+    display: grid;
+    gap: 16px;
+}
+
+.secretary-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.secretary-card {
+    display: grid;
+    grid-template-columns: 170px minmax(0, 1fr);
+    gap: 14px;
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fbfdff;
+    padding: 14px;
+}
+
+.image-open-button {
+    display: block;
+    min-height: 0;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+    cursor: zoom-in;
+}
+
+.secretary-thumb {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    height: 280px;
+    border: 2px dashed #b58b78;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #fff7ec, #eef8ff);
+    color: #8b5d4a;
+    font-weight: 900;
+    text-align: center;
+    object-fit: cover;
+    object-position: top center;
+}
+
+.image-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.58);
+}
+
+.image-modal-backdrop[hidden] {
+    display: none;
+}
+
+.image-modal {
+    display: grid;
+    gap: 14px;
+    width: min(960px, 100%);
+    max-height: calc(100vh - 40px);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: white;
+    padding: 16px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.image-modal img {
+    width: 100%;
+    max-height: calc(100vh - 140px);
+    object-fit: contain;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+}
+
+th, td {
+    border-bottom: 1px solid #e7eef4;
+    padding: 10px;
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    background: #f4f8fb;
+    color: var(--ink);
+    font-size: 13px;
+}
+
+td {
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.rule-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.rule-grid article {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fbfdff;
+    padding: 14px;
+}
+
+.rule-grid p {
+    margin-top: 8px;
+    line-height: 1.5;
+}
 
 .auth-page, .story-page {
     width: min(1360px, 100%);
@@ -519,17 +642,19 @@ dd { margin: 0; font-weight: 800; }
 
 .story-card {
     display: grid;
-    grid-template-columns: minmax(320px, 0.8fr) minmax(280px, 1fr);
-    align-items: center;
+    grid-template-columns: 1fr;
     gap: 12px;
     padding: 18px;
 }
 
 .story-image {
     width: 100%;
-    min-height: 340px;
-    aspect-ratio: 16 / 9;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: auto;
     font-size: 32px;
+    object-fit: contain;
+    background: white;
 }
 
 .story-action {
@@ -586,13 +711,17 @@ dd { margin: 0; font-weight: 800; }
 .event-image {
     display: grid;
     place-items: center;
+    width: 100%;
     min-height: 420px;
+    max-height: 70vh;
     border: 2px dashed #90a7b9;
     border-radius: 16px;
     background: linear-gradient(135deg, #eef8ff, #fff6e5);
     color: #597083;
     font-size: 28px;
     font-weight: 900;
+    object-fit: cover;
+    object-position: center;
 }
 
 .event-copy {
@@ -624,13 +753,15 @@ dd { margin: 0; font-weight: 800; }
     .status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .secretary-visual { min-height: 280px; }
     .market-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .secretary-list, .rule-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .story-card, .event-modal { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
     .app { padding: 12px; }
     .section-head, .quick-actions { flex-direction: column; align-items: stretch; }
-    .status-grid, .skyline, .market-list, .auth-grid, .story-grid { grid-template-columns: 1fr; }
+    .status-grid, .skyline, .market-list, .auth-grid, .story-grid, .secretary-list, .rule-grid, .secretary-card { grid-template-columns: 1fr; }
     .skyline { padding-top: 120px; }
     .story-image, .event-image { min-height: 240px; }
+    .loan-row { grid-template-columns: 1fr; }
 }

@@ -20,11 +20,15 @@
         <div class="status-grid">
             <div class="status-card">
                 <span>현금</span>
-                <strong class="money" th:text="${#numbers.formatInteger(player.cash, 0, 'COMMA')} + '원'">0원</strong>
+                <strong id="cashValue" class="money" th:text="${#numbers.formatInteger(player.cash, 0, 'COMMA')} + '원'">0원</strong>
             </div>
             <div class="status-card">
                 <span>월 순수익</span>
-                <strong class="money" th:text="${#numbers.formatInteger(player.monthlyNetIncome(), 0, 'COMMA')} + '원'">0원</strong>
+                <strong id="monthlyNetIncomeValue" class="money" th:text="${#numbers.formatInteger(player.monthlyNetIncome(), 0, 'COMMA')} + '원'">0원</strong>
+            </div>
+            <div class="status-card">
+                <span>직장</span>
+                <strong th:text="${player.employed ? '재직중' : '퇴사'}">재직중</strong>
             </div>
             <div class="status-card">
                 <span>평판</span>
@@ -37,6 +41,10 @@
             <div class="status-card date-card">
                 <span>날짜</span>
                 <strong th:text="${player.month} + '월 ' + ${player.day} + '일'">1월 1일</strong>
+                <div class="tick-progress" aria-label="다음 날 진행률">
+                    <span id="dayProgress"></span>
+                </div>
+                <small id="dayProgressText">다음 날 0%</small>
             </div>
         </div>
     </header>
@@ -44,12 +52,16 @@
     <div id="flashToast" th:if="${notice}" class="toast show" th:text="${notice}">알림</div>
 
     <nav class="city-tabs" aria-label="도시 선택">
-        <button class="active">청주</button>
-        <button>세종</button>
-        <button>대전</button>
-        <button class="locked">인천<span>잠김</span></button>
-        <button class="locked">부산<span>잠김</span></button>
-        <button class="locked">서울<span>잠김</span></button>
+        <form method="post" action="/city" th:each="city : ${cities}">
+            <input type="hidden" name="city" th:value="${city}">
+            <button type="submit"
+                    th:disabled="${cityUnlocks.get(city) != true}"
+                    th:classappend="${city == player.currentCity} ? ' active' : (${cityUnlocks.get(city) != true} ? ' locked' : '')">
+                <span th:text="${city}">도시</span>
+                <span th:if="${cityUnlocks.get(city) != true}">잠김</span>
+            </button>
+        </form>
+        <a class="info-tab" href="/info">정보</a>
     </nav>
 
     <main class="layout">
@@ -57,11 +69,12 @@
             <div class="section-head">
                 <div>
                     <h2 th:text="${player.currentCity}">청주</h2>
-                    <p>보유 건물 <span th:text="${buildings.size()}">0</span>/8 · 광고 없음 · 입주 확률 40%</p>
+                    <p>보유 건물 <span th:text="${buildings.size()}">0</span>/8 · 광고 없음 · 입주 40% · 퇴거 10% · 수리 30%</p>
                 </div>
                 <div class="quick-actions">
-                    <form method="post" action="/side-job">
-                        <button id="sideJobBtn" type="submit">부업하기 +10,000원</button>
+                    <button id="sideJobBtn" type="button">부업</button>
+                    <form method="post" action="/resign" th:if="${player.employed}">
+                        <button class="danger-button" type="submit">퇴사</button>
                     </form>
                     <button type="button">부동산 광고</button>
                 </div>
@@ -72,11 +85,11 @@
                 <div class="cloud cloud-a"></div>
                 <div class="cloud cloud-b"></div>
 
-                <button th:each="building : ${buildings}" class="building-slot owned" th:classappend="${buildingStat.index == 0} ? ' selected'" th:attr="data-building=${building.name}">
+                <button th:each="building : ${buildings}" class="building-slot owned" th:classappend="${buildingStat.index == 0} ? ' selected'" th:attr="data-building=${building.name}, data-building-id=${building.id}">
                     <span th:if="${building.repairRequested}" class="repair">수리요청</span>
                     <div class="image-placeholder building-image">AI 건물 이미지</div>
                     <strong th:text="${building.name}">건물명</strong>
-                    <span th:text="${building.occupied ? '입주중' : '공실'} + ' · 월세 ' + ${#numbers.formatInteger(building.monthlyRent, 0, 'COMMA')} + '원'">상태</span>
+                    <span th:text="${building.occupied ? (building.protectedTenant ? '후배 거주중' : '입주중') : '공실'} + ' · 월세 ' + ${#numbers.formatInteger(building.monthlyRent, 0, 'COMMA')} + '원'">상태</span>
                 </button>
 
                 <button th:each="slot : ${#numbers.sequence(1, 8 - buildings.size())}" class="building-slot empty" th:if="${buildings.size() < 8}">
@@ -92,19 +105,22 @@
                 <div class="section-head compact">
                     <div>
                         <h2>비서</h2>
-                        <p>미고용 · 숙련도 0/30</p>
+                        <p th:text="${player.firstSecretaryHired ? '고용중 · 숙련도 1/30' : '미고용 · 숙련도 0/30'}">미고용</p>
                     </div>
-                    <span class="badge">미배정</span>
+                    <span class="badge" th:text="${player.firstSecretaryHired ? '월급 300만원' : '미배정'}">미배정</span>
                 </div>
                 <div class="secretary-visual">
-                    <div class="secretary-image">AI 비서 이미지</div>
+                    <img class="secretary-image" src="/assets/secretaries/secretary-6.png" alt="테스트 비서 이미지">
                 </div>
                 <div class="secretary-info">
-                    <h3>고용 전</h3>
-                    <p>비서 시스템은 다음 단계에서 구현</p>
-                    <div class="skill-meter"><span style="width: 0"></span></div>
+                    <h3 th:text="${player.firstSecretaryHired ? '회사 후배' : '고용 전'}">고용 전</h3>
+                    <p th:text="${player.firstSecretaryHired ? '매월 15일 월급 지급. 자동수리는 다음 단계.' : '평판 1000 이상, 후배 입주 후 고용 가능'}">비서 상태</p>
+                    <div class="skill-meter"><span th:style="${player.firstSecretaryHired ? 'width: 4%' : 'width: 0'}"></span></div>
                 </div>
-                <button class="wide" type="button">비서 관리</button>
+                <form method="post" action="/secretary/first/hire" th:if="${!player.firstSecretaryHired}">
+                    <button class="wide" type="submit">회사 후배 비서 고용</button>
+                </form>
+                <button class="wide secondary" type="button" th:if="${player.firstSecretaryHired}">비서 관리</button>
             </section>
         </aside>
     </main>
@@ -112,10 +128,10 @@
     <section class="panel market-panel">
         <div class="section-head">
             <div>
-                <h2>청주 매물</h2>
-                <p>건물 종류 4종 모두 표시 · 매월 5일, 25일 가격 갱신</p>
+                <h2 th:text="${player.currentCity} + ' 매물'">매물</h2>
+                <p th:text="'건물 종류별 매물 · 5일마다 가격 갱신 · 다음 갱신 D-' + ${player.offerRefreshDday()}">매물 갱신</p>
             </div>
-            <button type="button">매물 갱신 정보</button>
+            <button type="button" th:text="'갱신 D-' + ${player.offerRefreshDday()}">갱신 D-5</button>
         </div>
         <div class="market-list">
             <article class="market-card" th:each="offer : ${offers}" th:classappend="${offer.valuationStatus.name() == 'UNDER'} ? ' low' : (${offer.valuationStatus.name() == 'OVER'} ? ' high' : ' normal')">
@@ -124,6 +140,7 @@
                 <h3 th:text="${offer.name}">매물명</h3>
                 <p th:text="'시장가 ' + ${#numbers.formatInteger(offer.marketPrice, 0, 'COMMA')} + '원'">시장가</p>
                 <strong class="money" th:text="${#numbers.formatInteger(offer.offerPrice, 0, 'COMMA')} + '원'">가격</strong>
+                <small th:text="'월세 ' + ${#numbers.formatInteger(offer.monthlyRent, 0, 'COMMA')} + '원 · 판매쿨타임 ' + ${offer.tradeCooldownDays} + '일'">월세</small>
                 <div class="buy-actions">
                     <form method="post" th:action="@{/offers/{id}/buy(id=${offer.id})}">
                         <input type="hidden" name="mode" value="cash">
@@ -142,18 +159,21 @@
     <section class="info-grid">
         <article class="panel">
             <h2>선택 건물</h2>
-            <div class="building-detail" th:if="${!buildings.isEmpty()}" th:with="building=${buildings[0]}">
+            <div class="building-detail" th:each="building : ${buildings}" th:classappend="${buildingStat.index == 0} ? ' active'" th:attr="data-building-detail-id=${building.id}">
                 <span class="badge good">보유중</span>
-                <h3 id="selectedBuilding" th:text="${building.name}">건물</h3>
+                <h3 class="selected-building-title" th:text="${building.name}">건물</h3>
                 <dl>
                     <div><dt>시장가</dt><dd th:text="${#numbers.formatInteger(building.marketPrice, 0, 'COMMA')} + '원'">0원</dd></div>
                     <div><dt>구매가</dt><dd th:text="${#numbers.formatInteger(building.purchasePrice, 0, 'COMMA')} + '원'">0원</dd></div>
                     <div><dt>월세</dt><dd th:text="${#numbers.formatInteger(building.monthlyRent, 0, 'COMMA')} + '원'">0원</dd></div>
-                    <div><dt>상태</dt><dd th:text="${building.occupied ? '입주중' : '공실'}">상태</dd></div>
+                    <div><dt>상태</dt><dd th:text="${building.occupied ? (building.protectedTenant ? '후배 거주중' : '입주중') : '공실'}">상태</dd></div>
+                    <div><dt>판매 가능</dt><dd th:text="${building.protectedTenant ? '비서 고용 전 불가' : (building.daysUntilSellable(player.elapsedDays) == 0 ? '가능' : 'D-' + building.daysUntilSellable(player.elapsedDays))}">D-0</dd></div>
                 </dl>
                 <div class="button-row">
                     <button type="button">수리 처리</button>
-                    <button class="secondary" type="button">판매</button>
+                    <form method="post" th:action="@{/buildings/{id}/sell(id=${building.id})}">
+                        <button class="secondary" type="submit" th:disabled="${!building.canSell(player.elapsedDays)}">판매</button>
+                    </form>
                 </div>
             </div>
             <p th:if="${buildings.isEmpty()}">보유 건물 없음</p>
@@ -163,21 +183,33 @@
             <h2>이번 달 일정</h2>
             <ul class="event-list">
                 <li><b>1일</b> 월세 정산</li>
+                <li th:if="${player.employed}"><b>1일</b> 재직 중 월급 300만원</li>
                 <li><b>랜덤 2회</b> 세입자 입주 시도</li>
                 <li><b>랜덤 2회</b> 세입자 퇴거 시도</li>
-                <li><b>5일, 25일</b> 매물 가격 갱신</li>
+                <li><b>5일마다</b> 매물 가격 갱신</li>
                 <li><b>15일</b> 비서 월급 지급</li>
             </ul>
         </article>
 
         <article class="panel">
-            <h2>대출</h2>
+            <h2>대출현황</h2>
             <p>상환 기간 6개월 · 총 이자 20%</p>
             <div class="loan-box">
-                <div><span>현재 대출</span><strong th:text="${#numbers.formatInteger(loanPrincipal, 0, 'COMMA')} + '원'">0원</strong></div>
+                <div><span>대출 한도</span><strong th:text="${@moneyText.format(loanLimit)}">0원</strong></div>
                 <div><span>대출 건수</span><strong th:text="${loans.size()} + '건'">0건</strong></div>
+                <div><span>대출 원금 합계</span><strong th:text="${@moneyText.format(loanPrincipal)}">0원</strong></div>
+                <div><span>총 상환액</span><strong th:text="${@moneyText.format(loanRepaymentTotal)}">0원</strong></div>
+                <div><span>월 상환 예정</span><strong th:text="${@moneyText.format(loanMonthlyPayment)}">0원</strong></div>
             </div>
-            <button class="wide" type="button">대출 상담</button>
+            <div class="loan-list" th:if="${!loans.isEmpty()}">
+                <div class="loan-row" th:each="loan : ${loans}">
+                    <strong th:text="'대출 #' + ${loan.id}">대출</strong>
+                    <span th:text="'원금 ' + ${@moneyText.format(loan.principal)}">원금</span>
+                    <span th:text="'잔여 ' + ${loan.remainingMonths} + '개월'">잔여</span>
+                    <span th:text="'월 ' + ${@moneyText.format(loan.monthlyPayment)}">월상환</span>
+                </div>
+            </div>
+            <p th:if="${loans.isEmpty()}">현재 대출 없음</p>
         </article>
     </section>
 
@@ -189,7 +221,8 @@
 
     <div th:if="${activeEvent != null}" class="event-modal-backdrop">
         <section class="event-modal">
-            <div class="event-image" th:text="${activeEvent.imageLabel}">AI 이벤트 이미지</div>
+            <img th:if="${#strings.startsWith(activeEvent.imageLabel, '/')}" class="event-image" th:src="${activeEvent.imageLabel}" alt="이벤트 이미지">
+            <div th:unless="${#strings.startsWith(activeEvent.imageLabel, '/')}" class="event-image" th:text="${activeEvent.imageLabel}">AI 이벤트 이미지</div>
             <div class="event-copy">
                 <span class="badge good">이벤트</span>
                 <h2 th:text="${activeEvent.title}">이벤트 제목</h2>

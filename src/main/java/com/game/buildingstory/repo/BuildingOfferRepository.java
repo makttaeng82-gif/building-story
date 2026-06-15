@@ -10,4 +10,6 @@ public interface BuildingOfferRepository extends JpaRepository<BuildingOffer, Lo
     List<BuildingOffer> findByPlayerAndCityOrderById(Player player, String city);
 
     boolean existsByPlayerAndCity(Player player, String city);
+
+    void deleteByPlayerAndCity(Player player, String city);
 }

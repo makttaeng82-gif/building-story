@@ -16,8 +16,8 @@ public class GameEventCatalog {
                     1,
                     3,
                     "오래된 후배의 연락",
-                    "회사 후배였던 사람이 찾아왔다. 친구가 원룸을 구한다며 소개시켜주러 왔다고 한다. 훗날 비서로도 함께할 수 있는 인연의 시작이다.",
-                    "AI 이벤트 이미지",
+                    "회사 후배였던 사람이 찾아왔다. 지낼 곳을 찾고 있다며 원룸에 직접 입주하고 싶다고 한다. 훗날 비서로도 함께할 수 있는 인연의 시작이다.",
+                    "/assets/events/first-tenant.png",
                     EFFECT_FIRST_TENANT_MOVE_IN
             )
     );

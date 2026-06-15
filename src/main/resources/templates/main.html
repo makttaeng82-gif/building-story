@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>건물주이야기</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body th:classappend="${activeEvent != null} ? ' game-paused'">
+<div class="app">
+    <header class="topbar">
+        <div class="brand">
+            <span class="logo">B</span>
+            <div>
+                <h1>건물주이야기</h1>
+                <p th:text="${player.username} + '님의 도시 경영'">도시 경영</p>
+            </div>
+        </div>
+
+        <div class="status-grid">
+            <div class="status-card">
+                <span>현금</span>
+                <strong class="money" th:text="${#numbers.formatInteger(player.cash, 0, 'COMMA')} + '원'">0원</strong>
+            </div>
+            <div class="status-card">
+                <span>월 순수익</span>
+                <strong class="money" th:text="${#numbers.formatInteger(player.monthlyNetIncome(), 0, 'COMMA')} + '원'">0원</strong>
+            </div>
+            <div class="status-card">
+                <span>평판</span>
+                <strong th:text="${player.reputation}">0</strong>
+            </div>
+            <div class="status-card">
+                <span>칭호</span>
+                <strong th:text="${player.title}">칭호</strong>
+            </div>
+            <div class="status-card date-card">
+                <span>날짜</span>
+                <strong th:text="${player.month} + '월 ' + ${player.day} + '일'">1월 1일</strong>
+            </div>
+        </div>
+    </header>
+
+    <div id="flashToast" th:if="${notice}" class="toast show" th:text="${notice}">알림</div>
+
+    <nav class="city-tabs" aria-label="도시 선택">
+        <button class="active">청주</button>
+        <button>세종</button>
+        <button>대전</button>
+        <button class="locked">인천<span>잠김</span></button>
+        <button class="locked">부산<span>잠김</span></button>
+        <button class="locked">서울<span>잠김</span></button>
+    </nav>
+
+    <main class="layout">
+        <section class="city-panel">
+            <div class="section-head">
+                <div>
+                    <h2 th:text="${player.currentCity}">청주</h2>
+                    <p>보유 건물 <span th:text="${buildings.size()}">0</span>/8 · 광고 없음 · 입주 확률 40%</p>
+                </div>
+                <div class="quick-actions">
+                    <form method="post" action="/side-job">
+                        <button id="sideJobBtn" type="submit">부업하기 +10,000원</button>
+                    </form>
+                    <button type="button">부동산 광고</button>
+                </div>
+            </div>
+
+            <div class="skyline">
+                <div class="sun"></div>
+                <div class="cloud cloud-a"></div>
+                <div class="cloud cloud-b"></div>
+
+                <button th:each="building : ${buildings}" class="building-slot owned" th:classappend="${buildingStat.index == 0} ? ' selected'" th:attr="data-building=${building.name}">
+                    <span th:if="${building.repairRequested}" class="repair">수리요청</span>
+                    <div class="image-placeholder building-image">AI 건물 이미지</div>
+                    <strong th:text="${building.name}">건물명</strong>
+                    <span th:text="${building.occupied ? '입주중' : '공실'} + ' · 월세 ' + ${#numbers.formatInteger(building.monthlyRent, 0, 'COMMA')} + '원'">상태</span>
+                </button>
+
+                <button th:each="slot : ${#numbers.sequence(1, 8 - buildings.size())}" class="building-slot empty" th:if="${buildings.size() < 8}">
+                    <div class="empty-plus">+</div>
+                    <strong>빈 부지</strong>
+                    <span>매물 구매 가능</span>
+                </button>
+            </div>
+        </section>
+
+        <aside class="secretary-panel">
+            <section class="panel secretary-focus">
+                <div class="section-head compact">
+                    <div>
+                        <h2>비서</h2>
+                        <p>미고용 · 숙련도 0/30</p>
+                    </div>
+                    <span class="badge">미배정</span>
+                </div>
+                <div class="secretary-visual">
+                    <div class="secretary-image">AI 비서 이미지</div>
+                </div>
+                <div class="secretary-info">
+                    <h3>고용 전</h3>
+                    <p>비서 시스템은 다음 단계에서 구현</p>
+                    <div class="skill-meter"><span style="width: 0"></span></div>
+                </div>
+                <button class="wide" type="button">비서 관리</button>
+            </section>
+        </aside>
+    </main>
+
+    <section class="panel market-panel">
+        <div class="section-head">
+            <div>
+                <h2>청주 매물</h2>
+                <p>건물 종류 4종 모두 표시 · 매월 5일, 25일 가격 갱신</p>
+            </div>
+            <button type="button">매물 갱신 정보</button>
+        </div>
+        <div class="market-list">
+            <article class="market-card" th:each="offer : ${offers}" th:classappend="${offer.valuationStatus.name() == 'UNDER'} ? ' low' : (${offer.valuationStatus.name() == 'OVER'} ? ' high' : ' normal')">
+                <div class="image-placeholder market-image">AI 건물 이미지</div>
+                <span class="badge" th:classappend="${offer.valuationStatus.name() == 'UNDER'} ? ' good' : (${offer.valuationStatus.name() == 'OVER'} ? ' danger' : '')" th:text="${offer.valuationStatus.label()} + ' ' + ${offer.valuationStatus.rate()} + '%'">상태</span>
+                <h3 th:text="${offer.name}">매물명</h3>
+                <p th:text="'시장가 ' + ${#numbers.formatInteger(offer.marketPrice, 0, 'COMMA')} + '원'">시장가</p>
+                <strong class="money" th:text="${#numbers.formatInteger(offer.offerPrice, 0, 'COMMA')} + '원'">가격</strong>
+                <div class="buy-actions">
+                    <form method="post" th:action="@{/offers/{id}/buy(id=${offer.id})}">
+                        <input type="hidden" name="mode" value="cash">
+                        <button type="submit" th:disabled="${player.cash < offer.offerPrice}" th:text="${player.cash < offer.offerPrice ? '현금부족' : '현금구매'}">현금구매</button>
+                    </form>
+                    <form method="post" th:action="@{/offers/{id}/buy(id=${offer.id})}">
+                        <input type="hidden" name="mode" value="loan">
+                        <button class="secondary" type="submit" th:disabled="${player.cash < offer.cashForLoanPurchase()}" th:text="${player.cash < offer.cashForLoanPurchase() ? '현금부족' : '대출구매'}">대출구매</button>
+                    </form>
+                </div>
+                <small th:text="'대출구매: 대출 ' + ${#numbers.formatInteger(offer.loanAmount(), 0, 'COMMA')} + '원 · 현금 ' + ${#numbers.formatInteger(offer.cashForLoanPurchase(), 0, 'COMMA')} + '원'">대출구매</small>
+            </article>
+        </div>
+    </section>
+
+    <section class="info-grid">
+        <article class="panel">
+            <h2>선택 건물</h2>
+            <div class="building-detail" th:if="${!buildings.isEmpty()}" th:with="building=${buildings[0]}">
+                <span class="badge good">보유중</span>
+                <h3 id="selectedBuilding" th:text="${building.name}">건물</h3>
+                <dl>
+                    <div><dt>시장가</dt><dd th:text="${#numbers.formatInteger(building.marketPrice, 0, 'COMMA')} + '원'">0원</dd></div>
+                    <div><dt>구매가</dt><dd th:text="${#numbers.formatInteger(building.purchasePrice, 0, 'COMMA')} + '원'">0원</dd></div>
+                    <div><dt>월세</dt><dd th:text="${#numbers.formatInteger(building.monthlyRent, 0, 'COMMA')} + '원'">0원</dd></div>
+                    <div><dt>상태</dt><dd th:text="${building.occupied ? '입주중' : '공실'}">상태</dd></div>
+                </dl>
+                <div class="button-row">
+                    <button type="button">수리 처리</button>
+                    <button class="secondary" type="button">판매</button>
+                </div>
+            </div>
+            <p th:if="${buildings.isEmpty()}">보유 건물 없음</p>
+        </article>
+
+        <article class="panel">
+            <h2>이번 달 일정</h2>
+            <ul class="event-list">
+                <li><b>1일</b> 월세 정산</li>
+                <li><b>랜덤 2회</b> 세입자 입주 시도</li>
+                <li><b>랜덤 2회</b> 세입자 퇴거 시도</li>
+                <li><b>5일, 25일</b> 매물 가격 갱신</li>
+                <li><b>15일</b> 비서 월급 지급</li>
+            </ul>
+        </article>
+
+        <article class="panel">
+            <h2>대출</h2>
+            <p>상환 기간 6개월 · 총 이자 20%</p>
+            <div class="loan-box">
+                <div><span>현재 대출</span><strong th:text="${#numbers.formatInteger(loanPrincipal, 0, 'COMMA')} + '원'">0원</strong></div>
+                <div><span>대출 건수</span><strong th:text="${loans.size()} + '건'">0건</strong></div>
+            </div>
+            <button class="wide" type="button">대출 상담</button>
+        </article>
+    </section>
+
+    <form class="logout-form" method="post" action="/logout">
+        <button class="secondary" type="submit">로그아웃</button>
+    </form>
+
+    <div class="toast" id="toast"></div>
+
+    <div th:if="${activeEvent != null}" class="event-modal-backdrop">
+        <section class="event-modal">
+            <div class="event-image" th:text="${activeEvent.imageLabel}">AI 이벤트 이미지</div>
+            <div class="event-copy">
+                <span class="badge good">이벤트</span>
+                <h2 th:text="${activeEvent.title}">이벤트 제목</h2>
+                <p th:text="${activeEvent.body}">이벤트 내용</p>
+                <form method="post" th:action="@{/events/{id}/complete(id=${activeEvent.id})}">
+                    <button type="submit">계속 진행하기</button>
+                </form>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

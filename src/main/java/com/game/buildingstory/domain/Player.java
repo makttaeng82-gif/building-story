@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.util.List;
+
 @Entity
 @Table(name = "players")
 public class Player {
@@ -42,6 +44,17 @@ public class Player {
     private long monthlyAdCost;
     private long monthlySecretarySalary;
     private long monthlyLoanPayment;
+    private Integer eventScheduleMonth;
+    private Integer eventScheduleCycle;
+    private Integer moveInEventDayOne;
+    private Integer moveInEventDayTwo;
+    private Integer moveOutEventDayOne;
+    private Integer moveOutEventDayTwo;
+    private Integer repairEventDay;
+    private Integer moveInChancePercent = 40;
+    private Integer moveOutChancePercent = 20;
+    private Integer repairRequestChancePercent = 30;
+    private String dismissedSecretaryOfferKeys = "";
 
     protected Player() {
     }
@@ -93,7 +106,7 @@ public class Player {
     public void advanceDay() {
         day++;
         elapsedDays = getElapsedDays() + 1;
-        if (day > 31) {
+        if (day > daysInMonth(month)) {
             day = 1;
             month++;
             if (month > 12) {
@@ -120,6 +133,10 @@ public class Player {
 
     public void resume() {
         this.paused = false;
+    }
+
+    public void togglePause() {
+        this.paused = !isPaused();
     }
 
     public String getCurrentCity() {
@@ -153,6 +170,10 @@ public class Player {
         }
     }
 
+    public void leaveJob() {
+        employed = false;
+    }
+
     public boolean isFirstSecretaryHired() {
         return Boolean.TRUE.equals(firstSecretaryHired);
     }
@@ -174,7 +195,12 @@ public class Player {
     }
 
     public int offerRefreshDday() {
-        return Math.max(0, nextOfferRefreshDay - elapsedDays);
+        return Math.max(0, getNextOfferRefreshDay() - getElapsedDays());
+    }
+
+    public int offerRefreshProgressPercent() {
+        int daysLeft = Math.min(5, offerRefreshDday());
+        return Math.max(0, Math.min(100, (5 - daysLeft) * 100 / 5));
     }
 
     public int getMonth() {
@@ -183,6 +209,10 @@ public class Player {
 
     public int getDay() {
         return day;
+    }
+
+    public int getDaysInCurrentMonth() {
+        return daysInMonth(month);
     }
 
     public long getMonthlyRentIncome() {
@@ -213,7 +243,11 @@ public class Player {
     }
 
     public void addReputation(int amount) {
-        reputation += amount;
+        reputation = Math.max(0, reputation + amount);
+    }
+
+    public void setReputationForTest(int reputation) {
+        this.reputation = Math.max(0, reputation);
     }
 
     public void addSecretarySalaryCost(long amount) {
@@ -235,5 +269,118 @@ public class Player {
 
     public long monthlyNetIncome() {
         return monthlyRentIncome + monthlySideIncome + getMonthlySalaryIncome() - monthlyAdCost - monthlySecretarySalary - monthlyLoanPayment;
+    }
+
+    public int getMoveInChancePercent() {
+        return moveInChancePercent == null ? 40 : moveInChancePercent;
+    }
+
+    public int getMoveOutChancePercent() {
+        return moveOutChancePercent == null ? 20 : moveOutChancePercent;
+    }
+
+    public int getRepairRequestChancePercent() {
+        return repairRequestChancePercent == null ? 30 : repairRequestChancePercent;
+    }
+
+    public void updateTestChances(int moveInChancePercent, int moveOutChancePercent, int repairRequestChancePercent) {
+        this.moveInChancePercent = clampPercent(moveInChancePercent);
+        this.moveOutChancePercent = clampPercent(moveOutChancePercent);
+        this.repairRequestChancePercent = clampPercent(repairRequestChancePercent);
+    }
+
+    public boolean canResign() {
+        return getElapsedDays() > 30;
+    }
+
+    public int daysUntilResignAvailable() {
+        return Math.max(0, 31 - getElapsedDays());
+    }
+
+    public String dateTextAfterDays(int days) {
+        int targetMonth = month;
+        int targetDay = day + Math.max(0, days);
+        while (targetDay > daysInMonth(targetMonth)) {
+            targetDay -= daysInMonth(targetMonth);
+            targetMonth++;
+            if (targetMonth > 12) {
+                targetMonth = 1;
+            }
+        }
+        return targetMonth + "월 " + targetDay + "일";
+    }
+
+    public String ddayText(int days) {
+        int safeDays = Math.max(0, days);
+        if (safeDays == 0) {
+            return "오늘";
+        }
+        return dateTextAfterDays(safeDays) + " · D-" + safeDays;
+    }
+
+    public boolean isSecretaryOfferDismissed(String key) {
+        return dismissedSecretaryOfferKeys != null && List.of(dismissedSecretaryOfferKeys.split(",")).contains(key);
+    }
+
+    public void dismissSecretaryOffer(String key) {
+        if (key == null || key.isBlank() || isSecretaryOfferDismissed(key)) {
+            return;
+        }
+        dismissedSecretaryOfferKeys = dismissedSecretaryOfferKeys == null || dismissedSecretaryOfferKeys.isBlank()
+                ? key
+                : dismissedSecretaryOfferKeys + "," + key;
+    }
+
+    public boolean hasEventScheduleForCurrentMonth() {
+        return eventScheduleMonth != null && eventScheduleMonth == month
+                && eventScheduleCycle != null && eventScheduleCycle == currentScheduleCycle()
+                && moveInEventDayOne != null
+                && moveInEventDayTwo != null
+                && moveOutEventDayOne != null
+                && moveOutEventDayTwo != null
+                && repairEventDay != null;
+    }
+
+    public void scheduleMonthlyRandomEvents(int moveInEventDayOne, int moveInEventDayTwo, int moveOutEventDayOne, int moveOutEventDayTwo, int repairEventDay) {
+        this.eventScheduleMonth = month;
+        this.eventScheduleCycle = currentScheduleCycle();
+        this.moveInEventDayOne = moveInEventDayOne;
+        this.moveInEventDayTwo = moveInEventDayTwo;
+        this.moveOutEventDayOne = moveOutEventDayOne;
+        this.moveOutEventDayTwo = moveOutEventDayTwo;
+        this.repairEventDay = repairEventDay;
+    }
+
+    public boolean isMoveInEventDay() {
+        return day == valueOrImpossible(moveInEventDayOne) || day == valueOrImpossible(moveInEventDayTwo);
+    }
+
+    public boolean isMoveOutEventDay() {
+        return day == valueOrImpossible(moveOutEventDayOne) || day == valueOrImpossible(moveOutEventDayTwo);
+    }
+
+    public boolean isRepairEventDay() {
+        return day == valueOrImpossible(repairEventDay);
+    }
+
+    private int valueOrImpossible(Integer value) {
+        return value == null ? -1 : value;
+    }
+
+    private int currentScheduleCycle() {
+        int completedYears = Math.max(0, getElapsedDays() - getDay()) / 365;
+        return completedYears * 12 + month;
+    }
+
+    private int clampPercent(int value) {
+        return Math.max(0, Math.min(100, value));
+    }
+
+    private int daysInMonth(int month) {
+        return switch (month) {
+            case 2 -> 28;
+            case 4, 6, 9, 11 -> 30;
+            default -> 31;
+        };
     }
 }

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="market" class="panel market-panel">
+    <div class="section-head">
+        <div>
+            <h2 th:text="${player.currentCity} + ' 매물'">매물</h2>
+            <p th:text="'건물 종류별 매물 · 5일마다 가격 갱신 · 다음 갱신 ' + ${player.ddayText(player.offerRefreshDday())}">매물 갱신</p>
+        </div>
+        <div class="refresh-progress-card" aria-label="매물 갱신 진행률">
+            <span>매물 갱신</span>
+            <strong th:text="${player.ddayText(player.offerRefreshDday())}">D-5</strong>
+            <div class="refresh-progress">
+                <span th:style="'width: ' + ${player.offerRefreshProgressPercent()} + '%'"></span>
+            </div>
+            <small th:text="${player.offerRefreshProgressPercent()} + '%'">0%</small>
+        </div>
+    </div>
+    <div class="market-list">
+        <article class="market-card" th:each="offer : ${offers}"
+                 th:with="offerUnlocked=${@gameService.isOfferUnlocked(player, offer)}, purchaseCooldown=${@gameService.purchaseCooldownDaysLeft(player, offer)}, purchaseWaiting=${purchaseCooldown > 0}"
+                 th:classappend="${!offerUnlocked} ? ' locked-offer' : (${purchaseWaiting} ? ' waiting-offer' : (${offer.valuationStatus.name() == 'UNDER'} ? ' low' : (${offer.valuationStatus.name() == 'OVER'} ? ' high' : ' normal')))">
+            <img class="market-image" th:src="${@gameService.buildingImagePath(offer)}" th:alt="${offer.name} + ' 이미지'">
+            <span class="badge" th:classappend="${offer.valuationStatus.name() == 'UNDER'} ? ' good' : (${offer.valuationStatus.name() == 'OVER'} ? ' danger' : '')" th:text="${offer.valuationStatus.label()} + ' ' + ${offer.valuationStatus.rate()} + '%'">상태</span>
+            <h3 th:text="${offer.name}">매물명</h3>
+            <p th:text="'시장가 ' + ${@moneyText.format(offer.marketPrice)}">시장가</p>
+            <strong class="money" th:text="${@moneyText.format(offer.offerPrice)}">가격</strong>
+            <small th:text="'월세 ' + ${@moneyText.format(offer.monthlyRent)} + ' · 판매쿨타임 ' + ${offer.tradeCooldownDays} + '일'">월세</small>
+            <small th:if="${!offerUnlocked}">해금 전 · 구매 불가</small>
+            <small th:if="${purchaseCooldown > 0}" th:text="'구매쿨타임 ' + ${player.ddayText(purchaseCooldown)}">구매쿨타임</small>
+            <div class="market-lock-overlay" th:if="${!offerUnlocked}">
+                <span class="lock-icon" aria-hidden="true"></span>
+                <strong>해금 필요</strong>
+            </div>
+            <div class="market-lock-overlay waiting" th:if="${offerUnlocked && purchaseWaiting}">
+                <span class="lock-icon" aria-hidden="true"></span>
+                <strong>다음 거래</strong>
+                <span th:text="${player.ddayText(purchaseCooldown)}">대기시간</span>
+            </div>
+            <div class="buy-actions">
+                <form method="post" th:action="@{/offers/{id}/buy(id=${offer.id})}">
+                    <input type="hidden" name="mode" value="cash">
+                    <button type="submit" th:disabled="${player.paused || !offerUnlocked || purchaseWaiting || player.cash < offer.offerPrice}" th:text="${player.paused ? '일시정지' : (!offerUnlocked ? '해금 전' : (purchaseWaiting ? '쿨타임' : (player.cash < offer.offerPrice ? '현금부족' : '현금구매')))}">현금구매</button>
+                </form>
+                <form method="post" th:action="@{/offers/{id}/buy(id=${offer.id})}">
+                    <input type="hidden" name="mode" value="loan">
+                    <button class="secondary" type="submit" th:disabled="${player.paused || !offerUnlocked || purchaseWaiting || player.cash < offer.cashForLoanPurchase() || availableLoanLimit < offer.loanAmount()}" th:text="${player.paused ? '일시정지' : (!offerUnlocked ? '해금 전' : (purchaseWaiting ? '쿨타임' : (player.cash < offer.cashForLoanPurchase() ? '현금부족' : (availableLoanLimit < offer.loanAmount() ? '한도초과' : '대출구매'))))}">대출구매</button>
+                </form>
+            </div>
+            <small th:text="'대출구매: 대출 ' + ${@moneyText.format(offer.loanAmount())} + ' · 현금 ' + ${@moneyText.format(offer.cashForLoanPurchase())}">대출구매</small>
+        </article>
+    </div>
+</section>
+</body>
+</html>

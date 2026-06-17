@@ -36,6 +36,10 @@ public class Loan {
         return principal;
     }
 
+    public Player getPlayer() {
+        return player;
+    }
+
     public Long getId() {
         return id;
     }
@@ -50,5 +54,23 @@ public class Loan {
 
     public long getMonthlyPayment() {
         return monthlyPayment;
+    }
+
+    public long remainingRepayment() {
+        return monthlyPayment * remainingMonths;
+    }
+
+    public void advanceMonth() {
+        if (remainingMonths > 0) {
+            remainingMonths--;
+        }
+    }
+
+    public boolean isMatured() {
+        return remainingMonths <= 0;
+    }
+
+    public void extendGracePeriod() {
+        this.remainingMonths = 6;
     }
 }

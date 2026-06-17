@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<article th:fragment="testPanel" class="panel test-panel">
+    <h2>테스트</h2>
+    <form method="post" action="/test/cash">
+        <button type="submit">현금 3천만원 증가</button>
+    </form>
+    <form method="post" action="/test/chances" class="test-controls">
+        <label>
+            입주확률
+            <input type="number" name="moveInChance" min="0" max="100" th:value="${player.moveInChancePercent}">
+        </label>
+        <label>
+            퇴거확률
+            <input type="number" name="moveOutChance" min="0" max="100" th:value="${player.moveOutChancePercent}">
+        </label>
+        <label>
+            수리확률
+            <input type="number" name="repairChance" min="0" max="100" th:value="${player.repairRequestChancePercent}">
+        </label>
+        <button class="secondary" type="submit">확률 적용</button>
+    </form>
+    <form method="post" action="/test/reputation" class="test-controls">
+        <label>
+            평판
+            <input type="number" name="reputation" min="0" th:value="${player.reputation}">
+        </label>
+        <button class="secondary" type="submit">평판 적용</button>
+    </form>
+    <form method="post" action="/test/secretary-proficiency" class="test-controls">
+        <label>
+            비서
+            <select name="secretaryKey">
+                <option th:each="secretary : ${secretarySpecs}" th:value="${secretary.key()}" th:text="${secretary.name()} + ' - ' + ${secretary.origin()}">비서</option>
+            </select>
+        </label>
+        <label>
+            숙련도
+            <input type="number" name="proficiency" min="1" max="30" value="1">
+        </label>
+        <button class="secondary" type="submit">숙련도 적용</button>
+    </form>
+    <div class="test-divider"></div>
+    <h3>비서 이벤트 QA</h3>
+    <form method="post" action="/test/secretary-event/conditions" class="test-controls">
+        <label>
+            비서
+            <select name="secretaryKey">
+                <option th:each="secretary : ${secretarySpecs}" th:value="${secretary.key()}" th:text="${secretary.name()} + ' - ' + ${secretary.origin()}">비서</option>
+            </select>
+        </label>
+        <button class="secondary" type="submit">조건 맞추기</button>
+    </form>
+    <form method="post" action="/test/secretary-event/building" class="test-controls">
+        <label>
+            비서
+            <select name="secretaryKey">
+                <option th:each="secretary : ${secretarySpecs}" th:value="${secretary.key()}" th:text="${secretary.name()} + ' - ' + ${secretary.origin()}">비서</option>
+            </select>
+        </label>
+        <button class="secondary" type="submit">입주 세팅</button>
+    </form>
+    <form method="post" action="/test/secretary-event/stage" class="test-controls">
+        <label>
+            비서
+            <select name="secretaryKey">
+                <option th:each="secretary : ${secretarySpecs}" th:value="${secretary.key()}" th:text="${secretary.name()} + ' - ' + ${secretary.origin()}">비서</option>
+            </select>
+        </label>
+        <label>
+            단계
+            <select name="stage">
+                <option value="TENANT">입주</option>
+                <option value="REQUEST">부탁 모달</option>
+                <option value="ACCEPTED">부탁 수락 후</option>
+                <option value="HIRE">고용 모달</option>
+                <option value="COMPLETED">완료</option>
+            </select>
+        </label>
+        <button class="secondary" type="submit">단계 이동</button>
+    </form>
+    <ul class="event-list" th:if="${!secretaryTenantEvents.isEmpty()}">
+        <li th:each="event : ${secretaryTenantEvents}">
+            <b th:text="${@gameService.secretarySpec(event.secretaryKey).name()}">비서</b>
+            <span th:text="${event.city} + ' · ' + ${event.status}">상태</span>
+            <small th:text="${event.building.name}">건물</small>
+        </li>
+    </ul>
+    <p th:if="${secretaryTenantEvents.isEmpty()}">진행 중인 비서 이벤트 없음</p>
+</article>
+</body>
+</html>

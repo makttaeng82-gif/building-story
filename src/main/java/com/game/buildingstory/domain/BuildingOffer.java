@@ -91,7 +91,7 @@ public class BuildingOffer {
     }
 
     public long loanAmount() {
-        return offerPrice * 30 / 100;
+        return offerPrice * 60 / 100;
     }
 
     public long cashForLoanPurchase() {

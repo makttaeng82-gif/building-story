@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="cityPanel" class="city-panel">
+    <div class="section-head">
+        <div>
+            <h2 th:text="${player.currentCity}">청주</h2>
+            <p>
+                보유 건물 <span th:text="${buildings.size()}">0</span>/8 · 광고 없음 ·
+                입주 <span th:text="${@gameService.effectiveMoveInChancePercentText(player, player.currentCity)}">40%</span> ·
+                퇴거 <span th:text="${@gameService.effectiveMoveOutChancePercentText(player, player.currentCity)}">10%</span> ·
+                수리 <span th:text="${@gameService.effectiveRepairRequestChancePercentText(player, player.currentCity)}">30%</span>
+            </p>
+        </div>
+        <div class="quick-actions">
+            <button id="sideJobBtn" type="button" th:disabled="${player.paused}" th:text="${player.paused ? '일시정지' : '부업'}">부업</button>
+            <form method="post" action="/resign" th:if="${player.employed}">
+                <button class="danger-button" type="submit" th:disabled="${player.paused || !player.canResign()}" th:text="${player.paused ? '일시정지' : (player.canResign() ? '퇴사' : '퇴사 ' + player.ddayText(player.daysUntilResignAvailable()))}">퇴사</button>
+            </form>
+            <button type="button">부동산 광고</button>
+        </div>
+    </div>
+
+    <div class="skyline" th:classappend="' city-bg-' + ${@gameService.cityBackgroundClass(player.currentCity)}">
+        <div class="sun"></div>
+        <div class="cloud cloud-a"></div>
+        <div class="cloud cloud-b"></div>
+
+        <article th:each="building : ${buildings}" class="building-slot owned" th:classappend="${buildingStat.index == 0} ? ' selected'" th:attr="data-building=${building.name}, data-building-id=${building.id}">
+            <span th:if="${building.secretaryResident}" class="sale-lock-badge">판매불가</span>
+            <span th:if="${building.tenantProtectedDaysLeft(player.elapsedDays) > 0}" class="protection" th:text="'보호 D-' + ${building.tenantProtectedDaysLeft(player.elapsedDays)}">보호</span>
+            <form th:if="${building.repairRequested}" method="post" th:action="@{/buildings/{id}/repair(id=${building.id})}">
+                <button class="repair" type="submit" th:disabled="${player.paused || player.cash < building.repairCost()}" th:text="${player.paused ? '일시정지' : (player.cash < building.repairCost() ? '수리비 부족' : '수리요청')}">수리요청</button>
+            </form>
+            <img class="building-image" th:src="${@gameService.buildingImagePath(building)}" th:alt="${building.name} + ' 이미지'">
+            <strong th:text="${building.name} + ' #' + ${buildingStat.count}">건물명</strong>
+            <span th:text="${(@gameService.secretaryTenantStatusText(building).isBlank() ? (building.occupied ? (building.protectedTenant ? '후배 거주중' : '입주중') : '공실') : @gameService.secretaryTenantStatusText(building)) + ' · ' + (@gameService.rentWaivedBySecretaryEvent(player, building) ? '월세 감면' : '월세 ' + @moneyText.format(@gameService.effectiveMonthlyRent(player, building)))}">상태</span>
+        </article>
+
+        <button th:each="slot : ${#numbers.sequence(1, 8 - buildings.size())}" class="building-slot empty" th:if="${buildings.size() < 8}">
+            <div class="empty-plus">+</div>
+            <strong>빈 부지</strong>
+            <span>매물 구매 가능</span>
+        </button>
+    </div>
+</section>
+</body>
+</html>

@@ -34,6 +34,8 @@ public class GameEvent {
     @Column(nullable = false)
     private String effectKey;
 
+    private String actionLabel;
+
     @Enumerated(EnumType.STRING)
     private GameEventStatus status;
 
@@ -47,6 +49,18 @@ public class GameEvent {
         this.body = definition.body();
         this.imageLabel = definition.imageLabel();
         this.effectKey = definition.effectKey();
+        this.actionLabel = "계속 진행하기";
+        this.status = GameEventStatus.ACTIVE;
+    }
+
+    public GameEvent(Player player, String eventKey, String title, String body, String imageLabel, String effectKey, String actionLabel) {
+        this.player = player;
+        this.eventKey = eventKey;
+        this.title = title;
+        this.body = body;
+        this.imageLabel = imageLabel;
+        this.effectKey = effectKey;
+        this.actionLabel = actionLabel;
         this.status = GameEventStatus.ACTIVE;
     }
 
@@ -76,6 +90,10 @@ public class GameEvent {
 
     public String getEffectKey() {
         return effectKey;
+    }
+
+    public String getActionLabel() {
+        return actionLabel == null || actionLabel.isBlank() ? "계속 진행하기" : actionLabel;
     }
 
     public GameEventStatus getStatus() {

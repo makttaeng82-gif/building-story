@@ -3,6 +3,8 @@ HELP.md
 build/
 data/
 bootrun*.log
+server-8080*.log
+handoff-summary.txt
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/

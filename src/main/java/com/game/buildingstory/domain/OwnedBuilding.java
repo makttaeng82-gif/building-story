@@ -19,6 +19,7 @@ public class OwnedBuilding {
     private String city;
     private String typeName;
     private String name;
+    private Integer buildingSlot;
     private long marketPrice;
     private long purchasePrice;
     private long monthlyRent;
@@ -26,7 +27,10 @@ public class OwnedBuilding {
     private Integer tradeCooldownDays;
     private boolean occupied;
     private boolean repairRequested;
+    private Integer repairNeglectedMonths;
     private Boolean protectedTenant;
+    private String residentSecretaryKey;
+    private Integer tenantMoveInDayCount;
 
     protected OwnedBuilding() {
     }
@@ -36,6 +40,7 @@ public class OwnedBuilding {
         this.city = offer.getCity();
         this.typeName = offer.getTypeName();
         this.name = offer.getName();
+        this.buildingSlot = offer.getBuildingSlot();
         this.marketPrice = offer.getMarketPrice();
         this.purchasePrice = offer.getOfferPrice();
         this.monthlyRent = offer.getMonthlyRent();
@@ -43,12 +48,18 @@ public class OwnedBuilding {
         this.tradeCooldownDays = offer.getTradeCooldownDays();
         this.occupied = false;
         this.repairRequested = false;
+        this.repairNeglectedMonths = 0;
         this.protectedTenant = false;
     }
 
     public OwnedBuilding(Player player, String city, String typeName, String name, long marketPrice, long purchasePrice, long monthlyRent, int tradeCooldownDays) {
+        this(player, city, null, typeName, name, marketPrice, purchasePrice, monthlyRent, tradeCooldownDays);
+    }
+
+    public OwnedBuilding(Player player, String city, Integer buildingSlot, String typeName, String name, long marketPrice, long purchasePrice, long monthlyRent, int tradeCooldownDays) {
         this.player = player;
         this.city = city;
+        this.buildingSlot = buildingSlot;
         this.typeName = typeName;
         this.name = name;
         this.marketPrice = marketPrice;
@@ -58,6 +69,7 @@ public class OwnedBuilding {
         this.tradeCooldownDays = tradeCooldownDays;
         this.occupied = false;
         this.repairRequested = false;
+        this.repairNeglectedMonths = 0;
         this.protectedTenant = false;
     }
 
@@ -81,6 +93,10 @@ public class OwnedBuilding {
         return name;
     }
 
+    public Integer getBuildingSlot() {
+        return buildingSlot;
+    }
+
     public long getMarketPrice() {
         return marketPrice;
     }
@@ -95,6 +111,10 @@ public class OwnedBuilding {
 
     public int getTradeCooldownDays() {
         return tradeCooldownDays == null ? 15 : tradeCooldownDays;
+    }
+
+    public int getPurchaseDayCountForCalculation(int currentDayCount) {
+        return purchaseDayCount == null ? currentDayCount : purchaseDayCount;
     }
 
     public int daysUntilSellable(int currentDayCount) {
@@ -118,8 +138,71 @@ public class OwnedBuilding {
         return repairRequested;
     }
 
+    public int getRepairNeglectedMonths() {
+        return repairNeglectedMonths == null ? 0 : repairNeglectedMonths;
+    }
+
+    public long repairCost() {
+        return marketPrice / 1000;
+    }
+
+    public void requestRepair() {
+        if (!repairRequested) {
+            this.repairRequested = true;
+            this.repairNeglectedMonths = 0;
+        }
+    }
+
+    public boolean repair() {
+        if (!repairRequested) {
+            return false;
+        }
+        boolean repairedWithinOneMonth = getRepairNeglectedMonths() == 0;
+        this.repairRequested = false;
+        this.repairNeglectedMonths = 0;
+        return repairedWithinOneMonth;
+    }
+
+    public void clearRepairRequest() {
+        this.repairRequested = false;
+        this.repairNeglectedMonths = 0;
+    }
+
+    public void advanceRepairNeglectMonth() {
+        if (repairRequested) {
+            this.repairNeglectedMonths = getRepairNeglectedMonths() + 1;
+        }
+    }
+
     public void moveIn() {
         this.occupied = true;
+    }
+
+    public void moveIn(int currentDayCount) {
+        this.occupied = true;
+        this.tenantMoveInDayCount = currentDayCount;
+    }
+
+    public boolean canTenantMoveOut(int currentDayCount) {
+        if (!occupied || isProtectedTenant()) {
+            return false;
+        }
+        if (tenantMoveInDayCount == null) {
+            return true;
+        }
+        int moveInDay = tenantMoveInDayCount;
+        return currentDayCount - moveInDay >= 60;
+    }
+
+    public int tenantProtectedDaysLeft(int currentDayCount) {
+        if (!occupied || isProtectedTenant()) {
+            return 0;
+        }
+        if (tenantMoveInDayCount == null) {
+            return 0;
+        }
+        int moveInDay = tenantMoveInDayCount;
+        return Math.max(0, 60 - (currentDayCount - moveInDay));
     }
 
     public boolean isProtectedTenant() {
@@ -131,8 +214,24 @@ public class OwnedBuilding {
         this.protectedTenant = true;
     }
 
+    public boolean isSecretaryResident() {
+        return residentSecretaryKey != null && !residentSecretaryKey.isBlank();
+    }
+
+    public String getResidentSecretaryKey() {
+        return residentSecretaryKey;
+    }
+
+    public void moveInSecretaryTenant(String secretaryKey) {
+        this.occupied = true;
+        this.protectedTenant = true;
+        this.residentSecretaryKey = secretaryKey;
+    }
+
     public void moveOut() {
         this.occupied = false;
         this.protectedTenant = false;
+        this.residentSecretaryKey = null;
+        this.tenantMoveInDayCount = null;
     }
 }

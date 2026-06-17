@@ -23,16 +23,20 @@
                 <strong class="money" th:text="${@moneyText.format(player.cash)}">0원</strong>
             </div>
             <div class="status-card">
-                <span>월 순수익</span>
-                <strong class="money" th:text="${@moneyText.format(player.monthlyNetIncome())}">0원</strong>
+                <span>대출</span>
+                <strong class="money" th:text="${@moneyText.format(loanRemainingRepayment)}">0원</strong>
             </div>
             <div class="status-card">
+                <span>총 월세</span>
+                <strong class="money" th:text="${@moneyText.format(totalMonthlyRent)}">0원</strong>
+            </div>
+            <div class="status-card" th:if="${player.employed}">
                 <span>직장</span>
                 <strong th:text="${player.employed ? '재직중' : '퇴사'}">재직중</strong>
             </div>
             <div class="status-card">
                 <span>평판</span>
-                <strong th:text="${player.reputation}">0</strong>
+                <strong th:text="${@gameService.reputationText(player.reputation)}">0</strong>
             </div>
             <div class="status-card">
                 <span>칭호</span>
@@ -54,6 +58,7 @@
                     th:classappend="${city == player.currentCity} ? ' active' : (${cityUnlocks.get(city) != true} ? ' locked' : '')">
                 <span th:text="${city}">도시</span>
                 <span th:if="${cityUnlocks.get(city) != true}">잠김</span>
+                <span class="repair-count-badge" th:if="${repairCountsByCity.get(city) != null && repairCountsByCity.get(city) > 0}" th:text="${repairCountsByCity.get(city)}">0</span>
             </button>
         </form>
         <a class="info-tab active" href="/info">정보</a>
@@ -73,14 +78,38 @@
                         <img class="secretary-thumb" th:src="${secretary.imagePath()}" th:alt="${secretary.name()} + ' 비서 이미지'">
                     </button>
                     <div>
-                        <span class="badge" th:text="'기본 숙련도 ' + ${secretary.baseProficiency()} + '/30'">숙련도</span>
-                        <h3 th:text="${secretary.name()} + ' - ' + ${secretary.origin()}">비서명</h3>
+                        <h3>
+                            <span th:text="${secretary.name()} + ' - ' + ${secretary.origin()}">비서명</span>
+                            <button class="help-dot" type="button" th:attr="aria-controls='info-secretary-hire-' + ${secretary.key()}">?</button>
+                        </h3>
+                        <div class="help-detail help-popover" th:id="'info-secretary-hire-' + ${secretary.key()}" hidden>
+                            <p th:text="'입주조건: ' + ${@gameService.secretaryMoveInConditionText(secretary)}">입주조건</p>
+                            <p th:text="'고용조건: ' + ${@gameService.secretaryHireConditionText(secretary)}">고용조건</p>
+                        </div>
                         <dl>
-                            <div><dt>고용 조건</dt><dd th:text="'평판 ' + ${#numbers.formatInteger(secretary.requiredReputation(), 0, 'COMMA')} + ' 이상'">조건</dd></div>
-                            <div><dt>월급</dt><dd th:text="${@moneyText.format(secretary.monthlySalary())}">월급</dd></div>
+                            <div>
+                                <dt>월급 <button class="help-dot" type="button" th:attr="aria-controls='info-secretary-salary-' + ${secretary.key()}">?</button></dt>
+                                <dd th:text="${@moneyText.format(secretary.monthlySalaryForProficiency(secretary.baseProficiency()))}">월급</dd>
+                            </div>
+                            <div class="help-detail help-popover dl-detail" th:id="'info-secretary-salary-' + ${secretary.key()}" hidden>
+                                <p th:text="${secretary.salaryDetail()}">월급 상세</p>
+                            </div>
                             <div><dt>기본 효과</dt><dd th:text="${secretary.effect()}">효과</dd></div>
-                            <div><dt>숙련도 상승</dt><dd th:text="${secretary.growthBonus()}">성장</dd></div>
-                            <div><dt>해금 메모</dt><dd th:text="${secretary.unlockNote()}">메모</dd></div>
+                            <div><dt>특수효과</dt><dd th:text="${secretary.specialEffectSummary()}">특수효과</dd></div>
+                            <div>
+                                <dt>숙련도 <button class="help-dot" type="button" th:attr="aria-controls='info-secretary-growth-' + ${secretary.key()}">?</button></dt>
+                                <dd th:text="${secretary.baseProficiency()} + '/30'">숙련도</dd>
+                            </div>
+                            <div class="help-detail help-popover dl-detail" th:id="'info-secretary-growth-' + ${secretary.key()}" hidden>
+                                <p th:text="${secretary.growthDetail()}">숙련도 상세</p>
+                            </div>
+                            <div>
+                                <dt>호감도 <button class="help-dot" type="button" th:attr="aria-controls='info-secretary-affinity-' + ${secretary.key()}">?</button></dt>
+                                <dd>1/30</dd>
+                            </div>
+                            <div class="help-detail help-popover dl-detail" th:id="'info-secretary-affinity-' + ${secretary.key()}" hidden>
+                                <p th:text="${secretary.specialEffectDetail()}">호감도 상세</p>
+                            </div>
                         </dl>
                     </div>
                 </article>
@@ -107,7 +136,7 @@
                     <tbody>
                     <tr th:each="tier : ${reputationTiers}">
                         <td th:text="${tier.title()}">칭호</td>
-                        <td th:text="${#numbers.formatInteger(tier.requiredReputation(), 0, 'COMMA')}">0</td>
+                        <td th:text="${@gameService.reputationText(tier.requiredReputation())}">0</td>
                         <td th:text="${tier.requiresResignation() ? '퇴사 필요' : '-'}">-</td>
                         <td th:text="${tier.unlockLabel().isEmpty() ? '-' : tier.unlockLabel()}">해금</td>
                     </tr>

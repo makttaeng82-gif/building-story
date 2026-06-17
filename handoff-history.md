@@ -1,0 +1,249 @@
+# Handoff History
+
+# 2026-06-18
+
+- Continued template refactoring pass 14.
+  - Extracted main page city/building skyline markup into `src/main/resources/templates/fragments/main-city-panel.html`.
+  - Extracted main page assigned secretary panel markup into `src/main/resources/templates/fragments/main-secretary-panel.html`.
+  - Replaced the old `main.html` layout body with `main-city-panel :: cityPanel` and `main-secretary-panel :: secretaryPanel`.
+  - `main.html` line count changed from 208 to 105.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `9928`.
+  - HTTP render check for `/main` passed with city panel, skyline, secretary panel, market panel, and info-grid present.
+  - Mojibake pattern check found no matches.
+
+- Continued template refactoring pass 13.
+  - Extracted the main page info-grid markup into `src/main/resources/templates/fragments/main-info-grid.html`.
+  - Included the existing QA/test panel fragment from inside the new info-grid fragment.
+  - Replaced the old `main.html` info-grid block with `fragments/main-info-grid :: infoGrid`.
+  - `main.html` line count changed from 354 to 208.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `38904`.
+  - HTTP render check for `/main` passed with info-grid, building detail, loan box, donation confirm attributes, and test panel present.
+  - Mojibake pattern check found no matches.
+
+## Earlier Project Work Summary
+
+- Base app built as a Spring Boot game project.
+  - Login/register/logout implemented.
+  - First story screen implemented.
+  - Main game screen implemented with city tabs, owned buildings, market offers, selected building panel, monthly records, loans, donation/luxury/gift panels.
+  - Info screen implemented for secretary list, title/unlock table, and building price/rent data.
+- Time system implemented.
+  - Main screen advances one day through `/tick`.
+  - Info screen does not advance time.
+  - Event and auction modal states pause progression.
+- Building and city system implemented.
+  - Cities: Cheongju, Sejong, Daejeon, Busan, Incheon, Seoul.
+  - Building catalog, reputation unlock tiers, city unlock checks, market offer refresh, buy/sell, purchase cooldown, and sale valuation implemented.
+  - Owned building and market cards use building images under `src/main/resources/static/assets/buildings/`.
+- Monthly and daily event systems implemented.
+  - Move-in, move-out, repair request, repair completion, rent settlement, reputation gain/loss, salary/loan/secretary salary records.
+  - Repair request handling remains allowed for secretary-resident buildings by design.
+- Loan system implemented.
+  - Loan purchase uses 60% loan / 40% cash.
+  - Loan limit and repayment checks exist.
+  - Loan status panel adjusted to show principal-focused data.
+- Auction system implemented.
+  - Auction chance set to 3%.
+  - Auction auto-cancel duration set to 20 seconds.
+  - Auction modal shows remaining time.
+  - Auction display name/type is corrected from catalog slot.
+- Shop systems implemented.
+  - Donation shop.
+  - Luxury shop.
+  - Gift shop with five gift items:
+    - 고급 원두세트
+    - 만년필
+    - 프리미엄 향수
+    - 최고급 보석
+    - 인센티브
+  - Gift prices and images added.
+  - Gift purchase quantity controls and confirmation modals added.
+  - Gift giving from owned secretary list added.
+  - Gift use is affinity-range gated and gives affinity experience +1.
+- Secretary system implemented.
+  - Secretary catalog with six secretaries.
+  - Secretary list modal and info screen list.
+  - Assignment/unassignment by city.
+  - Secretary proficiency and affinity level/experience display.
+  - Secretary salary and auto-repair cooldown display.
+  - Secretary images and event images added.
+  - Secretary-6 main image changed to `secretary-6-main.png`.
+  - Secretary special effects apply only to assigned city.
+  - Final city chance text reflects secretary effects.
+- Secretary tenant event chains implemented.
+  - Flow: tenant intro -> request -> accepted/waiting -> hire -> completed.
+  - Cheongju secretary keeps January 3 intro flow.
+  - Sejong, Daejeon, Busan, Incheon, Seoul secretary tenant chains added.
+  - Secretary resident buildings are sale-locked.
+  - Rent waiver events exclude waived rent from total monthly rent and settlement.
+  - Seoul secretary has special residence move on hire.
+  - QA controls added for secretary event conditions/building/stage testing.
+- Visual assets added.
+  - Building images for all city/slot combinations.
+  - Auction images.
+  - Secretary event images.
+  - Gift and luxury item images.
+
+## 2026-06-18
+
+- Fixed market refresh and confirm modal issues before continuing refactor.
+  - Root cause for unexpected market refresh: `BuildingTradeService.buyOffer` deleted the purchased offer, then `/main` called `ensureOffers`, whose previous condition refreshed whenever city offer count was lower than catalog size.
+  - Changed `buyOffer` to keep the purchased offer row.
+  - Changed `ensureOffers` to create offers only when the city has no offers and no purchase cooldown history.
+  - Added `PurchaseCooldownRepository.existsByPlayerAndCity`.
+  - Added regression test `buyingOfferDoesNotRefreshMarketBeforeRefreshDay`.
+  - Donation forms now use the shared confirm modal.
+  - Donation, luxury, and gift purchase confirm modal title is `구매 하시겠습니까?`; buttons remain `확인` and `취소`.
+  - Confirm modal now participates in `game-paused`, and server-rendered pause state is preserved with `data-player-paused`.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`. PID: `31660`.
+  - HTTP flow check passed:
+    - Buying one offer kept market card count at 4.
+    - Purchased offer showed cooldown text.
+    - Donation confirm attributes rendered.
+    - `data-player-paused` rendered.
+    - No template error.
+  - Checked mojibake patterns in service, repo, web, template, static JS, test, and handoff files; no matches found.
+
+- Continued refactoring pass 12.
+  - Split main page QA/test panel markup into `src/main/resources/templates/fragments/main-test-panel.html`.
+  - Replaced the test panel block in `main.html` with `th:replace="~{fragments/main-test-panel :: testPanel}"`.
+  - `main.html` line count changed from 440 to 353.
+  - `fragments/main-test-panel.html` line count is 93.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`. PID: `36876`.
+  - HTTP render check passed:
+    - `/main` rendered with `.test-panel`, `/test/cash`, `/test/secretary-event/stage`, and no template error.
+  - Checked mojibake patterns in service, web, template, test, and handoff files; no matches found.
+
+- Continued refactoring pass 11.
+  - Split main page market markup into `src/main/resources/templates/fragments/main-market.html`.
+  - Replaced the market block in `main.html` with `th:replace="~{fragments/main-market :: market}"`.
+  - `main.html` line count changed from 489 to 440.
+  - `fragments/main-market.html` line count is 55.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`. PID: `7516`.
+  - HTTP render check passed:
+    - `/main` rendered with `.market-panel`, `.market-card`, `#secretaryModal`, and `#confirmModal`.
+  - Checked mojibake patterns in service, web, template, test, and handoff files; no matches found.
+
+- Continued refactoring pass 10.
+  - Split main page modal markup into `src/main/resources/templates/fragments/main-modals.html`.
+  - Moved secretary list modal, confirm modal, secretary offer modal, auction modal, auction result modal, and active event modal out of `main.html`.
+  - Replaced the removed block with `th:replace="~{fragments/main-modals :: modals}"`.
+  - `main.html` line count changed from 693 to 489.
+  - `fragments/main-modals.html` line count is 212.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`. PID: `34124`.
+  - Browser render check passed:
+    - `/login` loaded.
+    - Test user registered.
+    - `/story` completed.
+    - `/main` rendered with `#secretaryModal`, `#confirmModal`, and market content present.
+  - Checked mojibake patterns in service, web, template, test, and handoff files; no matches found.
+
+## 2026-06-17
+
+- Continued refactoring pass 9.
+  - Extracted active event lookup, event activation, event completion/cancel validation, secretary event effect dispatch, resignation confirmation, resignation payout, severance calculation, and auto resignation into `EventFlowService`.
+  - `GameService` now delegates event/resignation behavior instead of owning the effect logic.
+  - `GameService.java` line count changed from 704 to 585.
+  - `EventFlowService.java` line count is 187.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Checked mojibake patterns in service, web, test, and handoff files; no matches found.
+  - Restarted server on `http://localhost:8080`. PID: `32788`.
+- Continued refactoring pass 8.
+  - Extracted monthly settlement, rent calculation, scheduled move-in/move-out/repair request events, repair neglect processing, rent waiver records, loan maturity processing, and unlock event activation into `SettlementService`.
+  - Removed duplicated settlement/random event helpers from `GameService`.
+  - `GameService.java` line count changed from 895 to 704.
+  - `SettlementService.java` line count is 282.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Checked mojibake patterns in service, web, test, and handoff files; no matches found.
+  - Restarted server on `http://localhost:8080`. PID: `16392`.
+- Continued refactoring pass 7.
+  - Extracted secretary hire, ownership lookup, offer lookup, assignment, unassignment, salary processing, auto repair, and secretary effect percentage calculations into `SecretaryOperationsService`.
+  - `GameService.java` line count changed from 1086 to 895.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080` with the secretary operations refactor.
+- Continued refactoring pass 6.
+  - Extracted loan list, remaining repayment/principal, loan limit, available loan limit, immediate repayment, and maturity failure handling into `LoanService`.
+  - Updated `BuildingTradeService` to use `LoanService` for loan limit/principal checks.
+  - Removed direct `LoanRepository` dependency from `GameService`.
+  - `GameService.java` line count changed from 1121 to 1086.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080` with the loan refactor.
+- Continued refactoring pass 5.
+  - Extracted building trade and market behavior into `BuildingTradeService`.
+  - Moved buy offer, sell building, repair building, offer refresh, offer unlock, purchase cooldown, sell availability, building image path, and auction display name/type helpers.
+  - `GameService.java` line count changed from 1314 to 1121.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080` with the building trade refactor.
+- Fixed QA/test helper persistence regression after refactor.
+  - `QaService` initially had no `@Transactional`, so `/test/*` POSTs could show notices without persisting entity field mutations.
+  - Added `@Transactional` to `QaService`.
+  - Added regression test `qaCashChangePersistsWithoutCallerTransaction`.
+  - Verified manually through HTTP: `/test/cash` changed displayed cash from `0원` to `3000만원`.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Continued refactoring pass 4.
+  - Extracted QA/test helper behavior into `QaService`.
+  - Updated `/test/*` controller endpoints to call `QaService` instead of `GameService`.
+  - Updated tests that directly used QA helpers to inject `QaService`.
+  - Removed QA-only dependencies and helper methods from `GameService`.
+  - `GameService.java` line count changed from 1464 to 1314.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080` with the QA helper refactor.
+- Continued refactoring pass 3.
+  - Extracted auction active-state lookup, random activation, bidding, cancel, and result completion into `AuctionService`.
+  - `GameService.java` line count changed from 1569 to 1464.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080` with the auction refactor.
+- Continued refactoring pass 2.
+  - Cleaned 33 root-level temporary files matching `tmp-*`.
+  - `server-8080.log` and `server-8080.err.log` could not be kept deleted while the server was active; they were recreated after restart.
+  - Extracted donation, luxury purchase, gift purchase, gift inventory lookup, and gift-to-secretary behavior into `ShopService`.
+  - `GameService.java` line count changed from 1643 to 1569.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080` with the refactored code.
+- Started code refactoring to reduce oversized files.
+  - Baseline test before refactor passed with `.\gradlew.bat test --console=plain`.
+  - Extracted `SecretaryTenantScenario` from `GameService`.
+  - Extracted secretary tenant scenario list and condition display text into `SecretaryTenantScenarioCatalog`.
+  - Extracted reputation/percent display formatting into `GameTextFormatter`.
+  - Extracted secretary tenant event flow into `SecretaryTenantEventService`.
+  - `GameService.java` line count changed from 2019 to 1643.
+  - Preserved existing behavior intent; no feature changes intended.
+  - Ran `.\gradlew.bat test --console=plain` after each major extraction and all runs passed.
+  - Checked mojibake patterns in service and handoff files; no matches found.
+- Added mandatory handoff encoding rule.
+  - Always read/write Markdown handoff files as UTF-8.
+  - Do not rely on PowerShell default encoding or Windows console code page.
+  - If Korean text appears broken, re-read with `Get-Content -Raw -Encoding UTF8 -LiteralPath "handoff-current.md"` before assuming file damage.
+- Planned next work:
+  - Refactor code before adding more features.
+  - Main pain point is oversized `GameService` and `main.html`.
+  - Recommended order: formatting helpers, secretary event service, shop service, auction service, Thymeleaf fragments.
+  - First target should be secretary tenant event logic because it is the most complex and most often edited.
+- Resignation event flow added.
+  - Step 1: resignation confirmation modal using `/assets/events/resign-think.jpg`.
+  - Step 1 buttons: `그래! 퇴사하자` / `아직.. 아니야..`.
+  - Step 2: resignation payout modal using `/assets/events/resign-submit.jpg`.
+  - Step 2 button: `퇴직금 수령하기`.
+  - Severance formula: elapsed days since signup x 400,000 won.
+  - Auto resignation when `elapsedDays >= 181`.
+- Reputation display corrected.
+  - Korean unit format added through `GameService.reputationText(long)`.
+  - Example: `300,000,000` -> `3억`.
+  - Example: `1,500,000` -> `150만`.
+  - Applied to main header, info header, info reputation table, luxury reputation reward, and recent record reputation changes.
+- Secretary condition help text corrected.
+  - Replaced generic unlock text with `입주조건` and `고용조건`.
+  - Applied to info screen and main secretary modal.
+- Created `handoff-current.md` as the fast current-state handoff file.
+- Established handoff policy:
+  - Read `handoff-current.md` first at task start.
+  - Keep `handoff-current.md` short and current-state only.
+  - Append detailed records to `handoff-history.md`.
+  - Use `handoff-history.md` or `git log` only when older context is needed.
+  - Do not use mojibake-heavy `handoff-summary.txt` by default.

@@ -73,6 +73,8 @@ public class SettlementService {
                         player.addReputation(reputationChange);
                         saveRecord(player, RecordType.RENT_INCOME, "월세", rent, reputationChange, building.getName(), null);
                     });
+            String secretaryReputationNotice = secretaryOperationsService.processMonthlyReputation(player);
+            notice = appendNotice(notice, secretaryReputationNotice);
             reputationCatalog.newlyUnlocked(oldReputation, player.getReputation(), !player.isEmployed()).stream()
                     .findFirst()
                     .ifPresent(tier -> activateUnlockEvent(player, tier));
@@ -139,7 +141,9 @@ public class SettlementService {
         int secondMoveInDay = randomDistinctEventDay(player, firstMoveInDay);
         int firstMoveOutDay = randomEventDay(player);
         int secondMoveOutDay = randomDistinctEventDay(player, firstMoveOutDay);
-        player.scheduleMonthlyRandomEvents(firstMoveInDay, secondMoveInDay, firstMoveOutDay, secondMoveOutDay, randomEventDay(player));
+        int firstRepairDay = randomEventDay(player);
+        int secondRepairDay = randomDistinctEventDay(player, firstRepairDay);
+        player.scheduleMonthlyRandomEvents(firstMoveInDay, secondMoveInDay, firstMoveOutDay, secondMoveOutDay, firstRepairDay, secondRepairDay);
     }
 
     private int randomEventDay(Player player) {
@@ -193,11 +197,22 @@ public class SettlementService {
         if (movedOutBuildings.isEmpty()) {
             return "";
         }
-        movedOutBuildings.forEach(building -> {
+        int defendedCount = 0;
+        int movedOutCount = 0;
+        for (OwnedBuilding building : movedOutBuildings) {
+            if (secretaryOperationsService.defendMoveOut(player, building)) {
+                defendedCount++;
+                continue;
+            }
             building.moveOut();
             saveRecord(player, RecordType.MOVE_OUT, "세입자 퇴거", null, 0, building.getName(), null);
-        });
-        return movedOutBuildings.size() + "채 세입자 퇴거";
+            movedOutCount++;
+        }
+        String notice = movedOutCount == 0 ? "" : movedOutCount + "채 세입자 퇴거";
+        if (defendedCount > 0) {
+            notice = appendNotice(notice, defendedCount + "채 퇴거방어");
+        }
+        return notice;
     }
 
     private String attemptRepairRequest(Player player) {

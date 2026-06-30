@@ -73,8 +73,8 @@
         <p th:if="${loans.isEmpty()}">현재 대출 없음</p>
     </article>
 
-    <article class="panel reputation-shop-panel">
-        <h2>기부</h2>
+    <details class="panel reputation-shop-panel collapsible-panel" open>
+        <summary>기부</summary>
         <p>현금 50,000원당 평판 1</p>
         <div class="donation-actions">
             <form class="donation-card confirm-form" method="post" action="/donations" data-confirm-title="구매 하시겠습니까?" data-confirm-message="기부 x1">
@@ -110,11 +110,11 @@
                 <button class="secondary" type="submit" th:disabled="${player.paused || player.cash < 50000000}" th:text="${player.paused ? '일시정지' : '구매'}">구매</button>
             </form>
         </div>
-    </article>
+    </details>
 
     <section class="shop-split-grid">
-        <article class="panel reputation-shop-panel split-shop-panel">
-            <h2>사치품</h2>
+        <details class="panel reputation-shop-panel split-shop-panel collapsible-panel" open>
+            <summary>사치품</summary>
             <p>기부 대비 평판 효율 1.5배 · 각 아이템 1회 구매</p>
             <div class="luxury-list">
                 <div class="luxury-row" th:each="item : ${luxuryItems}" th:with="itemOwned=${@gameService.isLuxuryItemOwned(player, item)}">
@@ -127,10 +127,10 @@
                     </form>
                 </div>
             </div>
-        </article>
+        </details>
 
-        <article class="panel reputation-shop-panel split-shop-panel">
-            <h2>선물</h2>
+        <details class="panel reputation-shop-panel split-shop-panel collapsible-panel" open>
+            <summary>선물</summary>
             <p>구입 후 보유 비서에게 선물 가능</p>
             <div class="gift-list">
                 <form class="gift-row confirm-form" method="post" th:each="gift : ${giftItems}" th:action="@{/gift-items/{key}/buy(key=${gift.key()})}" th:with="ownedQuantity=${@gameService.ownedGiftQuantity(player, gift)}" th:attr="data-confirm-title='구매 하시겠습니까?', data-confirm-message=${gift.name()}">
@@ -143,7 +143,7 @@
                     <button class="secondary" type="submit" th:disabled="${player.paused || player.cash < gift.price()}" th:text="${player.paused ? '일시정지' : (player.cash < gift.price() ? '현금부족' : '구매')}">구매</button>
                 </form>
             </div>
-        </article>
+        </details>
     </section>
 
     <article th:replace="~{fragments/main-test-panel :: testPanel}"></article>

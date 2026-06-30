@@ -461,9 +461,19 @@ button.repair {
     font-size: 19px;
     line-height: 1.18;
 }
+.secretary-focus .section-head p {
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
 .secretary-focus .secretary-info h3 {
     font-size: 15px;
     line-height: 1.22;
+}
+.secretary-focus .secretary-info > p {
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 .secretary-visual {
     display: grid;
@@ -531,6 +541,38 @@ img.event-image {
     object-position: top center;
 }
 .secretary-info { display: grid; gap: 8px; }
+.secretary-ability-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 92px;
+    gap: 8px;
+    align-items: center;
+}
+.secretary-ability-actions .badge,
+.secretary-ability-actions button {
+    width: 100%;
+}
+.ability-modal {
+    width: min(520px, calc(100vw - 32px));
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: var(--shadow);
+    padding: 18px;
+}
+.ability-list {
+    display: grid;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+.ability-list li {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #f8fbfd;
+    padding: 10px 12px;
+    font-weight: 700;
+    color: var(--ink);
+}
 .secretary-exp-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -986,6 +1028,19 @@ dd { margin: 0; font-weight: 800; }
     position: relative;
     overflow: visible;
 }
+.secretary-modal .secretary-card dl dt,
+.secretary-modal .secretary-card dl dd,
+.secretary-modal .secretary-action-row select,
+.secretary-modal .secretary-action-row button,
+.secretary-modal .secretary-assignment button {
+    font-size: 12px;
+}
+.secretary-modal .secretary-card dl dd {
+    white-space: nowrap;
+}
+.secretary-modal .secretary-card dl {
+    gap: 6px;
+}
 .secretary-card.locked-secretary > :not(.secretary-lock-overlay) {
     filter: brightness(0.58);
 }
@@ -1337,16 +1392,68 @@ td {
     transform: translate(-50%, 20px);
     opacity: 0;
     pointer-events: none;
+    transition: 0.2s ease;
+}
+
+#toast.toast {
+    display: grid;
+    gap: 8px;
+    width: min(560px, calc(100vw - 32px));
+}
+
+#flashToast.toast,
+.toast-item {
+    justify-self: center;
     padding: 12px 18px;
     border-radius: 999px;
     background: #1f2a37;
     color: white;
     font-weight: 800;
     box-shadow: var(--shadow);
-    transition: 0.2s ease;
 }
 
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
+.toast-item {
+    max-width: 100%;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: 0.2s ease;
+}
+.toast-item.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.collapsible-panel {
+    display: block;
+}
+.collapsible-panel > summary {
+    cursor: pointer;
+    color: var(--ink);
+    font-size: 20px;
+    font-weight: 900;
+    list-style: none;
+}
+.collapsible-panel > summary::-webkit-details-marker {
+    display: none;
+}
+.collapsible-panel > summary::after {
+    content: "접기";
+    float: right;
+    min-height: 26px;
+    border-radius: 999px;
+    background: #eef2f7;
+    color: var(--muted);
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 800;
+}
+.collapsible-panel:not([open]) > summary::after {
+    content: "펼치기";
+}
+.collapsible-panel > summary + * {
+    margin-top: 10px;
+}
 
 .event-modal-backdrop {
     position: fixed;

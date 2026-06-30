@@ -23,6 +23,7 @@ public class OwnedSecretary {
     private Integer affinity = 1;
     private Integer affinityExperience = 0;
     private Integer nextAutoRepairDay = 1;
+    private Integer autoRepairsUsedInCooldown = 0;
 
     protected OwnedSecretary() {
     }
@@ -93,8 +94,18 @@ public class OwnedSecretary {
         return nextAutoRepairDay == null ? 1 : nextAutoRepairDay;
     }
 
+    public int getAutoRepairsUsedInCooldown() {
+        return autoRepairsUsedInCooldown == null ? 0 : autoRepairsUsedInCooldown;
+    }
+
     public boolean canAutoRepair(int elapsedDays) {
         return elapsedDays >= getNextAutoRepairDay();
+    }
+
+    public boolean canAutoRepair(int elapsedDays, int maxRepairsPerCooldown) {
+        int safeMaxRepairs = Math.max(1, maxRepairsPerCooldown);
+        return elapsedDays >= getNextAutoRepairDay()
+                || (safeMaxRepairs > 1 && getAutoRepairsUsedInCooldown() < safeMaxRepairs);
     }
 
     public int autoRepairCooldownDaysLeft(int elapsedDays) {
@@ -109,6 +120,15 @@ public class OwnedSecretary {
 
     public void startAutoRepairCooldown(int currentDay, int cooldownDays) {
         this.nextAutoRepairDay = currentDay + Math.max(1, cooldownDays);
+    }
+
+    public void recordAutoRepair(int currentDay, int cooldownDays) {
+        if (currentDay >= getNextAutoRepairDay()) {
+            this.nextAutoRepairDay = currentDay + Math.max(1, cooldownDays);
+            this.autoRepairsUsedInCooldown = 1;
+            return;
+        }
+        this.autoRepairsUsedInCooldown = getAutoRepairsUsedInCooldown() + 1;
     }
 
     public void addProficiencyExperience(int amount) {

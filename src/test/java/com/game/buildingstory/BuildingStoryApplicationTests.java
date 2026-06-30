@@ -22,6 +22,7 @@ import com.game.buildingstory.repo.SecretaryTenantEventRepository;
 import com.game.buildingstory.service.GameService;
 import com.game.buildingstory.service.QaService;
 import com.game.buildingstory.service.SecretaryCatalog;
+import com.game.buildingstory.service.SecretaryOperationsService;
 import com.game.buildingstory.repo.OwnedLuxuryItemRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,9 @@ class BuildingStoryApplicationTests {
 
 	@Autowired
 	private QaService qaService;
+
+	@Autowired
+	private SecretaryOperationsService secretaryOperationsService;
 
 	@Autowired
 	private PlayerRepository playerRepository;
@@ -157,6 +161,95 @@ class BuildingStoryApplicationTests {
 	}
 
 	@Test
+	@Transactional
+	void lowProficiencySecretaryAutoRepairsOnlyFirstTwoManagedBuildings() {
+		Player player = playerRepository.save(new Player("managed-repair-limit-test", "hash"));
+		player.addCash(1_000_000L);
+		for (int i = 1; i <= 3; i++) {
+			OwnedBuilding building = new OwnedBuilding(player, "청주", i, "원룸", "테스트 원룸 " + i, 30_000_000L, 0L, 200_000L, 4);
+			building.moveIn();
+			if (i == 3) {
+				building.requestRepair();
+			}
+			ownedBuildingRepository.save(building);
+		}
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-1", 1));
+		secretary.assignTo("청주");
+
+		assertThat(secretaryOperationsService.processAutoRepairs(player)).isBlank();
+
+		var buildings = ownedBuildingRepository.findByPlayerAndCityOrderById(player, "청주");
+		assertThat(buildings.get(0).isRepairRequested()).isFalse();
+		assertThat(buildings.get(1).isRepairRequested()).isFalse();
+		assertThat(buildings.get(2).isRepairRequested()).isTrue();
+	}
+
+	@Test
+	@Transactional
+	void proficiencyElevenSecretaryCanAutoRepairTwoBuildingsPerCooldown() {
+		Player player = playerRepository.save(new Player("double-auto-repair-test", "hash"));
+		player.addCash(1_000_000L);
+		for (int i = 1; i <= 3; i++) {
+			OwnedBuilding building = new OwnedBuilding(player, "청주", i, "원룸", "테스트 원룸 " + i, 30_000_000L, 0L, 200_000L, 4);
+			building.moveIn();
+			building.requestRepair();
+			ownedBuildingRepository.save(building);
+		}
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-2", 11));
+		secretary.assignTo("청주");
+
+		assertThat(secretaryOperationsService.processAutoRepairs(player)).contains("비서수리 1건");
+
+		var buildings = ownedBuildingRepository.findByPlayerAndCityOrderById(player, "청주");
+		assertThat(buildings.get(0).isRepairRequested()).isFalse();
+		assertThat(buildings.get(1).isRepairRequested()).isFalse();
+		assertThat(buildings.get(2).isRepairRequested()).isTrue();
+	}
+
+	@Test
+	@Transactional
+	void secretaryOneAutoRepairCostUsesAffinityDiscount() {
+		Player player = playerRepository.save(new Player("auto-repair-discount-test", "hash"));
+		player.addCash(1_000_000L);
+		OwnedBuilding building = new OwnedBuilding(player, "청주", 1, "원룸", "테스트 원룸", 30_000_000L, 0L, 200_000L, 4);
+		building.moveIn();
+		building.requestRepair();
+		ownedBuildingRepository.save(building);
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-1", 1));
+		secretary.addAffinityExperience(63);
+		assertThat(secretary.getAffinity()).isEqualTo(10);
+		secretary.assignTo("청주");
+
+		secretaryOperationsService.processAutoRepairs(player);
+
+		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(973_000L);
+		assertThat(monthlyRecordRepository.findAll())
+				.anySatisfy(record -> {
+					assertThat(record.getTitle()).isEqualTo("비서수리");
+					assertThat(record.getAmount()).isEqualTo(-27_000L);
+				});
+	}
+
+	@Test
+	@Transactional
+	void secretaryAbilitySummariesShowCurrentUnlockedAbilities() {
+		Player player = playerRepository.save(new Player("secretary-ability-summary-test", "hash"));
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-1", 16));
+		secretary.addAffinityExperience(168);
+		assertThat(secretary.getAffinity()).isEqualTo(17);
+		secretary.assignTo("청주");
+
+		assertThat(gameService.activeSecretaryAbilitySummaries(secretary))
+				.contains(
+						"자동수리 수리비 감소 17%",
+						"관리 가능 건물 8채",
+						"쿨타임 내 자동수리 최대 2건",
+						"자동수리 시 평판 +1 추가 증가",
+						"매월 1일 배치 평판 +1~+3"
+				);
+	}
+
+	@Test
 	void secretarySalaryIncreasesByProficiencyTier() {
 		var secretary = secretaryCatalog.find("secretary-1").orElseThrow();
 
@@ -169,8 +262,37 @@ class BuildingStoryApplicationTests {
 
 	@Test
 	void secretarySpecialEffectAndDefaultMoveOutChanceAreUpdated() {
-		assertThat(new Player("default-chance-test", "hash").getMoveOutChancePercent()).isEqualTo(20);
-		assertThat(secretaryCatalog.find("secretary-2").orElseThrow().specialEffectSummary()).isEqualTo("퇴거확률 감소 0.2%");
+		Player player = new Player("default-chance-test", "hash");
+
+		assertThat(player.getMoveInChancePercent()).isEqualTo(35);
+		assertThat(player.getMoveOutChancePercent()).isEqualTo(25);
+		assertThat(player.getRepairRequestChancePercent()).isEqualTo(35);
+		player.updateTestChances(40, 20, 30);
+		assertThat(player.getMoveInChancePercent()).isEqualTo(35);
+		assertThat(player.getMoveOutChancePercent()).isEqualTo(25);
+		assertThat(player.getRepairRequestChancePercent()).isEqualTo(35);
+		assertThat(gameService.baseMoveInChancePercent(player)).isEqualTo(35);
+		assertThat(gameService.baseMoveOutChancePercent(player)).isEqualTo(25);
+		assertThat(gameService.baseRepairRequestChancePercent(player)).isEqualTo(35);
+		assertThat(secretaryCatalog.find("secretary-2").orElseThrow().specialEffectSummary()).isEqualTo("퇴거확률 감소 0.3%");
+	}
+
+	@Test
+	void randomBuildingEventsAllowTwoRepairDaysPerMonth() {
+		Player player = new Player("repair-schedule-test", "hash");
+
+		player.scheduleMonthlyRandomEvents(2, 3, 4, 5, 6, 7);
+
+		assertThat(player.hasEventScheduleForCurrentMonth()).isTrue();
+		assertThat(player.isRepairEventDay()).isFalse();
+		for (int i = 0; i < 5; i++) {
+			player.advanceDay();
+		}
+		assertThat(player.getDay()).isEqualTo(6);
+		assertThat(player.isRepairEventDay()).isTrue();
+		player.advanceDay();
+		assertThat(player.getDay()).isEqualTo(7);
+		assertThat(player.isRepairEventDay()).isTrue();
 	}
 
 	@Test
@@ -228,6 +350,63 @@ class BuildingStoryApplicationTests {
 		assertThat(gameService.giveGiftToSecretary(player.getId(), secretary.getId(), "fountain-pen", 1))
 				.isEqualTo("호감도 구간에 맞지 않는 선물");
 		assertThat(ownedGiftItemRepository.findByPlayerAndGiftKey(player, "fountain-pen").orElseThrow().getQuantity()).isEqualTo(1);
+	}
+
+	@Test
+	void giftBalancePricesAreUpdated() {
+		assertThat(gameService.giftItems().stream()
+				.filter(gift -> "jewelry".equals(gift.key()))
+				.findFirst()
+				.orElseThrow()
+				.price()).isEqualTo(80_000_000L);
+		assertThat(gameService.giftItems().stream()
+				.filter(gift -> "incentive".equals(gift.key()))
+				.findFirst()
+				.orElseThrow()
+				.price()).isEqualTo(500_000_000L);
+	}
+
+	@Test
+	@Transactional
+	void giftQuantityCannotExceedOwnedQuantity() {
+		Player player = playerRepository.save(new Player("gift-owned-quantity-test", "hash"));
+		player.addCash(1_000_000L);
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-1", 1));
+
+		gameService.buyGiftItem(player.getId(), "coffee-beans", 1);
+
+		assertThat(gameService.maxGiftQuantityForSecretary(player, secretary, gameService.giftItems().getFirst())).isEqualTo(1);
+		assertThat(gameService.giveGiftToSecretary(player.getId(), secretary.getId(), "coffee-beans", 2))
+				.isEqualTo("선물 수량 부족");
+		assertThat(ownedGiftItemRepository.findByPlayerAndGiftKey(player, "coffee-beans").orElseThrow().getQuantity()).isEqualTo(1);
+		assertThat(ownedSecretaryRepository.findById(secretary.getId()).orElseThrow().getAffinityExperience()).isZero();
+	}
+
+	@Test
+	@Transactional
+	void giftQuantityCannotContinuePastGiftAffinityRange() {
+		Player player = playerRepository.save(new Player("gift-affinity-boundary-test", "hash"));
+		player.addCash(5_000_000L);
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-1", 1));
+		secretary.addAffinityExperience(63);
+		assertThat(secretary.getAffinity()).isEqualTo(10);
+
+		gameService.buyGiftItem(player.getId(), "coffee-beans", 20);
+		var coffeeBeans = gameService.giftItems().stream()
+				.filter(gift -> "coffee-beans".equals(gift.key()))
+				.findFirst()
+				.orElseThrow();
+
+		assertThat(gameService.maxGiftQuantityForSecretary(player, secretary, coffeeBeans)).isEqualTo(12);
+		assertThat(gameService.giveGiftToSecretary(player.getId(), secretary.getId(), "coffee-beans", 13))
+				.isEqualTo("현재 호감도 구간에서 선물 가능한 수량 초과");
+		assertThat(ownedGiftItemRepository.findByPlayerAndGiftKey(player, "coffee-beans").orElseThrow().getQuantity()).isEqualTo(20);
+
+		assertThat(gameService.giveGiftToSecretary(player.getId(), secretary.getId(), "coffee-beans", 12))
+				.isEqualTo("설아름에게 고급 원두세트 12개 선물 완료");
+		OwnedSecretary updatedSecretary = ownedSecretaryRepository.findById(secretary.getId()).orElseThrow();
+		assertThat(updatedSecretary.getAffinity()).isEqualTo(11);
+		assertThat(ownedGiftItemRepository.findByPlayerAndGiftKey(player, "coffee-beans").orElseThrow().getQuantity()).isEqualTo(8);
 	}
 
 	@Test
@@ -302,6 +481,23 @@ class BuildingStoryApplicationTests {
 	}
 
 	@Test
+	void buildingCatalogRentAndCooldownBalanceAreUpdated() {
+		var cheongjuRoom = gameService.buildingSpecs().stream()
+				.filter(spec -> spec.city().equals("청주") && spec.slot() == 1)
+				.findFirst()
+				.orElseThrow();
+		var seoulFinal = gameService.buildingSpecs().stream()
+				.filter(spec -> spec.city().equals("서울") && spec.slot() == 4)
+				.findFirst()
+				.orElseThrow();
+
+		assertThat(cheongjuRoom.monthlyRent()).isEqualTo(300_000L);
+		assertThat(cheongjuRoom.tradeCooldownDays()).isEqualTo(5);
+		assertThat(seoulFinal.monthlyRent()).isEqualTo(27_000_000_000L);
+		assertThat(seoulFinal.tradeCooldownDays()).isEqualTo(264);
+	}
+
+	@Test
 	@Transactional
 	void secretaryRentBonusAppliesOnlyToAssignedCity() {
 		Player player = playerRepository.save(new Player("secretary-rent-bonus-test", "hash"));
@@ -312,7 +508,7 @@ class BuildingStoryApplicationTests {
 		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-4", 15));
 		secretary.assignTo("test-city");
 
-		assertThat(gameService.effectiveMonthlyRent(player, assignedCityBuilding)).isEqualTo(1_003_000L);
+		assertThat(gameService.effectiveMonthlyRent(player, assignedCityBuilding)).isEqualTo(1_005_000L);
 		assertThat(gameService.effectiveMonthlyRent(player, otherCityBuilding)).isEqualTo(1_000_000L);
 	}
 
@@ -323,10 +519,27 @@ class BuildingStoryApplicationTests {
 		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-3", 20));
 		secretary.assignTo("test-city");
 
-		assertThat(gameService.effectiveMoveInChancePercentText(player, "test-city")).isEqualTo("40.5%");
-		assertThat(gameService.effectiveMoveInChancePercentText(player, "other-city")).isEqualTo("40%");
-		assertThat(gameService.effectiveMoveOutChancePercentText(player, "test-city")).isEqualTo("20%");
-		assertThat(gameService.effectiveRepairRequestChancePercentText(player, "test-city")).isEqualTo("30%");
+		assertThat(gameService.effectiveMoveInChancePercentText(player, "test-city")).isEqualTo("35.5%");
+		assertThat(gameService.effectiveMoveInChancePercentText(player, "other-city")).isEqualTo("35%");
+		assertThat(gameService.effectiveMoveOutChancePercentText(player, "test-city")).isEqualTo("25%");
+		assertThat(gameService.effectiveRepairRequestChancePercentText(player, "test-city")).isEqualTo("35%");
+	}
+
+	@Test
+	@Transactional
+	void assignedSecretaryAddsMonthlyReputationRecordOnFirstDay() {
+		Player player = playerRepository.save(new Player("secretary-monthly-reputation-test", "hash"));
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-1", 1));
+		secretary.assignTo("청주");
+
+		secretaryOperationsService.processMonthlyReputation(player);
+
+		assertThat(playerRepository.findById(player.getId()).orElseThrow().getReputation()).isBetween(1, 3);
+		assertThat(monthlyRecordRepository.findAll())
+				.anySatisfy(record -> {
+					assertThat(record.getTitle()).isEqualTo("비서 관리");
+					assertThat(record.getReputationChange()).isBetween(1, 3);
+				});
 	}
 
 	@Test
@@ -342,6 +555,21 @@ class BuildingStoryApplicationTests {
 
 		assertThat(gameService.daysUntilSellable(player, assignedCityBuilding)).isEqualTo(99);
 		assertThat(gameService.daysUntilSellable(player, otherCityBuilding)).isEqualTo(100);
+	}
+
+	@Test
+	@Transactional
+	void cityPanelCanDisplayRentBonusAndBuildingWaitReductionText() {
+		Player player = playerRepository.save(new Player("secretary-city-effect-text-test", "hash"));
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-5", 20));
+		secretary.assignTo("test-city");
+
+		assertThat(gameService.rentBonusPercent(player, "test-city")).isEqualTo(0.25);
+		assertThat(gameService.rentBonusPercentText(player, "test-city")).isEqualTo("0.25%");
+		assertThat(gameService.buildingWaitReductionPercent(player, "test-city")).isEqualTo(0.5);
+		assertThat(gameService.buildingWaitReductionPercentText(player, "test-city")).isEqualTo("0.5%");
+		assertThat(gameService.rentBonusPercent(player, "other-city")).isZero();
+		assertThat(gameService.buildingWaitReductionPercent(player, "other-city")).isZero();
 	}
 
 	@Test

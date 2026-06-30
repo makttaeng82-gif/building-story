@@ -193,10 +193,38 @@ public class SecretaryOperationsService {
                 continue;
             }
             SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElse(null);
-            if (spec == null || !secretary.canAutoRepair(player.getElapsedDays())) {
+            int maxRepairs = maxAutoRepairsPerCooldown(secretary);
+            if (spec == null || !secretary.canAutoRepair(player.getElapsedDays(), maxRepairs)) {
                 continue;
             }
-            notice = appendNotice(notice, repairOneBuilding(player, secretary, spec));
+            for (int repaired = 0; repaired < maxRepairs && secretary.canAutoRepair(player.getElapsedDays(), maxRepairs); repaired++) {
+                String repairNotice = repairOneBuilding(player, secretary, spec);
+                if (repairNotice.isBlank()) {
+                    break;
+                }
+                notice = appendNotice(notice, repairNotice);
+            }
+        }
+        return notice;
+    }
+
+    public String processMonthlyReputation(Player player) {
+        String notice = "";
+        for (OwnedSecretary secretary : ownedSecretaryRepository.findByPlayerOrderById(player)) {
+            if (secretary.getAssignedCity() == null) {
+                continue;
+            }
+            SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElse(null);
+            if (spec == null) {
+                continue;
+            }
+            int reputationGain = random.nextInt(3) + 1;
+            player.addReputation(reputationGain);
+            saveRecord(player, RecordType.SECRETARY_SALARY, "비서 관리", null, reputationGain, null, spec.name() + " · " + secretary.getAssignedCity());
+            notice = appendNotice(notice, spec.name() + " 비서 관리 평판 +" + reputationGain);
+        }
+        if (!notice.isBlank()) {
+            refreshTitle(player);
         }
         return notice;
     }
@@ -218,27 +246,40 @@ public class SecretaryOperationsService {
         SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElseThrow();
         int affinity = secretary.getAffinity();
         return switch (secretary.getSecretaryKey()) {
-            case "secretary-1" -> spec.specialEffect() + " " + GameTextFormatter.percent(0.5 * affinity);
-            case "secretary-2" -> spec.specialEffect() + " " + GameTextFormatter.percent(0.2 * affinity);
+            case "secretary-1" -> spec.specialEffect() + " " + GameTextFormatter.percent(repairCostReductionPercent(secretary));
+            case "secretary-2" -> spec.specialEffect() + " " + GameTextFormatter.percent(0.3 * affinity);
             case "secretary-3" -> spec.specialEffect() + " " + GameTextFormatter.percent(0.5 * affinity);
-            case "secretary-4" -> spec.specialEffect() + " " + GameTextFormatter.percent(0.3 * affinity);
+            case "secretary-4" -> spec.specialEffect() + " " + GameTextFormatter.percent(0.5 * affinity);
             case "secretary-5" -> spec.specialEffect() + " " + GameTextFormatter.percent(0.25 * affinity) + " · " + GameTextFormatter.percent(0.5 * affinity);
             case "secretary-6" -> spec.specialEffect() + " " + GameTextFormatter.percent(1.0 * affinity);
             default -> spec.specialEffectSummary();
         };
     }
 
+    @Transactional(readOnly = true)
+    public List<String> activeAbilitySummaries(OwnedSecretary secretary) {
+        SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElseThrow();
+        return List.of(
+                appliedSpecialEffectSummary(secretary),
+                "관리 가능 건물 " + managedBuildingLimit(secretary) + "채",
+                "자동수리 주기 " + spec.autoCheckDays(secretary.getProficiency()) + "일",
+                "쿨타임 내 자동수리 최대 " + maxAutoRepairsPerCooldown(secretary) + "건",
+                secretary.getProficiency() >= 16 ? "자동수리 시 평판 +1 추가 증가" : "",
+                moveOutDefenseChance(secretary) > 0 ? "입주자 퇴거방어 " + moveOutDefenseChance(secretary) + "%" : "",
+                secretary.getAssignedCity() == null ? "" : "매월 1일 배치 평판 +1~+3"
+        ).stream()
+                .filter(summary -> summary != null && !summary.isBlank())
+                .toList();
+    }
+
     public double repairRequestReductionPercent(Player player, String city) {
-        return assignedSecretary(player, city)
-                .filter(secretary -> "secretary-1".equals(secretary.getSecretaryKey()))
-                .map(secretary -> 0.5 * secretary.getAffinity())
-                .orElse(0.0);
+        return 0.0;
     }
 
     public double moveOutReductionPercent(Player player, String city) {
         return assignedSecretary(player, city)
                 .filter(secretary -> "secretary-2".equals(secretary.getSecretaryKey()))
-                .map(secretary -> 0.2 * secretary.getAffinity())
+                .map(secretary -> 0.3 * secretary.getAffinity())
                 .orElse(0.0);
     }
 
@@ -252,36 +293,94 @@ public class SecretaryOperationsService {
     public double rentBonusPercent(Player player, String city) {
         return assignedSecretary(player, city)
                 .map(secretary -> switch (secretary.getSecretaryKey()) {
-                    case "secretary-4" -> 0.3 * secretary.getAffinity();
+                    case "secretary-4" -> 0.5 * secretary.getAffinity();
                     case "secretary-5" -> 0.25 * secretary.getAffinity();
                     default -> 0.0;
                 })
                 .orElse(0.0);
     }
 
+    public boolean defendMoveOut(Player player, OwnedBuilding building) {
+        Optional<OwnedSecretary> secretaryOptional = assignedSecretary(player, building.getCity())
+                .filter(secretary -> secretary.getProficiency() >= 21);
+        if (secretaryOptional.isEmpty()) {
+            return false;
+        }
+        OwnedSecretary secretary = secretaryOptional.get();
+        int chance = moveOutDefenseChance(secretary);
+        if (random.nextInt(100) >= chance) {
+            return false;
+        }
+        SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElse(null);
+        String secretaryName = spec == null ? "비서" : spec.name();
+        saveRecord(player, RecordType.MOVE_OUT, "퇴거방어", null, 0, building.getName(), secretaryName + " · 방어확률 " + chance + "%");
+        return true;
+    }
+
     private String repairOneBuilding(Player player, OwnedSecretary secretary, SecretarySpec spec) {
         Optional<OwnedBuilding> repairTarget = ownedBuildingRepository.findByPlayerAndCityOrderById(player, secretary.getAssignedCity()).stream()
+                .limit(managedBuildingLimit(secretary))
                 .filter(OwnedBuilding::isRepairRequested)
                 .findFirst();
         if (repairTarget.isEmpty()) {
             return "";
         }
         OwnedBuilding building = repairTarget.get();
-        long repairCost = building.repairCost();
+        long repairCost = automaticRepairCost(secretary, building);
         if (!player.spendCash(repairCost)) {
             return "";
         }
         boolean repairedWithinOneMonth = building.repair();
         int reputationChange = repairedWithinOneMonth ? REPAIR_REPUTATION_REWARD : 0;
+        if (repairedWithinOneMonth && secretary.getProficiency() >= 16) {
+            reputationChange += 1;
+        }
         if (repairedWithinOneMonth) {
-            player.addReputation(REPAIR_REPUTATION_REWARD);
+            player.addReputation(reputationChange);
             refreshTitle(player);
         }
         int experienceGain = random.nextInt(100) < 70 ? 1 : 2;
         secretary.addProficiencyExperience(experienceGain);
-        secretary.startAutoRepairCooldown(player.getElapsedDays(), spec.autoCheckDays(secretary.getProficiency()));
+        secretary.recordAutoRepair(player.getElapsedDays(), spec.autoCheckDays(secretary.getProficiency()));
         saveRecord(player, RecordType.REPAIR_COMPLETE, "비서수리", -repairCost, reputationChange, building.getName(), spec.name() + " · 숙련도 경험치 +" + experienceGain);
         return spec.name() + " 비서수리 1건";
+    }
+
+    private int managedBuildingLimit(OwnedSecretary secretary) {
+        int proficiency = secretary.getProficiency();
+        if (proficiency >= 16) {
+            return 8;
+        }
+        if (proficiency >= 11) {
+            return 6;
+        }
+        if (proficiency >= 6) {
+            return 4;
+        }
+        return 2;
+    }
+
+    private int maxAutoRepairsPerCooldown(OwnedSecretary secretary) {
+        return secretary.getProficiency() >= 11 ? 2 : 1;
+    }
+
+    private int moveOutDefenseChance(OwnedSecretary secretary) {
+        if (secretary.getProficiency() >= 26) {
+            return 50;
+        }
+        if (secretary.getProficiency() >= 21) {
+            return 30;
+        }
+        return 0;
+    }
+
+    private long automaticRepairCost(OwnedSecretary secretary, OwnedBuilding building) {
+        double reduction = "secretary-1".equals(secretary.getSecretaryKey()) ? repairCostReductionPercent(secretary) : 0.0;
+        return Math.max(0L, (long) Math.floor(building.repairCost() * (100.0 - reduction) / 100.0));
+    }
+
+    private double repairCostReductionPercent(OwnedSecretary secretary) {
+        return secretary.getAffinity();
     }
 
     private String pausedActionMessage() {

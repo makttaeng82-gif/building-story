@@ -283,16 +283,16 @@ public class BuildingTradeService {
 
     private ValuationStatus randomValuation() {
         int roll = random.nextInt(100);
-        if (roll < 30) {
+        if (roll < 25) {
             return ValuationStatus.UNDER;
         }
-        if (roll < 70) {
+        if (roll < 75) {
             return ValuationStatus.FAIR;
         }
         return ValuationStatus.OVER;
     }
 
-    private double buildingWaitReductionPercent(Player player, String city) {
+    public double buildingWaitReductionPercent(Player player, String city) {
         return ownedSecretaryRepository.findByPlayerOrderById(player).stream()
                 .filter(secretary -> secretary.isAssignedTo(city))
                 .findFirst()

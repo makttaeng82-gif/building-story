@@ -80,13 +80,13 @@
                                 </div>
                                 <button class="secondary gift-modal-close" type="button">닫기</button>
                             </div>
-                            <form class="gift-give-row confirm-form" method="post" th:each="gift : ${giftItems}" th:action="@{/owned-secretaries/{id}/gifts(id=${owned.id})}" th:with="ownedQuantity=${@gameService.ownedGiftQuantity(player, gift)}, giftUsable=${owned.affinity >= gift.minAffinityLevel() && owned.affinity <= gift.maxAffinityLevel() && ownedQuantity > 0}" th:attr="data-confirm-title='선물 확인', data-confirm-message=${secretary.name()} + '에게 ' + ${gift.name()} + ' 선물?'">
+                            <form class="gift-give-row confirm-form" method="post" th:each="gift : ${giftItems}" th:action="@{/owned-secretaries/{id}/gifts(id=${owned.id})}" th:with="ownedQuantity=${@gameService.ownedGiftQuantity(player, gift)}, maxGiftQuantity=${@gameService.maxGiftQuantityForSecretary(player, owned, gift)}, giftUsable=${maxGiftQuantity > 0}" th:attr="data-confirm-title='선물 확인', data-confirm-message=${secretary.name()} + '에게 ' + ${gift.name()} + ' 선물?'">
                                 <img class="shop-image gift-image" th:src="${gift.imagePath()}" th:alt="${gift.name()} + ' 이미지'">
                                 <strong th:text="${gift.name()}">선물</strong>
                                 <span th:text="'보유 ' + ${ownedQuantity}">보유</span>
                                 <span>호감도 +1</span>
                                 <input type="hidden" name="giftKey" th:value="${gift.key()}">
-                                <input class="quantity-input" type="number" name="quantity" min="1" max="99" value="1" th:disabled="${!giftUsable}">
+                                <input class="quantity-input" type="number" name="quantity" min="1" th:max="${maxGiftQuantity}" value="1" th:disabled="${!giftUsable}">
                                 <button class="secondary" type="submit" th:disabled="${!giftUsable}" th:text="${ownedQuantity <= 0 ? '미보유' : (giftUsable ? '선물' : '구간불가')}">선물</button>
                             </form>
                         </div>

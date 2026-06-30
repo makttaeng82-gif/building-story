@@ -11,8 +11,8 @@ public class GiftItemCatalog {
             new GiftItemSpec("coffee-beans", "고급 원두세트", 150_000L, "/assets/shop/gift-coffee-beans.png", 1, 10, 1),
             new GiftItemSpec("fountain-pen", "만년필", 1_000_000L, "/assets/shop/gift-fountain-pen.png", 11, 15, 1),
             new GiftItemSpec("premium-perfume", "프리미엄 향수", 10_000_000L, "/assets/shop/gift-premium-perfume.png", 16, 20, 1),
-            new GiftItemSpec("jewelry", "최고급 보석", 150_000_000L, "/assets/shop/gift-jewelry.png", 21, 25, 1),
-            new GiftItemSpec("incentive", "인센티브", 1_500_000_000L, "/assets/shop/gift-incentive.png", 26, 30, 1)
+            new GiftItemSpec("jewelry", "최고급 보석", 80_000_000L, "/assets/shop/gift-jewelry.png", 21, 25, 1),
+            new GiftItemSpec("incentive", "인센티브", 500_000_000L, "/assets/shop/gift-incentive.png", 26, 30, 1)
     );
 
     public List<GiftItemSpec> all() {

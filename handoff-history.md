@@ -1,6 +1,106 @@
 # Handoff History
 
+# 2026-06-30
+
+- Updated UI/UX pass.
+  - Renamed assigned secretary ability button from `능력보기` to `능력`.
+  - Ability modal open handling now uses delegated click handling and participates in pause-state checks.
+  - Reduced font size in owned secretary list assignment controls and ability description rows.
+  - Donation, luxury shop, gift shop, and test panel are now collapsible sections.
+  - Toast display duration changed from 3.2 seconds to 8 seconds.
+  - Async toasts now stack up to 5 messages upward.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `51144`.
+
+# 2026-06-30
+
+- Updated secretary panel UX.
+  - Header badge now shows salary only.
+  - Repair D-day moved below secretary image/ability text above experience cards.
+  - Added ability view button and modal.
+  - Ability modal pauses time while open.
+  - Ability modal lists currently active secretary effects, managed building count, auto-repair cycle/count, auto-repair reputation bonus, move-out defense, and monthly assigned reputation bonus.
+  - Added regression test for active ability summary text.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `51216`.
+
+# 2026-06-30
+
+- Applied secretary balance tuning pass.
+  - Secretary auto-repair now only manages city buildings by order.
+  - Proficiency 1-5 manages 2 buildings, 6-10 manages 4, 11-15 manages 6, 16+ manages all 8.
+  - Proficiency 11+ can auto-repair up to 2 buildings during one cooldown period.
+  - Proficiency 16+ gives +1 extra reputation on successful auto-repair.
+  - Proficiency 21+ can defend normal tenant move-out at 30%; proficiency 26+ defends at 50%; records title `퇴거방어`.
+  - Assigned secretaries add reputation +1 to +3 on day 1 each month; records title `비서 관리`.
+  - Changed 설아름 special effect to auto-repair cost reduction by affinity x 1%.
+  - Changed 설하은 move-out reduction to affinity x 0.3%.
+  - Changed 한아리 rent bonus to affinity x 0.5%.
+  - Added regression tests for managed repair range, two repairs per cooldown, repair cost discount, and monthly secretary reputation.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `44504`.
+
+# 2026-06-30
+
+- Applied balance tuning pass.
+  - Corrected current project path in `handoff-current.md` from `D:\gameproject` to `D:\codex\gameproject`.
+  - Changed base city chances to 입주 35%, 퇴거 25%, 수리 35%.
+  - Existing persisted legacy default chances 40/20/30 are displayed and calculated as 35/25/35.
+  - Added a second monthly repair event schedule so 입주, 퇴거, 수리 can each occur up to 2 times per month.
+  - Changed market valuation distribution to 저평가 25%, 시장가 50%, 고평가 25%.
+  - Increased all building catalog monthly rents by 1.5x.
+  - Increased all building catalog trade cooldowns by 10% with ceiling.
+  - Changed gift prices: 최고급 보석 80,000,000원, 인센티브 500,000,000원.
+  - Removed the unused 부동산 광고 button from the city panel.
+  - Added regression tests for default chances, two repair days, gift prices, and building rent/cooldown balance.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `54792`.
+  - HTTP render check passed for `/main` and `/info`.
+    - `/main` rendered 입주 35%, 퇴거 25%, 수리 35%.
+    - `/main` did not render the unused 부동산 광고 button.
+    - `/main` rendered gift prices as 최고급 보석 8000만원 and 인센티브 5억원.
+    - `/info` rendered 청주 원룸 월세 30만원, 쿨타임 5일, 서울 반포 자이맹 리 월세 270억원, 쿨타임 264일.
+
 # 2026-06-18
+
+- Fixed secretary effect display and gift quantity limits.
+  - City panel now conditionally displays active rent bonus and building wait-time reduction when a relevant secretary is assigned.
+  - Exposed rent bonus and building wait reduction percentages through `GameService`.
+  - Made `BuildingTradeService.buildingWaitReductionPercent` public for display use.
+  - Gift quantity inputs for giving gifts now use the actual maximum usable quantity instead of fixed `99`.
+  - `app-ui.js` now clamps quantity input values to their min/max while typing.
+  - `ShopService.giveGiftToSecretary` now rejects quantities above owned quantity before spending.
+  - `ShopService.giveGiftToSecretary` now rejects quantities that would keep applying a gift after crossing that gift's affinity range.
+  - Added regression tests for owned gift quantity overflow, affinity range overflow, and city panel rent/wait effect text.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `43568`.
+  - HTTP render check for `/main` passed and `/app-ui.js` returned 200.
+  - Mojibake pattern check found no matches.
+
+- Continued frontend refactoring pass 16.
+  - Split modal/popover UI behavior from `src/main/resources/static/app.js` into `src/main/resources/static/app-ui.js`.
+  - `app.js` now stays focused on page entry, selected building state, toast, auction timer, side job, and day progression.
+  - `app-ui.js` owns confirm modal, image modal, help popovers, secretary modal, gift popovers, and Escape close handling.
+  - Changed `main.html` and `info.html` to load `/app.js` as `type="module"`.
+  - `app.js` line count changed from 402 to 208.
+  - `app-ui.js` is 209 lines.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `30872`.
+  - Browser check passed: `/main` loaded the module script, `/app.js` and `/app-ui.js` returned 200, and console warning/error logs were empty after page load.
+  - Mojibake pattern check found no matches.
+
+- Continued web-layer refactoring pass 15.
+  - Extracted `/main` model assembly into `src/main/java/com/game/buildingstory/web/MainPageModelAssembler.java`.
+  - Extracted `/info` model assembly into `src/main/java/com/game/buildingstory/web/InfoPageModelAssembler.java`.
+  - Moved `/test/*` QA endpoints from `GameController` into `src/main/java/com/game/buildingstory/web/QaController.java`.
+  - Added `currentPlayerId` helper to `GameController`.
+  - `GameController.java` line count changed from 468 to 360.
+  - Initial test run failed because PowerShell `Set-Content -Encoding UTF8` wrote a BOM to `GameController.java`.
+  - Removed the BOM and rewrote the file as UTF-8 without BOM.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `34688`.
+  - HTTP checks for `/main`, `/info`, and `/test/cash` passed.
+  - Mojibake pattern check found no matches.
 
 - Continued template refactoring pass 14.
   - Extracted main page city/building skyline markup into `src/main/resources/templates/fragments/main-city-panel.html`.

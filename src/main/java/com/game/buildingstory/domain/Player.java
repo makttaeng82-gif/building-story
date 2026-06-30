@@ -51,9 +51,10 @@ public class Player {
     private Integer moveOutEventDayOne;
     private Integer moveOutEventDayTwo;
     private Integer repairEventDay;
-    private Integer moveInChancePercent = 40;
-    private Integer moveOutChancePercent = 20;
-    private Integer repairRequestChancePercent = 30;
+    private Integer repairEventDayTwo;
+    private Integer moveInChancePercent = 35;
+    private Integer moveOutChancePercent = 25;
+    private Integer repairRequestChancePercent = 35;
     private String dismissedSecretaryOfferKeys = "";
 
     protected Player() {
@@ -272,15 +273,24 @@ public class Player {
     }
 
     public int getMoveInChancePercent() {
-        return moveInChancePercent == null ? 40 : moveInChancePercent;
+        if (hasLegacyDefaultChances()) {
+            return 35;
+        }
+        return moveInChancePercent == null ? 35 : moveInChancePercent;
     }
 
     public int getMoveOutChancePercent() {
-        return moveOutChancePercent == null ? 20 : moveOutChancePercent;
+        if (hasLegacyDefaultChances()) {
+            return 25;
+        }
+        return moveOutChancePercent == null ? 25 : moveOutChancePercent;
     }
 
     public int getRepairRequestChancePercent() {
-        return repairRequestChancePercent == null ? 30 : repairRequestChancePercent;
+        if (hasLegacyDefaultChances()) {
+            return 35;
+        }
+        return repairRequestChancePercent == null ? 35 : repairRequestChancePercent;
     }
 
     public void updateTestChances(int moveInChancePercent, int moveOutChancePercent, int repairRequestChancePercent) {
@@ -338,10 +348,11 @@ public class Player {
                 && moveInEventDayTwo != null
                 && moveOutEventDayOne != null
                 && moveOutEventDayTwo != null
-                && repairEventDay != null;
+                && repairEventDay != null
+                && repairEventDayTwo != null;
     }
 
-    public void scheduleMonthlyRandomEvents(int moveInEventDayOne, int moveInEventDayTwo, int moveOutEventDayOne, int moveOutEventDayTwo, int repairEventDay) {
+    public void scheduleMonthlyRandomEvents(int moveInEventDayOne, int moveInEventDayTwo, int moveOutEventDayOne, int moveOutEventDayTwo, int repairEventDay, int repairEventDayTwo) {
         this.eventScheduleMonth = month;
         this.eventScheduleCycle = currentScheduleCycle();
         this.moveInEventDayOne = moveInEventDayOne;
@@ -349,6 +360,7 @@ public class Player {
         this.moveOutEventDayOne = moveOutEventDayOne;
         this.moveOutEventDayTwo = moveOutEventDayTwo;
         this.repairEventDay = repairEventDay;
+        this.repairEventDayTwo = repairEventDayTwo;
     }
 
     public boolean isMoveInEventDay() {
@@ -360,7 +372,7 @@ public class Player {
     }
 
     public boolean isRepairEventDay() {
-        return day == valueOrImpossible(repairEventDay);
+        return day == valueOrImpossible(repairEventDay) || day == valueOrImpossible(repairEventDayTwo);
     }
 
     private int valueOrImpossible(Integer value) {
@@ -374,6 +386,12 @@ public class Player {
 
     private int clampPercent(int value) {
         return Math.max(0, Math.min(100, value));
+    }
+
+    private boolean hasLegacyDefaultChances() {
+        return Integer.valueOf(40).equals(moveInChancePercent)
+                && Integer.valueOf(20).equals(moveOutChancePercent)
+                && Integer.valueOf(30).equals(repairRequestChancePercent);
     }
 
     private int daysInMonth(int month) {

@@ -2,11 +2,12 @@
 
 ## Project
 
-- Path: `D:\gameproject`
+- Path: `D:\codex\gameproject`
 - App: Spring Boot building management game
 - Server: `http://localhost:8080`
 - Run: `.\gradlew.bat bootRun`
 - Test: `.\gradlew.bat test --console=plain`
+- Account rule: username must be 2-20 characters, password must be at least 4 characters.
 - Legacy handoff: `handoff-summary.txt` is large and partially mojibake. Do not read it by default.
 
 ## Handoff File Policy
@@ -29,10 +30,12 @@
   - Avoid growing already-large files when a responsibility can be cleanly separated.
   - Prefer existing project patterns over one-off solutions.
   - Keep behavior changes and refactoring changes clearly separated when possible.
+  - New features must be designed so future changes can be localized to the relevant service, controller, template fragment, or script module.
+  - Do not add quick fixes that make later maintenance harder unless explicitly marked as temporary and documented.
 - Main screen time advances through `/tick`.
 - Info screen does not advance time.
 - Event and auction modals pause normal play.
-- Active test server was restarted on port 8080 after city/secretary panel fragment extraction. PID: `9928`.
+- Active test server was restarted on port 8080 after secretary effect display and gift limit fixes. PID: `43568`.
 - Next planned work: code refactoring to reduce lookup time.
 
 ## Recent Implemented Systems
@@ -53,6 +56,42 @@
 
 ## Latest Changes
 
+- Updated UI/UX pass:
+  - Renamed assigned secretary ability button from `능력보기` to `능력`.
+  - Ability modal open handling now uses delegated click handling and participates in pause-state checks.
+  - Reduced font size in owned secretary list assignment controls and ability description rows.
+  - Donation, luxury shop, gift shop, and test panel are now collapsible sections.
+  - Toast display duration changed from 3.2 seconds to 8 seconds.
+  - Async toasts now stack up to 5 messages upward.
+- Updated secretary panel UX:
+  - Header badge now shows salary only.
+  - Repair D-day moved below secretary image/ability text above experience cards.
+  - Added ability view button and modal.
+  - Ability modal pauses time while open.
+  - Ability modal lists currently active secretary effects, managed building count, auto-repair cycle/count, auto-repair reputation bonus, move-out defense, and monthly assigned reputation bonus.
+  - Added regression test for active ability summary text.
+- Applied secretary balance tuning pass:
+  - Secretary auto-repair now only manages city buildings by order.
+  - Proficiency 1-5 manages 2 buildings, 6-10 manages 4, 11-15 manages 6, 16+ manages all 8.
+  - Proficiency 11+ can auto-repair up to 2 buildings during one cooldown period.
+  - Proficiency 16+ gives +1 extra reputation on successful auto-repair.
+  - Proficiency 21+ can defend normal tenant move-out at 30%; proficiency 26+ defends at 50%; records title `퇴거방어`.
+  - Assigned secretaries add reputation +1 to +3 on day 1 each month; records title `비서 관리`.
+  - 설아름 effect changed from repair-request chance reduction to auto-repair cost reduction, affinity x 1%.
+  - 설하은 move-out reduction changed to affinity x 0.3%.
+  - 한아리 rent bonus changed to affinity x 0.5%.
+  - Added regression tests for managed repair range, two repairs per cooldown, repair cost discount, and monthly secretary reputation.
+- Applied balance tuning pass:
+  - Base city chances changed to move-in 35%, move-out 25%, repair 35%.
+  - Existing persisted legacy default chances 40/20/30 are displayed and calculated as 35/25/35.
+  - Move-in, move-out, and repair events can each occur up to 2 times per month.
+  - Market valuation chance changed to under 25%, fair 50%, over 25%.
+  - Building catalog monthly rents increased by 1.5x.
+  - Building catalog trade cooldowns increased by 10% with ceiling.
+  - Gift prices changed: jewelry 80,000,000 won, incentive 500,000,000 won.
+  - Removed the unused real-estate ad button from the city panel.
+  - Test panel chance inputs now use the same corrected base chance values as the city chance display.
+  - Added regression tests for default chances, two repair days, gift prices, and building rent/cooldown balance.
 - Fixed QA/test helper persistence after refactor.
   - Root cause: `QaService` was missing transactional boundaries after `/test/*` endpoints were moved from `GameService`.
   - Added `@Transactional` to `QaService`.
@@ -94,10 +133,26 @@
   - `fragments/main-city-panel.html`
 - Split main page secretary panel markup into:
   - `fragments/main-secretary-panel.html`
+- Split web layer responsibilities:
+  - `MainPageModelAssembler`
+  - `InfoPageModelAssembler`
+  - `QaController`
+- Split frontend UI interaction code:
+  - `app.js` remains the main game loop/entry script.
+  - `app-ui.js` owns confirm modal, image modal, help popovers, secretary modal, and gift popovers.
+- Fixed secretary effect display and gift giving limits:
+  - City panel now conditionally shows active rent bonus and building wait-time reduction.
+  - Gift quantity inputs now cap at the currently usable quantity.
+  - Quantity inputs are clamped client-side when typed above max.
+  - Server rejects gift quantities above owned quantity.
+  - Server rejects gift quantities that would continue applying a gift after the secretary crosses that gift's affinity range.
 - `main.html` was reduced from 693 lines to 105 lines.
 - `fragments/main-info-grid.html` is 152 lines.
 - `fragments/main-city-panel.html` is 48 lines.
 - `fragments/main-secretary-panel.html` is 65 lines.
+- `GameController.java` was reduced from 468 lines to 360 lines.
+- `app.js` was reduced from 402 lines to 208 lines.
+- `app-ui.js` is 209 lines.
 - Fixed market refresh behavior:
   - Buying a building no longer deletes its offer.
   - `ensureOffers` no longer refreshes just because the city has fewer offers than the catalog.
@@ -153,8 +208,13 @@
 - `src/main/resources/templates/fragments/main-city-panel.html`
 - `src/main/resources/templates/fragments/main-secretary-panel.html`
 - `src/main/resources/static/app.js`
+- `src/main/resources/static/app-ui.js`
 - `src/main/resources/templates/main.html`
+- `src/main/resources/templates/info.html`
 - `src/main/java/com/game/buildingstory/web/GameController.java`
+- `src/main/java/com/game/buildingstory/web/MainPageModelAssembler.java`
+- `src/main/java/com/game/buildingstory/web/InfoPageModelAssembler.java`
+- `src/main/java/com/game/buildingstory/web/QaController.java`
 - `src/test/java/com/game/buildingstory/BuildingStoryApplicationTests.java`
 - `handoff-current.md`
 - `handoff-history.md`
@@ -180,6 +240,18 @@
 - Test after market refresh and confirm modal fixes: `.\gradlew.bat test --console=plain` passed.
 - Test after main info-grid fragment extraction: `.\gradlew.bat test --console=plain` passed.
 - Test after main city/secretary panel fragment extraction: `.\gradlew.bat test --console=plain` passed.
+- Test after controller/model assembler refactor: `.\gradlew.bat test --console=plain` passed.
+- Test after app.js UI interaction split: `.\gradlew.bat test --console=plain` passed.
+- Test after secretary effect display and gift limit fixes: `.\gradlew.bat test --console=plain` passed.
+- Test after balance tuning pass: `.\gradlew.bat test --console=plain` passed.
+- Test after account-rule note and chance display sync: `.\gradlew.bat test --console=plain` passed.
+- Test after secretary balance tuning pass: `.\gradlew.bat test --console=plain` passed.
+- Test after secretary panel ability modal UX: `.\gradlew.bat test --console=plain` passed.
+- Test after collapsible panels and toast UI pass: `.\gradlew.bat test --console=plain` passed.
+- Added regression tests:
+  - `giftQuantityCannotExceedOwnedQuantity`
+  - `giftQuantityCannotContinuePastGiftAffinityRange`
+  - `cityPanelCanDisplayRentBonusAndBuildingWaitReductionText`
 - Added regression test `buyingOfferDoesNotRefreshMarketBeforeRefreshDay`.
 - Browser render check after fragment extraction passed:
   - `/login` loaded.
@@ -201,13 +273,40 @@
 - HTTP render check after city/secretary panel fragment extraction passed:
   - `/main` rendered with `.layout`, `.city-panel`, `.skyline`, `.secretary-panel`, `.secretary-focus`, `.market-panel`, and `.info-grid`.
   - No template error.
+- HTTP check after controller/model assembler refactor passed:
+  - `/main` rendered with city panel, market panel, and confirm modal.
+  - `/info` rendered building information.
+  - `/test/cash` still persisted cash change.
+  - No template error.
+- Browser check after app.js UI interaction split passed:
+  - `/app.js` and `/app-ui.js` returned 200 with `text/javascript`.
+  - `/main` loaded with `script[type="module"][src="/app.js"]`.
+  - Browser console had no warning/error entries after loading `/main`.
+- HTTP render check after secretary effect display and gift limit fixes passed:
+  - `/main` rendered city panel chance text.
+  - Gift max expressions were resolved by Thymeleaf.
+  - `/app-ui.js` returned 200 with `text/javascript`.
+  - No template error.
+- HTTP render check after balance tuning pass passed:
+  - `/main` rendered 입주 35%, 퇴거 25%, 수리 35%.
+  - `/main` did not render the unused 부동산 광고 button.
+  - `/main` rendered gift prices as 최고급 보석 8000만원 and 인센티브 5억원.
+  - `/info` rendered updated catalog values including 청주 원룸 월세 30만원, 쿨타임 5일, 서울 반포 자이맹 리 월세 270억원, 쿨타임 264일.
 - Manual QA cash POST verified: cash changed from `0원` to `3000만원`.
-- Server restarted successfully on `http://localhost:8080`. PID: `9928`.
+- Server restarted successfully on `http://localhost:8080`. PID: `51144`.
 - Mojibake pattern check against service files and handoff files found no matches.
 
 ## Next Planned Work
 
-- Continue refactoring before adding features.
-- Recommended next targets:
-  - Split remaining `main.html` header/navigation/toast shell only if useful.
-  - Reduce `GameService` remaining read/display delegation methods if useful.
+- Next work should be game balance tuning, not broad refactoring.
+- Balance tuning scope:
+  - Building prices, rents, purchase cooldowns, and city unlock reputation.
+  - Monthly salary, loan limit/repayment pressure, donation efficiency, luxury item rewards, and gift prices.
+  - Secretary salary, proficiency scaling, affinity gift ranges, special effect strength, and auto-repair cooldown.
+  - Auction frequency, bid risk/reward, and fail/success outcomes.
+- Balance tuning process:
+  - First document the current economy curve by city and progression stage.
+  - Identify target pacing: early game, mid game, late game, secretary unlock timing, Seoul/endgame timing.
+  - Change numbers in small batches and add/adjust regression tests for important thresholds.
+  - Keep balance constants localized in catalog/service classes; do not hard-code new numbers in templates.
+  - After each balance pass, run `.\gradlew.bat test --console=plain` and manually check `/main` and `/info`.

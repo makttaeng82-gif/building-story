@@ -65,6 +65,11 @@ public class ShopService {
                 .orElse(0);
     }
 
+    public int maxGiftQuantityForSecretary(Player player, OwnedSecretary secretary, GiftItemSpec gift) {
+        int ownedQuantity = ownedGiftQuantity(player, gift);
+        return maxGiftQuantityForSecretary(secretary, gift, ownedQuantity);
+    }
+
     public boolean isLuxuryItemOwned(Player player, LuxuryItemSpec item) {
         return ownedLuxuryItemRepository.findByPlayerAndItemKey(player, item.key()).isPresent();
     }
@@ -142,14 +147,46 @@ public class ShopService {
         }
         int safeQuantity = Math.max(1, Math.min(99, quantity));
         OwnedGiftItem ownedGift = ownedGiftItemRepository.findByPlayerAndGiftKey(player, gift.key()).orElse(null);
-        if (ownedGift == null || !ownedGift.spendQuantity(safeQuantity)) {
+        if (ownedGift == null || ownedGift.getQuantity() < safeQuantity) {
             return "선물 수량 부족";
         }
+        int maxGiftQuantity = maxGiftQuantityForSecretary(secretary, gift, ownedGift.getQuantity());
+        if (safeQuantity > maxGiftQuantity) {
+            return "현재 호감도 구간에서 선물 가능한 수량 초과";
+        }
+        ownedGift.spendQuantity(safeQuantity);
         int beforeAffinity = secretary.getAffinity();
         secretary.addAffinityExperience(gift.affinityExperience() * safeQuantity);
         saveRecord(player, RecordType.BUILDING_BUY, "비서 선물", null, 0, gift.name(), "호감도 " + beforeAffinity + " -> " + secretary.getAffinity());
         SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElseThrow();
         return spec.name() + "에게 " + gift.name() + " " + safeQuantity + "개 선물 완료";
+    }
+
+    private int maxGiftQuantityForSecretary(OwnedSecretary secretary, GiftItemSpec gift, int ownedQuantity) {
+        int maxByOwned = Math.max(0, Math.min(99, ownedQuantity));
+        int affinity = secretary.getAffinity();
+        int affinityExperience = secretary.getAffinityExperience();
+        int usableQuantity = 0;
+        for (int i = 0; i < maxByOwned; i++) {
+            if (affinity < gift.minAffinityLevel() || affinity > gift.maxAffinityLevel() || affinity >= 30) {
+                break;
+            }
+            usableQuantity++;
+            affinityExperience += gift.affinityExperience();
+            while (affinity < 30 && affinityExperience >= requiredAffinityExperience(affinity)) {
+                affinityExperience -= requiredAffinityExperience(affinity);
+                affinity++;
+            }
+            if (affinity >= 30) {
+                affinity = 30;
+                affinityExperience = 0;
+            }
+        }
+        return usableQuantity;
+    }
+
+    private int requiredAffinityExperience(int affinity) {
+        return affinity >= 30 ? 0 : affinity + 2;
     }
 
     private String pausedActionMessage() {

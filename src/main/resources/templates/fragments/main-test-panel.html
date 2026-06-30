@@ -1,23 +1,23 @@
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
-<article th:fragment="testPanel" class="panel test-panel">
-    <h2>테스트</h2>
+<details th:fragment="testPanel" class="panel test-panel collapsible-panel" open>
+    <summary>테스트</summary>
     <form method="post" action="/test/cash">
         <button type="submit">현금 3천만원 증가</button>
     </form>
     <form method="post" action="/test/chances" class="test-controls">
         <label>
             입주확률
-            <input type="number" name="moveInChance" min="0" max="100" th:value="${player.moveInChancePercent}">
+            <input type="number" name="moveInChance" min="0" max="100" th:value="${@gameService.baseMoveInChancePercent(player)}">
         </label>
         <label>
             퇴거확률
-            <input type="number" name="moveOutChance" min="0" max="100" th:value="${player.moveOutChancePercent}">
+            <input type="number" name="moveOutChance" min="0" max="100" th:value="${@gameService.baseMoveOutChancePercent(player)}">
         </label>
         <label>
             수리확률
-            <input type="number" name="repairChance" min="0" max="100" th:value="${player.repairRequestChancePercent}">
+            <input type="number" name="repairChance" min="0" max="100" th:value="${@gameService.baseRepairRequestChancePercent(player)}">
         </label>
         <button class="secondary" type="submit">확률 적용</button>
     </form>
@@ -88,6 +88,6 @@
         </li>
     </ul>
     <p th:if="${secretaryTenantEvents.isEmpty()}">진행 중인 비서 이벤트 없음</p>
-</article>
+</details>
 </body>
 </html>

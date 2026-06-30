@@ -350,8 +350,48 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
+    public int baseMoveInChancePercent(Player player) {
+        return player.getMoveInChancePercent();
+    }
+
+    @Transactional(readOnly = true)
+    public int baseMoveOutChancePercent(Player player) {
+        return player.getMoveOutChancePercent();
+    }
+
+    @Transactional(readOnly = true)
+    public int baseRepairRequestChancePercent(Player player) {
+        return player.getRepairRequestChancePercent();
+    }
+
+    @Transactional(readOnly = true)
+    public double rentBonusPercent(Player player, String city) {
+        return secretaryOperationsService.rentBonusPercent(player, city);
+    }
+
+    @Transactional(readOnly = true)
+    public String rentBonusPercentText(Player player, String city) {
+        return formatPercent(rentBonusPercent(player, city));
+    }
+
+    @Transactional(readOnly = true)
+    public double buildingWaitReductionPercent(Player player, String city) {
+        return buildingTradeService.buildingWaitReductionPercent(player, city);
+    }
+
+    @Transactional(readOnly = true)
+    public String buildingWaitReductionPercentText(Player player, String city) {
+        return formatPercent(buildingWaitReductionPercent(player, city));
+    }
+
+    @Transactional(readOnly = true)
     public String appliedSecretarySpecialEffectSummary(OwnedSecretary secretary) {
         return secretaryOperationsService.appliedSpecialEffectSummary(secretary);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> activeSecretaryAbilitySummaries(OwnedSecretary secretary) {
+        return secretaryOperationsService.activeAbilitySummaries(secretary);
     }
 
     @Transactional(readOnly = true)
@@ -412,6 +452,11 @@ public class GameService {
     @Transactional(readOnly = true)
     public int ownedGiftQuantity(Player player, GiftItemSpec gift) {
         return shopService.ownedGiftQuantity(player, gift);
+    }
+
+    @Transactional(readOnly = true)
+    public int maxGiftQuantityForSecretary(Player player, OwnedSecretary secretary, GiftItemSpec gift) {
+        return shopService.maxGiftQuantityForSecretary(player, secretary, gift);
     }
 
     @Transactional(readOnly = true)

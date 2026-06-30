@@ -6,10 +6,12 @@
         <div>
             <h2 th:text="${player.currentCity}">청주</h2>
             <p>
-                보유 건물 <span th:text="${buildings.size()}">0</span>/8 · 광고 없음 ·
-                입주 <span th:text="${@gameService.effectiveMoveInChancePercentText(player, player.currentCity)}">40%</span> ·
-                퇴거 <span th:text="${@gameService.effectiveMoveOutChancePercentText(player, player.currentCity)}">10%</span> ·
-                수리 <span th:text="${@gameService.effectiveRepairRequestChancePercentText(player, player.currentCity)}">30%</span>
+                보유 건물 <span th:text="${buildings.size()}">0</span>/8 ·
+                입주 <span th:text="${@gameService.effectiveMoveInChancePercentText(player, player.currentCity)}">35%</span> ·
+                퇴거 <span th:text="${@gameService.effectiveMoveOutChancePercentText(player, player.currentCity)}">25%</span> ·
+                수리 <span th:text="${@gameService.effectiveRepairRequestChancePercentText(player, player.currentCity)}">35%</span>
+                <span th:if="${@gameService.rentBonusPercent(player, player.currentCity) > 0}" th:text="' · 월세 +' + ${@gameService.rentBonusPercentText(player, player.currentCity)}">월세</span>
+                <span th:if="${@gameService.buildingWaitReductionPercent(player, player.currentCity) > 0}" th:text="' · 건물대기시간 -' + ${@gameService.buildingWaitReductionPercentText(player, player.currentCity)}">대기</span>
             </p>
         </div>
         <div class="quick-actions">
@@ -17,7 +19,6 @@
             <form method="post" action="/resign" th:if="${player.employed}">
                 <button class="danger-button" type="submit" th:disabled="${player.paused || !player.canResign()}" th:text="${player.paused ? '일시정지' : (player.canResign() ? '퇴사' : '퇴사 ' + player.ddayText(player.daysUntilResignAvailable()))}">퇴사</button>
             </form>
-            <button type="button">부동산 광고</button>
         </div>
     </div>
 

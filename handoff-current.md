@@ -4,423 +4,126 @@
 
 - Path: `D:\codex\gameproject`
 - App: Spring Boot building management game
-- Server: `http://localhost:8080`
+- Server URL: `http://localhost:8080`
 - Run: `.\gradlew.bat bootRun`
 - Test: `.\gradlew.bat test --console=plain`
-- Account rule: username must be 2-20 characters, password must be at least 4 characters.
-- Legacy handoff: `handoff-summary.txt` is large and partially mojibake. Do not read it by default.
+- Account rule: username 2-20 chars, password at least 4 chars.
+- Start new work by reading this file first.
+- Read/write Markdown handoff files as UTF-8.
+- Do not use `handoff-summary.txt` by default; it is large and partially mojibake.
 
-## Handoff File Policy
+## Current State
 
-- At the start of a new chat or task, read `handoff-current.md` first.
-- Encoding rule is mandatory: all Markdown handoff files must be read and written as UTF-8.
-- Do not rely on PowerShell default encoding or console code page. Windows may use CP949 and Korean text can appear as mojibake even when the file is valid UTF-8.
-- If Korean text looks broken, first re-read the file with explicit UTF-8 before assuming the file content is damaged.
-  - PowerShell read: `Get-Content -Raw -Encoding UTF8 -LiteralPath "handoff-current.md"`
-  - PowerShell write: `Set-Content -Encoding UTF8 -LiteralPath "handoff-current.md" -Value $text`
-- At the end of work, keep `handoff-current.md` short and update only the current state.
-- Append detailed work history to `handoff-history.md`.
-- Check `handoff-history.md` or `git log` only when older reasoning or past details are needed.
-- Do not use `handoff-summary.txt` as the default handoff source.
+- Current branch: `codex/refactor-building-story`
+- Latest pushed commit: `64456f4 add stock market systems and events`
+- Remote: `origin/codex/refactor-building-story`
+- Working tree was clean immediately after push.
+- Server is stopped. Port 8080 has no listener.
+- Last verification before push: `.\gradlew.bat test --console=plain` passed.
 
-## Current Rule Notes
+## Recent GitHub Push
 
-- Do not overwrite unrelated dirty worktree changes.
-- During development, consider extensibility and maintainability before implementation.
-  - Avoid growing already-large files when a responsibility can be cleanly separated.
-  - Prefer existing project patterns over one-off solutions.
-  - Keep behavior changes and refactoring changes clearly separated when possible.
-  - New features must be designed so future changes can be localized to the relevant service, controller, template fragment, or script module.
-  - Do not add quick fixes that make later maintenance harder unless explicitly marked as temporary and documented.
-- Main screen time advances through `/tick`.
-- Info screen does not advance time.
-- Event and auction modals pause normal play.
-- Active test server is running on port 8080 after stock holding/filter/exchange UX work. Listening process PID: `58316`.
-- Next planned work: code refactoring to reduce lookup time.
+- Pushed to GitHub:
+  - Branch: `codex/refactor-building-story`
+  - Commit: `64456f4`
+  - Message: `add stock market systems and events`
+- `gh` CLI is not installed in this environment, so no PR was created.
 
-## Recent Implemented Systems
+## Recent Stock Work
 
-- Auction chance is 3%, auction auto-cancel timer is 20 seconds.
-- Gift shop exists with 5 gift items.
-- Gifts give affinity experience +1 and are gated by affinity range.
-- Secretary event chain exists:
-  - tenant intro
-  - request
-  - request accepted or waiting
-  - hire event
-  - completed
-- Secretary event images are stored under `src/main/resources/static/assets/events/`.
-- Building images are used in owned building and market cards.
-- Secretary special effects are reflected in final city chance text.
-- QA tools exist on the main test panel for secretary event setup/stage.
+- Stock content unlocks after Seoul unlock schedule.
+- Stock screen exists as `/main?view=stocks`.
+- Stock screen shares main game time flow.
+- Stock screen sends `/tick?view=stocks`.
+- City event/auction reload signals are deferred while viewing stocks.
+- City events can be created in background and shown after returning to city view.
+- Stock market initializes 15 companies:
+  - IT 3, food 3, retail 3, manufacturing 3, telecom 3.
+  - Each industry has one safe, one normal, one aggressive stock internally.
+  - Safe/normal/aggressive labels are not shown in the stock list.
+- Stock prices update every 5 elapsed days.
+- Stock chart is server-rendered SVG candlestick.
+- Stock prices use coin values.
+- Coin exchange rate: `1 coin = 100 won`.
+- Buy/sell fee: 0.5%, rounded up.
+- Buy/sell are immediate market-price actions.
+- Loss is limited to principal; no margin/debt stock trading.
+- Stock trade history exists.
+- Trade history currently shows records from the last 90 days.
+- Trade history filters:
+  - all
+  - buy
+  - sell
+  - by stock
+- Cash/coin exchange has quick buttons:
+  - all available
+  - 100k
+  - 1m
+  - 10m coin
+- Stock right-side panel shows holding summary above recent city records.
+- Holding summary shows:
+  - held stock count
+  - total shares
+  - total cost
+  - total valuation
+  - profit/loss
 
-## Latest Changes
+## Stock Events
 
-- Added stock holding/filter/exchange UX:
-  - Stock right-side area now shows `보유종목요약` above recent records.
-  - Holding summary includes held stock count, total shares, total cost, total valuation, and profit/loss.
-  - Added `StockHoldingSummaryView`.
-  - Trade history now has filters: all, buy, sell, and stock-specific select.
-  - Cash/coin exchange forms now have quick buttons: all available, 100k, 1m, 10m coin.
-  - Updated app script cache key to `app.js?v=stock-tools-1`.
-- Added stock industry boom/recession events:
-  - Stock events can occur after stock content is unlocked.
-  - Monthly schedule chance is 15%.
-  - Event industry is random among IT, food, retail, manufacturing, and telecom.
-  - Trend is random boom or recession.
-  - Active event applies to the affected industry for the next 2 stock price updates.
-  - Boom adds a random +3% to +8% industry effect per affected stock update.
-  - Recession adds a random -3% to -8% industry effect per affected stock update.
-  - Event modal uses supplied news images under `src/main/resources/static/assets/stock-news/`.
-  - Recent records store stock industry news as `STOCK_EVENT`.
-  - Stock list no longer displays safe/normal/aggressive beside industry. Risk type remains internal for movement logic.
-- Fixed login 500 on existing DB:
-  - Cause: `players.coin` did not exist in the file H2 DB after adding stock coin balance.
-  - Changed `Player.coin` to nullable `Long` with getter fallback to 0.
-  - Added startup DB migration to add `players.coin` with default 0 and backfill nulls.
-  - Verified register/login POST returns 302 on the local server.
-- Updated stock screen:
-  - Added stock list filter tabs: all stocks and owned stocks.
-  - Owned stocks tab hides stocks with 0 owned quantity and shows an empty message when none exist.
-  - Added max buy and sell all actions.
-  - Max buy uses current coin balance and includes the 0.5% fee.
-  - Improved chart right-side price label visibility.
-- Improved stock trade and exchange UI:
-  - Buy form now shows max purchasable quantity, total coin cost, and fee before submit.
-  - Sell form now shows owned quantity, expected coin payout, and fee before submit.
-  - Cash/coin exchange forms now show max exchangeable amount and expected cash amount before submit.
-  - Async cash/coin exchange updates internal cash/coin balances so previews refresh without page reload.
-  - Added stock quantity quick buttons: +1, +10, +100, 50%, max.
-  - Quick quantity buttons use document-level delegated click handling and prevent default button behavior.
-  - Stock order quantities are saved in session storage per stock and buy/sell side, then restored after reload.
-  - Stock exchange coin inputs are saved in session storage per exchange direction, then restored after reload.
-  - Main page script URL now has cache-busting query `app.js?v=stock-quick-4`.
-  - Reworked buy/sell controls into two wider panels to avoid overflow.
-  - Detailed trade failure messages now include needed/held coin or held/requested quantity.
-- Changed stock-view time/event behavior:
-  - Stock screen now sends `/tick?view=stocks`.
-  - City event/auction reload signals are not sent while viewing stocks.
-  - Date-based city events can be created without pausing while on the stock screen, then shown when returning to the city screen.
-  - Added regression test for stock-view deferred due city event behavior.
-- Added stock coin trading UI and backend:
-  - Added player coin balance.
-  - Added cash/coin exchange at 1 coin = 100 won.
-  - Stock prices now display as coin values.
-  - Added async stock exchange forms so cash/coin exchange does not reload the page.
-  - Added immediate current-price stock buy/sell.
-  - Buy/sell fee is 0.5%, rounded up.
-  - Added stock trade history entity/repository and display panel.
-  - Added buy/sell controls under each stock detail.
-  - Removed placeholder "buy/sell preparing" buttons from the chart header.
-  - Stock screen now shows a right-side recent city record panel.
-  - Added regression test for cash-to-coin exchange, buy fee, sell payout, and trade history.
-- Updated stock price movement model:
-  - Added stock risk types: safe, normal, aggressive.
-  - Each industry now has one safe, one normal, and one aggressive stock.
-  - Safe noise: -2% to +2%.
-  - Normal noise: -4% to +4%.
-  - Aggressive noise: -7% to +7%.
-  - Each 5-day update now applies one market-wide mood effect to all stocks.
-  - Market mood ranges: bull +0.5% to +2.0%, neutral -0.7% to +0.7%, bear -2.0% to -0.5%.
-  - Recent 3-candle trend adds +0.5% or -0.5% when at least 2 candles share direction.
-  - Rare shocks added: 2% surge chance and 2% drop chance, each 8% to 18%.
-  - Final change is clamped to +/-12% normally and +/-25% with shocks.
-  - Stock list now shows risk label beside industry.
-- Fixed stock screen UX bugs:
-  - Pause/resume on stock screen now redirects back to `/main?view=stocks`.
-  - Stock refresh card now shows the next stock update date and D-day instead of current date.
-  - Added a navigation guard to prevent duplicate `/tick` calls during reload, addressing intermittent 2-day jumps.
-  - Selected stock now persists through day reloads.
-  - Stock company buttons and stock summary values now wrap inside their boxes.
-  - Stock prices now use exact won-level display instead of the real-estate compact money formatter.
-  - Chart right-side price labels have more horizontal room.
-- Implemented stock price-history core:
-  - Added `OwnedStock` and `StockPriceHistory` entities.
-  - Added stock holding and price history repositories.
-  - Stock market initializes 15 stock price rows when stock content unlocks or the stock screen is opened.
-  - Stock prices update every 5 elapsed days.
-  - Each update appends OHLCV data for all stocks.
-  - Normal stock movement is random -5% to +5%.
-  - Main stock tab now renders from `stockQuotes`.
-  - Left stock list shows industry, company, current price, previous update price, change rate, and change amount.
-  - Stock detail panel now has server-rendered SVG candlestick and volume bars.
-  - Up color is red and down color is blue.
-  - Added regression test for stock unlock seeding and 5-day price updates.
-- Updated recent records panel:
-  - Recent records now default to a floating right-side panel on wide screens.
-  - The panel has a `고정` button that returns it to the original info-grid position.
-  - When docked, the button changes to `따라오기` and restores floating mode.
-  - Docked/floating state is persisted in localStorage.
-  - On narrower screens the panel stays in the original layout.
-- Updated UI/UX pass:
-  - Renamed assigned secretary ability button from `능력보기` to `능력`.
-  - Ability modal open handling now uses delegated click handling and participates in pause-state checks.
-  - Reduced font size in owned secretary list assignment controls and ability description rows.
-  - Donation, luxury shop, gift shop, and test panel are now collapsible sections.
-  - Toast display duration changed from 3.2 seconds to 8 seconds.
-  - Async toasts now stack up to 5 messages upward.
-- Updated secretary panel UX:
-  - Header badge now shows salary only.
-  - Repair D-day moved below secretary image/ability text above experience cards.
-  - Added ability view button and modal.
-  - Ability modal pauses time while open.
-  - Ability modal lists currently active secretary effects, managed building count, auto-repair cycle/count, auto-repair reputation bonus, move-out defense, and monthly assigned reputation bonus.
-  - Added regression test for active ability summary text.
-- Applied secretary balance tuning pass:
-  - Secretary auto-repair now only manages city buildings by order.
-  - Proficiency 1-5 manages 2 buildings, 6-10 manages 4, 11-15 manages 6, 16+ manages all 8.
-  - Proficiency 11+ can auto-repair up to 2 buildings during one cooldown period.
-  - Proficiency 16+ gives +1 extra reputation on successful auto-repair.
-  - Proficiency 21+ can defend normal tenant move-out at 30%; proficiency 26+ defends at 50%; records title `퇴거방어`.
-  - Assigned secretaries add reputation +1 to +3 on day 1 each month; records title `비서 관리`.
-  - 설아름 effect changed from repair-request chance reduction to auto-repair cost reduction, affinity x 1%.
-  - 설하은 move-out reduction changed to affinity x 0.3%.
-  - 한아리 rent bonus changed to affinity x 0.5%.
-  - Added regression tests for managed repair range, two repairs per cooldown, repair cost discount, and monthly secretary reputation.
-- Applied balance tuning pass:
-  - Base city chances changed to move-in 35%, move-out 25%, repair 35%.
-  - Existing persisted legacy default chances 40/20/30 are displayed and calculated as 35/25/35.
-  - Move-in, move-out, and repair events can each occur up to 2 times per month.
-  - Market valuation chance changed to under 25%, fair 50%, over 25%.
-  - Building catalog monthly rents increased by 1.5x.
-  - Building catalog trade cooldowns increased by 10% with ceiling.
-  - Gift prices changed: jewelry 80,000,000 won, incentive 500,000,000 won.
-  - Removed the unused real-estate ad button from the city panel.
-  - Test panel chance inputs now use the same corrected base chance values as the city chance display.
-  - Added regression tests for default chances, two repair days, gift prices, and building rent/cooldown balance.
-- Fixed QA/test helper persistence after refactor.
-  - Root cause: `QaService` was missing transactional boundaries after `/test/*` endpoints were moved from `GameService`.
-  - Added `@Transactional` to `QaService`.
-  - Added regression test `qaCashChangePersistsWithoutCallerTransaction`.
-- Started code refactoring to reduce `GameService` size.
-- Extracted secretary tenant scenario data into:
-  - `SecretaryTenantScenario`
-  - `SecretaryTenantScenarioCatalog`
-- Extracted secretary tenant event flow into:
-  - `SecretaryTenantEventService`
-- Extracted display formatting into:
-  - `GameTextFormatter`
-- Extracted shop behavior into:
-  - `ShopService`
-- Extracted auction behavior into:
-  - `AuctionService`
-- Extracted QA/test helper behavior into:
-  - `QaService`
-- Extracted building trade/market behavior into:
-  - `BuildingTradeService`
-- Extracted loan behavior into:
-  - `LoanService`
-- Extracted secretary operations behavior into:
-  - `SecretaryOperationsService`
-- Extracted monthly settlement and random building event behavior into:
-  - `SettlementService`
-- Extracted event completion/cancel and resignation behavior into:
-  - `EventFlowService`
-- `GameService.java` was reduced from 2019 lines to 585 lines.
-- Split main page modal markup into:
-  - `fragments/main-modals.html`
-- Split main page market markup into:
-  - `fragments/main-market.html`
-- Split main page QA/test panel markup into:
-  - `fragments/main-test-panel.html`
-- Split main page info-grid markup into:
-  - `fragments/main-info-grid.html`
-- Split main page city panel markup into:
-  - `fragments/main-city-panel.html`
-- Split main page secretary panel markup into:
-  - `fragments/main-secretary-panel.html`
-- Split web layer responsibilities:
-  - `MainPageModelAssembler`
-  - `InfoPageModelAssembler`
-  - `QaController`
-- Split frontend UI interaction code:
-  - `app.js` remains the main game loop/entry script.
-  - `app-ui.js` owns confirm modal, image modal, help popovers, secretary modal, and gift popovers.
-- Fixed secretary effect display and gift giving limits:
-  - City panel now conditionally shows active rent bonus and building wait-time reduction.
-  - Gift quantity inputs now cap at the currently usable quantity.
-  - Quantity inputs are clamped client-side when typed above max.
-  - Server rejects gift quantities above owned quantity.
-  - Server rejects gift quantities that would continue applying a gift after the secretary crosses that gift's affinity range.
-- `main.html` was reduced from 693 lines to 105 lines.
-- `fragments/main-info-grid.html` is 152 lines.
-- `fragments/main-city-panel.html` is 48 lines.
-- `fragments/main-secretary-panel.html` is 65 lines.
-- `GameController.java` was reduced from 468 lines to 360 lines.
-- `app.js` was reduced from 402 lines to 208 lines.
-- `app-ui.js` is 209 lines.
-- Fixed market refresh behavior:
-  - Buying a building no longer deletes its offer.
-  - `ensureOffers` no longer refreshes just because the city has fewer offers than the catalog.
-  - Purchased offers remain visible with purchase cooldown until the scheduled 5-day refresh.
-- Fixed purchase confirmation behavior:
-  - Donation forms now use the shared confirm modal.
-  - Donation, luxury, and gift purchase confirm modal title is `구매 하시겠습니까?`.
-  - Confirm modal display now pauses day progression through `game-paused`.
-- Behavior intent: no feature changes, only responsibility split.
-- Cleaned 33 root-level `tmp-*` files. `server-8080.log` and `server-8080.err.log` were recreated by the active server.
+- Stock industry boom/recession events are implemented.
+- Occur only after stock content is unlocked.
+- Monthly chance: 15%.
+- Random industry: IT, food, retail, manufacturing, telecom.
+- Random trend: boom or recession.
+- Duration: next 2 stock price updates.
+- Boom effect: random +3% to +8% industry effect per affected stock update.
+- Recession effect: random -3% to -8% industry effect per affected stock update.
+- Event modal images are stored under `src/main/resources/static/assets/stock-news/`.
+- Stock industry news records use `RecordType.STOCK_EVENT`.
 
-## Secretary Event Conditions For Display
+## Real Estate News Events
 
-- 설아름
-  - 입주조건: 1월 3일 청주 첫 건물 입주 이벤트
-  - 고용조건: 현금 1억 최초 달성 후 월세 2달 감면 수락, 2달 경과
-- 설하은
-  - 입주조건: 세종 도담동 24평형 아파트 첫 구매
-  - 고용조건: 평판 1만5500 이상, 현금 3억 이상, 부탁 수락 후 1억원 지급
-- 이다은
-  - 입주조건: 대전 봉명동 상가주택 첫 구매
-  - 고용조건: 평판 5만500 이상, 그렌져 보유, 부탁 수락 후 30일 경과
-- 한아리
-  - 입주조건: 부산 센텀시티 첫 구매
-  - 고용조건: 평판 45만5000 이상, 현금 150억 이상, 부탁 수락 후 90억 지급
-- 김채린
-  - 입주조건: 인천 송도 센트럴파크 첫 구매
-  - 고용조건: 평판 131만 이상, 현금 2000억 이상, 대출 없음, 부탁 수락 후 1000억 지급
-- 신수아
-  - 입주조건: 서울 트리플렛 타워 첫 구매
-  - 고용조건: 모든 사치품 보유, 현금 10조 이상, 반포 자이맹 리 구매
+- City real-estate boom/fall news events exist.
+- Applies to current city only.
+- Monthly chance: 15%.
+- Effect duration: next 2 market refreshes.
+- Real-estate news images are under `src/main/resources/static/assets/news/`.
 
-## Files Changed In Latest Turn
+## Important Files
 
-- `src/main/java/com/game/buildingstory/service/GameService.java`
-- `src/main/java/com/game/buildingstory/service/GameTextFormatter.java`
-- `src/main/java/com/game/buildingstory/service/SecretaryTenantEventService.java`
-- `src/main/java/com/game/buildingstory/service/SecretaryTenantScenario.java`
-- `src/main/java/com/game/buildingstory/service/SecretaryTenantScenarioCatalog.java`
-- `src/main/java/com/game/buildingstory/service/ShopService.java`
-- `src/main/java/com/game/buildingstory/service/AuctionService.java`
-- `src/main/java/com/game/buildingstory/service/QaService.java`
-- `src/main/java/com/game/buildingstory/service/BuildingTradeService.java`
-- `src/main/java/com/game/buildingstory/service/LoanService.java`
-- `src/main/java/com/game/buildingstory/service/SecretaryOperationsService.java`
-- `src/main/java/com/game/buildingstory/service/SettlementService.java`
-- `src/main/java/com/game/buildingstory/service/EventFlowService.java`
-- `src/main/java/com/game/buildingstory/repo/PurchaseCooldownRepository.java`
-- `src/main/resources/templates/fragments/main-modals.html`
-- `src/main/resources/templates/fragments/main-market.html`
-- `src/main/resources/templates/fragments/main-test-panel.html`
-- `src/main/resources/templates/fragments/main-info-grid.html`
-- `src/main/resources/templates/fragments/main-city-panel.html`
-- `src/main/resources/templates/fragments/main-secretary-panel.html`
-- `src/main/resources/static/app.js`
-- `src/main/resources/static/app-ui.js`
-- `src/main/resources/templates/main.html`
-- `src/main/resources/templates/info.html`
-- `src/main/java/com/game/buildingstory/web/GameController.java`
-- `src/main/java/com/game/buildingstory/web/MainPageModelAssembler.java`
-- `src/main/java/com/game/buildingstory/web/InfoPageModelAssembler.java`
-- `src/main/java/com/game/buildingstory/web/QaController.java`
-- `src/test/java/com/game/buildingstory/BuildingStoryApplicationTests.java`
-- `handoff-current.md`
-- `handoff-history.md`
+- Stock service: `src/main/java/com/game/buildingstory/service/StockService.java`
+- Stock entities:
+  - `src/main/java/com/game/buildingstory/domain/OwnedStock.java`
+  - `src/main/java/com/game/buildingstory/domain/StockPriceHistory.java`
+  - `src/main/java/com/game/buildingstory/domain/StockTradeHistory.java`
+- Stock view fragment: `src/main/resources/templates/fragments/main-stock-panel.html`
+- Main view: `src/main/resources/templates/main.html`
+- Frontend logic: `src/main/resources/static/app.js`
+- Styles: `src/main/resources/static/styles.css`
+- Controller: `src/main/java/com/game/buildingstory/web/GameController.java`
+- Model assembler: `src/main/java/com/game/buildingstory/web/MainPageModelAssembler.java`
+- Tests: `src/test/java/com/game/buildingstory/BuildingStoryApplicationTests.java`
 
-## Verification Status
+## Validation Notes
 
-- Baseline test before refactor: `.\gradlew.bat test --console=plain` passed.
-- Test after scenario extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after display formatter extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after secretary tenant event service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after shop service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after auction service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after QA service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after QA transaction fix: `.\gradlew.bat test --console=plain` passed.
-- Test after building trade service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after loan service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after secretary operations service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after settlement service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after event flow service extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after main modal fragment extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after main market fragment extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after main test panel fragment extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after market refresh and confirm modal fixes: `.\gradlew.bat test --console=plain` passed.
-- Test after main info-grid fragment extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after main city/secretary panel fragment extraction: `.\gradlew.bat test --console=plain` passed.
-- Test after controller/model assembler refactor: `.\gradlew.bat test --console=plain` passed.
-- Test after app.js UI interaction split: `.\gradlew.bat test --console=plain` passed.
-- Test after secretary effect display and gift limit fixes: `.\gradlew.bat test --console=plain` passed.
-- Test after balance tuning pass: `.\gradlew.bat test --console=plain` passed.
-- Test after account-rule note and chance display sync: `.\gradlew.bat test --console=plain` passed.
-- Test after secretary balance tuning pass: `.\gradlew.bat test --console=plain` passed.
-- Test after secretary panel ability modal UX: `.\gradlew.bat test --console=plain` passed.
-- Test after collapsible panels and toast UI pass: `.\gradlew.bat test --console=plain` passed.
-- Test after recent records floating panel: `.\gradlew.bat test --console=plain` passed.
-- Test after collapsible panel state persistence: `.\gradlew.bat test --console=plain` passed.
-- Test after city market news event: `.\gradlew.bat test --console=plain` passed.
-- Test after market news QA button: `.\gradlew.bat test --console=plain` passed.
-- Test after market news record DB compatibility fix: `.\gradlew.bat test --console=plain` passed.
-- Test after market news market-panel badge: `.\gradlew.bat test --console=plain` passed.
-- Test after stock content skeleton: `.\gradlew.bat test --console=plain` passed.
-- Test after stock view moved into main: `.\gradlew.bat test --console=plain` passed.
-- Test after stock tab placement/render fix: `.\gradlew.bat test --console=plain` passed.
-- Test after stock chart-ready layout: `.\gradlew.bat test --console=plain` passed.
-- Test after stock price-history core and candlestick rendering data: `.\gradlew.bat test --console=plain` passed.
-- Test after stock screen UX bug fixes: `.\gradlew.bat test --console=plain` passed.
-- Test after stock movement model update: `.\gradlew.bat test --console=plain` passed.
-- Test after stock coin exchange and immediate trade: `.\gradlew.bat test --console=plain` passed.
-- Added regression tests:
-  - `giftQuantityCannotExceedOwnedQuantity`
-  - `giftQuantityCannotContinuePastGiftAffinityRange`
-  - `cityPanelCanDisplayRentBonusAndBuildingWaitReductionText`
-- Added regression test `buyingOfferDoesNotRefreshMarketBeforeRefreshDay`.
-- Added regression test `marketNewsAppliesForTwoOfferRefreshes`.
-- Added regression test `qaCanActivateCurrentCityMarketNews`.
-- Added regression test `stockContentUnlocksTwoDaysAfterSeoulUnlockSchedule`.
-- Browser render check after fragment extraction passed:
-  - `/login` loaded.
-  - Test user registered.
-  - `/story` completed.
-  - `/main` rendered with `#secretaryModal`, `#confirmModal`, and market content present.
-- HTTP render check after market fragment extraction passed:
-  - `/main` rendered with `.market-panel`, `.market-card`, `#secretaryModal`, and `#confirmModal`.
-- HTTP render check after test panel fragment extraction passed:
-  - `/main` rendered with `.test-panel`, `/test/cash`, `/test/secretary-event/stage`, and no template error.
-- HTTP flow check after market refresh fix passed:
-  - Buying one offer kept market card count at 4.
-  - Purchased offer showed cooldown text.
-  - Donation confirm attributes rendered.
-  - `data-player-paused` rendered.
-- HTTP render check after info-grid fragment extraction passed:
-  - `/main` rendered with `.info-grid`, `.building-detail`, `.loan-box`, donation confirm attributes, and `.test-panel`.
-  - No template error.
-- HTTP render check after city/secretary panel fragment extraction passed:
-  - `/main` rendered with `.layout`, `.city-panel`, `.skyline`, `.secretary-panel`, `.secretary-focus`, `.market-panel`, and `.info-grid`.
-  - No template error.
-- HTTP check after controller/model assembler refactor passed:
-  - `/main` rendered with city panel, market panel, and confirm modal.
-  - `/info` rendered building information.
-  - `/test/cash` still persisted cash change.
-  - No template error.
-- Browser check after app.js UI interaction split passed:
-  - `/app.js` and `/app-ui.js` returned 200 with `text/javascript`.
-  - `/main` loaded with `script[type="module"][src="/app.js"]`.
-  - Browser console had no warning/error entries after loading `/main`.
-- HTTP render check after secretary effect display and gift limit fixes passed:
-  - `/main` rendered city panel chance text.
-  - Gift max expressions were resolved by Thymeleaf.
-  - `/app-ui.js` returned 200 with `text/javascript`.
-  - No template error.
-- HTTP render check after balance tuning pass passed:
-  - `/main` rendered 입주 35%, 퇴거 25%, 수리 35%.
-  - `/main` did not render the unused 부동산 광고 button.
-  - `/main` rendered gift prices as 최고급 보석 8000만원 and 인센티브 5억원.
-  - `/info` rendered updated catalog values including 청주 원룸 월세 30만원, 쿨타임 5일, 서울 반포 자이맹 리 월세 270억원, 쿨타임 264일.
-- Manual QA cash POST verified: cash changed from `0원` to `3000만원`.
-- Server restarted successfully on `http://localhost:8080`. PID: `50244`.
-- Mojibake pattern check against service files and handoff files found no matches.
+- Regression tests cover:
+  - stock unlock after Seoul schedule
+  - 5-day stock price updates
+  - stock coin exchange and immediate buy/sell with fee
+  - stock-view deferred city events
+  - stock industry news activation and 2-update duration
+  - real-estate news 2-refresh duration
+- Last full test before push passed.
 
-## Next Planned Work
+## Known Tooling Notes
 
-- Next stock work should add trading behavior:
-  - Add buy/sell POST endpoints and forms.
-  - Apply 0.5% fee on buy and sell.
-  - Update `OwnedStock` quantity and average price.
-  - Prevent buys above available cash.
-  - Prevent sells above held quantity.
-  - Keep loss limited to principal; no margin, debt, or negative stock cash.
-  - Add regression tests for fee calculation, average price, sell proceeds, and oversell rejection.
-- Later stock work:
-  - Add industry boom/recession events.
-  - Boom movement: random -3% to +15%.
-  - Recession movement: random -15% to +3%.
-  - Add richer chart interaction if needed.
+- `gh` command is unavailable.
+- Use normal `git` for commit/push.
+- If PR creation is needed, install/configure GitHub CLI or create PR manually on GitHub.
+
+## Suggested Next Work
+
+- Decide whether stock industry boom/recession should be visible as an active badge/status on the stock screen.
+- Add QA button for stock industry event activation if manual testing is needed.
+- Consider splitting stock UI JS from `app.js` if stock UI grows further.
+- Consider adding portfolio detail per held stock if holding summary becomes too compact.

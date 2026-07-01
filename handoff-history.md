@@ -486,3 +486,9 @@
   - Updated main script cache key to `app.js?v=stock-tools-1`.
   - Verification: `.\gradlew.bat test --console=plain` passed.
   - Server restarted on port 8080.
+- GitHub and new-chat handoff:
+  - Server was stopped.
+  - Committed and pushed `64456f4 add stock market systems and events` to `origin/codex/refactor-building-story`.
+  - `gh` CLI was unavailable, so no PR was created.
+  - Rewrote `handoff-current.md` into a short current-state handoff for the next chat.
+  - Noted server stopped, latest pushed commit, stock systems, event systems, validation, and suggested next work.

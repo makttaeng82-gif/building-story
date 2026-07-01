@@ -21,14 +21,15 @@
             <div class="status-card">
                 <span>현금</span>
                 <strong class="money" th:text="${@moneyText.format(player.cash)}">0원</strong>
-            </div>
-            <div class="status-card">
-                <span>대출</span>
-                <strong class="money" th:text="${@moneyText.format(loanRemainingRepayment)}">0원</strong>
+                <small class="status-subline">대출 <b th:text="${@moneyText.format(loanRemainingRepayment)}">0원</b></small>
             </div>
             <div class="status-card">
                 <span>총 월세</span>
                 <strong class="money" th:text="${@moneyText.format(totalMonthlyRent)}">0원</strong>
+            </div>
+            <div class="status-card">
+                <span>코인</span>
+                <strong class="money" th:text="${@gameService.stockCoinText(player.coin)}">0코인</strong>
             </div>
             <div class="status-card" th:if="${player.employed}">
                 <span>직장</span>
@@ -37,10 +38,7 @@
             <div class="status-card">
                 <span>평판</span>
                 <strong th:text="${@gameService.reputationText(player.reputation)}">0</strong>
-            </div>
-            <div class="status-card">
-                <span>칭호</span>
-                <strong th:text="${player.title}">칭호</strong>
+                <small class="status-subline">칭호 <b th:text="${player.title}">칭호</b></small>
             </div>
             <div class="status-card date-card">
                 <span>날짜</span>
@@ -61,6 +59,8 @@
                 <span class="repair-count-badge" th:if="${repairCountsByCity.get(city) != null && repairCountsByCity.get(city) > 0}" th:text="${repairCountsByCity.get(city)}">0</span>
             </button>
         </form>
+        <a class="info-tab" th:if="${stockContentUnlocked}" href="/main?view=stocks">주식</a>
+        <span class="info-tab locked" th:if="${!stockContentUnlocked}" th:text="'주식 · ' + ${stockContentStatus}">주식</span>
         <a class="info-tab active" href="/info">정보</a>
     </nav>
 
@@ -172,6 +172,35 @@
                         <td th:text="${@moneyText.format(building.marketPrice())}">시장가</td>
                         <td th:text="${@moneyText.format(building.monthlyRent())}">월세</td>
                         <td th:text="${building.tradeCooldownDays()} + '일'">쿨타임</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="section-head">
+                <div>
+                    <h2>주식 종목</h2>
+                    <p>서울 진출 후 개방 · 업계별 호황/불황 이벤트 추가 예정</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>업계</th>
+                        <th>성격</th>
+                        <th>기업</th>
+                        <th>기준가</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="stock : ${stockSpecs}">
+                        <td th:text="${stock.industry()}">업계</td>
+                        <td th:text="${stock.riskType().label()}">성격</td>
+                        <td th:text="${stock.name()}">기업</td>
+                        <td th:text="${@gameService.stockCoinText(stock.basePrice())}">가격</td>
                     </tr>
                     </tbody>
                 </table>

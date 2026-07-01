@@ -57,8 +57,14 @@ public class EventFlowService {
     }
 
     public String activateEvent(Player player, GameEventDefinition definition) {
+        return activateEvent(player, definition, true);
+    }
+
+    public String activateEvent(Player player, GameEventDefinition definition, boolean pausePlayer) {
         GameEvent event = gameEventRepository.save(new GameEvent(player, definition));
-        player.pause();
+        if (pausePlayer) {
+            player.pause();
+        }
         return "EVENT:" + event.getId();
     }
 

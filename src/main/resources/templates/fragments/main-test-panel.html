@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
-<details th:fragment="testPanel" class="panel test-panel collapsible-panel" open>
+<details th:fragment="testPanel" class="panel test-panel collapsible-panel" data-collapsible-key="test" open>
     <summary>테스트</summary>
     <form method="post" action="/test/cash">
         <button type="submit">현금 3천만원 증가</button>
@@ -27,6 +27,16 @@
             <input type="number" name="reputation" min="0" th:value="${player.reputation}">
         </label>
         <button class="secondary" type="submit">평판 적용</button>
+    </form>
+    <form method="post" action="/test/market-news" class="test-controls">
+        <label>
+            부동산 이벤트
+            <select name="trend">
+                <option value="RISE">현재 도시 폭등</option>
+                <option value="FALL">현재 도시 폭락</option>
+            </select>
+        </label>
+        <button class="secondary" type="submit">이벤트 발생</button>
     </form>
     <form method="post" action="/test/secretary-proficiency" class="test-controls">
         <label>

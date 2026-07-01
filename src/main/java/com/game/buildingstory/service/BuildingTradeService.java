@@ -185,6 +185,7 @@ public class BuildingTradeService {
     }
 
     public void refreshOffers(Player player) {
+        String city = player.getCurrentCity();
         offerRepository.deleteByPlayerAndCity(player, player.getCurrentCity());
         buildingCatalog.byCity(player.getCurrentCity()).stream()
                 .map(spec -> new BuildingOffer(
@@ -196,9 +197,10 @@ public class BuildingTradeService {
                         spec.marketPrice(),
                         spec.monthlyRent(),
                         spec.tradeCooldownDays(),
-                        randomValuation()
+                        randomOfferValuation(player, city)
                 ))
                 .forEach(offerRepository::save);
+        player.consumeMarketNewsRefresh(city);
     }
 
     @Transactional(readOnly = true)
@@ -287,6 +289,29 @@ public class BuildingTradeService {
             return ValuationStatus.UNDER;
         }
         if (roll < 75) {
+            return ValuationStatus.FAIR;
+        }
+        return ValuationStatus.OVER;
+    }
+
+    private ValuationStatus randomOfferValuation(Player player, String city) {
+        if (!player.hasActiveMarketNewsForCity(city)) {
+            return randomValuation();
+        }
+        int roll = random.nextInt(100);
+        if (SettlementService.MARKET_NEWS_RISE.equals(player.getActiveMarketNewsTrend())) {
+            if (roll < 10) {
+                return ValuationStatus.UNDER;
+            }
+            if (roll < 30) {
+                return ValuationStatus.FAIR;
+            }
+            return ValuationStatus.OVER;
+        }
+        if (roll < 70) {
+            return ValuationStatus.UNDER;
+        }
+        if (roll < 90) {
             return ValuationStatus.FAIR;
         }
         return ValuationStatus.OVER;

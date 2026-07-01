@@ -35,7 +35,7 @@
 - Main screen time advances through `/tick`.
 - Info screen does not advance time.
 - Event and auction modals pause normal play.
-- Active test server was restarted on port 8080 after secretary effect display and gift limit fixes. PID: `43568`.
+- Active test server is running on port 8080 after stock holding/filter/exchange UX work. Listening process PID: `58316`.
 - Next planned work: code refactoring to reduce lookup time.
 
 ## Recent Implemented Systems
@@ -56,6 +56,102 @@
 
 ## Latest Changes
 
+- Added stock holding/filter/exchange UX:
+  - Stock right-side area now shows `보유종목요약` above recent records.
+  - Holding summary includes held stock count, total shares, total cost, total valuation, and profit/loss.
+  - Added `StockHoldingSummaryView`.
+  - Trade history now has filters: all, buy, sell, and stock-specific select.
+  - Cash/coin exchange forms now have quick buttons: all available, 100k, 1m, 10m coin.
+  - Updated app script cache key to `app.js?v=stock-tools-1`.
+- Added stock industry boom/recession events:
+  - Stock events can occur after stock content is unlocked.
+  - Monthly schedule chance is 15%.
+  - Event industry is random among IT, food, retail, manufacturing, and telecom.
+  - Trend is random boom or recession.
+  - Active event applies to the affected industry for the next 2 stock price updates.
+  - Boom adds a random +3% to +8% industry effect per affected stock update.
+  - Recession adds a random -3% to -8% industry effect per affected stock update.
+  - Event modal uses supplied news images under `src/main/resources/static/assets/stock-news/`.
+  - Recent records store stock industry news as `STOCK_EVENT`.
+  - Stock list no longer displays safe/normal/aggressive beside industry. Risk type remains internal for movement logic.
+- Fixed login 500 on existing DB:
+  - Cause: `players.coin` did not exist in the file H2 DB after adding stock coin balance.
+  - Changed `Player.coin` to nullable `Long` with getter fallback to 0.
+  - Added startup DB migration to add `players.coin` with default 0 and backfill nulls.
+  - Verified register/login POST returns 302 on the local server.
+- Updated stock screen:
+  - Added stock list filter tabs: all stocks and owned stocks.
+  - Owned stocks tab hides stocks with 0 owned quantity and shows an empty message when none exist.
+  - Added max buy and sell all actions.
+  - Max buy uses current coin balance and includes the 0.5% fee.
+  - Improved chart right-side price label visibility.
+- Improved stock trade and exchange UI:
+  - Buy form now shows max purchasable quantity, total coin cost, and fee before submit.
+  - Sell form now shows owned quantity, expected coin payout, and fee before submit.
+  - Cash/coin exchange forms now show max exchangeable amount and expected cash amount before submit.
+  - Async cash/coin exchange updates internal cash/coin balances so previews refresh without page reload.
+  - Added stock quantity quick buttons: +1, +10, +100, 50%, max.
+  - Quick quantity buttons use document-level delegated click handling and prevent default button behavior.
+  - Stock order quantities are saved in session storage per stock and buy/sell side, then restored after reload.
+  - Stock exchange coin inputs are saved in session storage per exchange direction, then restored after reload.
+  - Main page script URL now has cache-busting query `app.js?v=stock-quick-4`.
+  - Reworked buy/sell controls into two wider panels to avoid overflow.
+  - Detailed trade failure messages now include needed/held coin or held/requested quantity.
+- Changed stock-view time/event behavior:
+  - Stock screen now sends `/tick?view=stocks`.
+  - City event/auction reload signals are not sent while viewing stocks.
+  - Date-based city events can be created without pausing while on the stock screen, then shown when returning to the city screen.
+  - Added regression test for stock-view deferred due city event behavior.
+- Added stock coin trading UI and backend:
+  - Added player coin balance.
+  - Added cash/coin exchange at 1 coin = 100 won.
+  - Stock prices now display as coin values.
+  - Added async stock exchange forms so cash/coin exchange does not reload the page.
+  - Added immediate current-price stock buy/sell.
+  - Buy/sell fee is 0.5%, rounded up.
+  - Added stock trade history entity/repository and display panel.
+  - Added buy/sell controls under each stock detail.
+  - Removed placeholder "buy/sell preparing" buttons from the chart header.
+  - Stock screen now shows a right-side recent city record panel.
+  - Added regression test for cash-to-coin exchange, buy fee, sell payout, and trade history.
+- Updated stock price movement model:
+  - Added stock risk types: safe, normal, aggressive.
+  - Each industry now has one safe, one normal, and one aggressive stock.
+  - Safe noise: -2% to +2%.
+  - Normal noise: -4% to +4%.
+  - Aggressive noise: -7% to +7%.
+  - Each 5-day update now applies one market-wide mood effect to all stocks.
+  - Market mood ranges: bull +0.5% to +2.0%, neutral -0.7% to +0.7%, bear -2.0% to -0.5%.
+  - Recent 3-candle trend adds +0.5% or -0.5% when at least 2 candles share direction.
+  - Rare shocks added: 2% surge chance and 2% drop chance, each 8% to 18%.
+  - Final change is clamped to +/-12% normally and +/-25% with shocks.
+  - Stock list now shows risk label beside industry.
+- Fixed stock screen UX bugs:
+  - Pause/resume on stock screen now redirects back to `/main?view=stocks`.
+  - Stock refresh card now shows the next stock update date and D-day instead of current date.
+  - Added a navigation guard to prevent duplicate `/tick` calls during reload, addressing intermittent 2-day jumps.
+  - Selected stock now persists through day reloads.
+  - Stock company buttons and stock summary values now wrap inside their boxes.
+  - Stock prices now use exact won-level display instead of the real-estate compact money formatter.
+  - Chart right-side price labels have more horizontal room.
+- Implemented stock price-history core:
+  - Added `OwnedStock` and `StockPriceHistory` entities.
+  - Added stock holding and price history repositories.
+  - Stock market initializes 15 stock price rows when stock content unlocks or the stock screen is opened.
+  - Stock prices update every 5 elapsed days.
+  - Each update appends OHLCV data for all stocks.
+  - Normal stock movement is random -5% to +5%.
+  - Main stock tab now renders from `stockQuotes`.
+  - Left stock list shows industry, company, current price, previous update price, change rate, and change amount.
+  - Stock detail panel now has server-rendered SVG candlestick and volume bars.
+  - Up color is red and down color is blue.
+  - Added regression test for stock unlock seeding and 5-day price updates.
+- Updated recent records panel:
+  - Recent records now default to a floating right-side panel on wide screens.
+  - The panel has a `고정` button that returns it to the original info-grid position.
+  - When docked, the button changes to `따라오기` and restores floating mode.
+  - Docked/floating state is persisted in localStorage.
+  - On narrower screens the panel stays in the original layout.
 - Updated UI/UX pass:
   - Renamed assigned secretary ability button from `능력보기` to `능력`.
   - Ability modal open handling now uses delegated click handling and participates in pause-state checks.
@@ -248,11 +344,28 @@
 - Test after secretary balance tuning pass: `.\gradlew.bat test --console=plain` passed.
 - Test after secretary panel ability modal UX: `.\gradlew.bat test --console=plain` passed.
 - Test after collapsible panels and toast UI pass: `.\gradlew.bat test --console=plain` passed.
+- Test after recent records floating panel: `.\gradlew.bat test --console=plain` passed.
+- Test after collapsible panel state persistence: `.\gradlew.bat test --console=plain` passed.
+- Test after city market news event: `.\gradlew.bat test --console=plain` passed.
+- Test after market news QA button: `.\gradlew.bat test --console=plain` passed.
+- Test after market news record DB compatibility fix: `.\gradlew.bat test --console=plain` passed.
+- Test after market news market-panel badge: `.\gradlew.bat test --console=plain` passed.
+- Test after stock content skeleton: `.\gradlew.bat test --console=plain` passed.
+- Test after stock view moved into main: `.\gradlew.bat test --console=plain` passed.
+- Test after stock tab placement/render fix: `.\gradlew.bat test --console=plain` passed.
+- Test after stock chart-ready layout: `.\gradlew.bat test --console=plain` passed.
+- Test after stock price-history core and candlestick rendering data: `.\gradlew.bat test --console=plain` passed.
+- Test after stock screen UX bug fixes: `.\gradlew.bat test --console=plain` passed.
+- Test after stock movement model update: `.\gradlew.bat test --console=plain` passed.
+- Test after stock coin exchange and immediate trade: `.\gradlew.bat test --console=plain` passed.
 - Added regression tests:
   - `giftQuantityCannotExceedOwnedQuantity`
   - `giftQuantityCannotContinuePastGiftAffinityRange`
   - `cityPanelCanDisplayRentBonusAndBuildingWaitReductionText`
 - Added regression test `buyingOfferDoesNotRefreshMarketBeforeRefreshDay`.
+- Added regression test `marketNewsAppliesForTwoOfferRefreshes`.
+- Added regression test `qaCanActivateCurrentCityMarketNews`.
+- Added regression test `stockContentUnlocksTwoDaysAfterSeoulUnlockSchedule`.
 - Browser render check after fragment extraction passed:
   - `/login` loaded.
   - Test user registered.
@@ -293,20 +406,21 @@
   - `/main` rendered gift prices as 최고급 보석 8000만원 and 인센티브 5억원.
   - `/info` rendered updated catalog values including 청주 원룸 월세 30만원, 쿨타임 5일, 서울 반포 자이맹 리 월세 270억원, 쿨타임 264일.
 - Manual QA cash POST verified: cash changed from `0원` to `3000만원`.
-- Server restarted successfully on `http://localhost:8080`. PID: `51144`.
+- Server restarted successfully on `http://localhost:8080`. PID: `50244`.
 - Mojibake pattern check against service files and handoff files found no matches.
 
 ## Next Planned Work
 
-- Next work should be game balance tuning, not broad refactoring.
-- Balance tuning scope:
-  - Building prices, rents, purchase cooldowns, and city unlock reputation.
-  - Monthly salary, loan limit/repayment pressure, donation efficiency, luxury item rewards, and gift prices.
-  - Secretary salary, proficiency scaling, affinity gift ranges, special effect strength, and auto-repair cooldown.
-  - Auction frequency, bid risk/reward, and fail/success outcomes.
-- Balance tuning process:
-  - First document the current economy curve by city and progression stage.
-  - Identify target pacing: early game, mid game, late game, secretary unlock timing, Seoul/endgame timing.
-  - Change numbers in small batches and add/adjust regression tests for important thresholds.
-  - Keep balance constants localized in catalog/service classes; do not hard-code new numbers in templates.
-  - After each balance pass, run `.\gradlew.bat test --console=plain` and manually check `/main` and `/info`.
+- Next stock work should add trading behavior:
+  - Add buy/sell POST endpoints and forms.
+  - Apply 0.5% fee on buy and sell.
+  - Update `OwnedStock` quantity and average price.
+  - Prevent buys above available cash.
+  - Prevent sells above held quantity.
+  - Keep loss limited to principal; no margin, debt, or negative stock cash.
+  - Add regression tests for fee calculation, average price, sell proceeds, and oversell rejection.
+- Later stock work:
+  - Add industry boom/recession events.
+  - Boom movement: random -3% to +15%.
+  - Recession movement: random -15% to +3%.
+  - Add richer chart interaction if needed.

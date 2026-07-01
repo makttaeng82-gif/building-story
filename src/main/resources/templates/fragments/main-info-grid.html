@@ -32,8 +32,11 @@
         <p th:if="${buildings.isEmpty()}">보유 건물 없음</p>
     </article>
 
-    <article class="panel">
-        <h2>최근 기록</h2>
+    <article class="panel recent-record-panel" data-recent-record-panel>
+        <div class="record-panel-head">
+            <h2>최근 기록</h2>
+            <button class="secondary" type="button" data-record-panel-toggle>고정</button>
+        </div>
         <ul class="event-list record-list" th:if="${!records.isEmpty()}">
             <li th:each="record : ${records}">
                 <b th:text="${record.month} + '월 ' + ${record.day} + '일'">1월 1일</b>
@@ -73,7 +76,7 @@
         <p th:if="${loans.isEmpty()}">현재 대출 없음</p>
     </article>
 
-    <details class="panel reputation-shop-panel collapsible-panel" open>
+    <details class="panel reputation-shop-panel collapsible-panel" data-collapsible-key="donation" open>
         <summary>기부</summary>
         <p>현금 50,000원당 평판 1</p>
         <div class="donation-actions">
@@ -113,7 +116,7 @@
     </details>
 
     <section class="shop-split-grid">
-        <details class="panel reputation-shop-panel split-shop-panel collapsible-panel" open>
+        <details class="panel reputation-shop-panel split-shop-panel collapsible-panel" data-collapsible-key="luxury" open>
             <summary>사치품</summary>
             <p>기부 대비 평판 효율 1.5배 · 각 아이템 1회 구매</p>
             <div class="luxury-list">
@@ -129,7 +132,7 @@
             </div>
         </details>
 
-        <details class="panel reputation-shop-panel split-shop-panel collapsible-panel" open>
+        <details class="panel reputation-shop-panel split-shop-panel collapsible-panel" data-collapsible-key="gift" open>
             <summary>선물</summary>
             <p>구입 후 보유 비서에게 선물 가능</p>
             <div class="gift-list">

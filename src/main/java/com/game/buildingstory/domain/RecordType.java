@@ -13,5 +13,6 @@ public enum RecordType {
     AD_COST,
     LOAN_PAYMENT,
     BUILDING_BUY,
-    BUILDING_SELL
+    BUILDING_SELL,
+    STOCK_EVENT
 }

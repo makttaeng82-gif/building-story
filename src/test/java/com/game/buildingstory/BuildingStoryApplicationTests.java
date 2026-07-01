@@ -19,10 +19,14 @@ import com.game.buildingstory.repo.PlayerRepository;
 import com.game.buildingstory.repo.MonthlyRecordRepository;
 import com.game.buildingstory.repo.OwnedGiftItemRepository;
 import com.game.buildingstory.repo.SecretaryTenantEventRepository;
+import com.game.buildingstory.repo.StockPriceHistoryRepository;
 import com.game.buildingstory.service.GameService;
+import com.game.buildingstory.service.BuildingTradeService;
 import com.game.buildingstory.service.QaService;
 import com.game.buildingstory.service.SecretaryCatalog;
 import com.game.buildingstory.service.SecretaryOperationsService;
+import com.game.buildingstory.service.SettlementService;
+import com.game.buildingstory.service.StockService;
 import com.game.buildingstory.repo.OwnedLuxuryItemRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,10 +46,16 @@ class BuildingStoryApplicationTests {
 	private GameService gameService;
 
 	@Autowired
+	private BuildingTradeService buildingTradeService;
+
+	@Autowired
 	private QaService qaService;
 
 	@Autowired
 	private SecretaryOperationsService secretaryOperationsService;
+
+	@Autowired
+	private StockService stockService;
 
 	@Autowired
 	private PlayerRepository playerRepository;
@@ -70,6 +80,9 @@ class BuildingStoryApplicationTests {
 
 	@Autowired
 	private GameEventRepository gameEventRepository;
+
+	@Autowired
+	private StockPriceHistoryRepository stockPriceHistoryRepository;
 
 	@Autowired
 	private BuildingOfferRepository buildingOfferRepository;
@@ -478,6 +491,175 @@ class BuildingStoryApplicationTests {
 		assertThat(remainingOffer.getName()).isEqualTo("갱신 테스트 원룸");
 		assertThat(gameService.purchaseCooldownDaysLeft(player, remainingOffer)).isPositive();
 		assertThat(buildingOfferRepository.findByPlayerAndCityOrderById(player, "청주")).hasSize(1);
+	}
+
+	@Test
+	@Transactional
+	void marketNewsAppliesForTwoOfferRefreshes() {
+		Player player = playerRepository.save(new Player("market-news-refresh-test", "hash"));
+		player.scheduleMonthlyMarketNews(1, "청주", SettlementService.MARKET_NEWS_RISE);
+		player.activateMarketNews();
+
+		assertThat(gameService.marketNewsStatusText(player, "청주")).isEqualTo("부동산 폭등 · 매물갱신 2회");
+
+		buildingTradeService.refreshOffers(player);
+
+		assertThat(player.getActiveMarketNewsRefreshesLeft()).isEqualTo(1);
+		assertThat(gameService.marketNewsStatusText(player, "청주")).isEqualTo("부동산 폭등 · 매물갱신 1회");
+		assertThat(buildingOfferRepository.findByPlayerAndCityOrderById(player, "청주")).hasSize(4);
+
+		buildingTradeService.refreshOffers(player);
+
+		assertThat(player.hasActiveMarketNewsForCity("청주")).isFalse();
+		assertThat(gameService.marketNewsStatusText(player, "청주")).isBlank();
+	}
+
+	@Test
+	@Transactional
+	void qaCanActivateCurrentCityMarketNews() {
+		Player player = playerRepository.save(new Player("qa-market-news-test", "hash"));
+		player.changeCity("세종");
+
+		assertThat(qaService.activateMarketNewsEvent(player.getId(), SettlementService.MARKET_NEWS_FALL))
+				.isEqualTo("세종 부동산 폭락 뉴스");
+
+		assertThat(playerRepository.findById(player.getId()).orElseThrow().hasActiveMarketNewsForCity("세종")).isTrue();
+		assertThat(gameEventRepository.findFirstByPlayerAndStatus(player, com.game.buildingstory.domain.GameEventStatus.ACTIVE))
+				.isPresent()
+				.get()
+				.extracting(GameEvent::getTitle)
+				.isEqualTo("세종 부동산 폭락 뉴스");
+	}
+
+	@Test
+	@Transactional
+	void stockContentUnlocksTwoDaysAfterSeoulUnlockSchedule() {
+		Player player = playerRepository.save(new Player("stock-unlock-test", "hash"));
+		player.scheduleStockUnlock(player.getElapsedDays() + 2);
+
+		player.advanceDay();
+
+		assertThat(gameService.stockContentUnlocked(player)).isFalse();
+
+		player.advanceDay();
+		assertThat(stockService.activateUnlockNoticeIfDue(player)).isTrue();
+
+		Player updatedPlayer = playerRepository.findById(player.getId()).orElseThrow();
+		assertThat(updatedPlayer.isStockContentUnlocked()).isTrue();
+		assertThat(gameEventRepository.findFirstByPlayerAndStatus(updatedPlayer, com.game.buildingstory.domain.GameEventStatus.ACTIVE))
+				.isPresent()
+				.get()
+				.extracting(GameEvent::getTitle)
+				.isEqualTo("주식 투자 개방");
+		assertThat(stockPriceHistoryRepository.countByPlayer(updatedPlayer)).isEqualTo(stockService.stocks().size());
+	}
+
+	@Test
+	@Transactional
+	void stockPricesUpdateEveryFiveElapsedDays() {
+		Player player = playerRepository.save(new Player("stock-price-update-test", "hash"));
+		player.unlockStockContent();
+		stockService.ensureMarketInitialized(player);
+
+		assertThat(stockPriceHistoryRepository.countByPlayer(player)).isEqualTo(stockService.stocks().size());
+
+		for (int i = 0; i < 4; i++) {
+			player.advanceDay();
+		}
+		stockService.processPriceUpdates(player);
+		assertThat(stockPriceHistoryRepository.countByPlayer(player)).isEqualTo(stockService.stocks().size());
+
+		player.advanceDay();
+		stockService.processPriceUpdates(player);
+
+		assertThat(stockPriceHistoryRepository.countByPlayer(player)).isEqualTo(stockService.stocks().size() * 2L);
+		assertThat(stockService.stockQuotes(player))
+				.hasSize(stockService.stocks().size())
+				.allSatisfy(quote -> {
+					assertThat(quote.currentPrice()).isPositive();
+					assertThat(quote.previousPrice()).isPositive();
+					assertThat(quote.candles()).isNotEmpty();
+				});
+	}
+
+	@Test
+	@Transactional
+	void stockIndustryNewsActivatesAndAppliesForTwoPriceUpdates() {
+		Player player = playerRepository.save(new Player("stock-news-test", "hash"));
+		player.unlockStockContent();
+		stockService.ensureMarketInitialized(player);
+		player.scheduleMonthlyStockNews(player.getDay(), "IT", StockService.STOCK_NEWS_BOOM);
+
+		assertThat(stockService.activateIndustryNewsIfDue(player)).isTrue();
+		assertThat(player.hasActiveStockNewsForIndustry("IT")).isTrue();
+		assertThat(player.getActiveStockNewsRefreshesLeft()).isEqualTo(2);
+		assertThat(gameEventRepository.findFirstByPlayerAndStatus(player, com.game.buildingstory.domain.GameEventStatus.ACTIVE))
+				.isPresent()
+				.get()
+				.extracting(GameEvent::getTitle)
+				.isEqualTo("IT 업종 호황 뉴스");
+
+		for (int i = 0; i < 5; i++) {
+			player.advanceDay();
+		}
+		stockService.processPriceUpdates(player);
+		assertThat(player.getActiveStockNewsRefreshesLeft()).isEqualTo(1);
+
+		for (int i = 0; i < 5; i++) {
+			player.advanceDay();
+		}
+		stockService.processPriceUpdates(player);
+		assertThat(player.hasActiveStockNewsForIndustry("IT")).isFalse();
+	}
+
+	@Test
+	@Transactional
+	void stockExchangeAndImmediateTradeUseCoinWithFee() {
+		Player player = playerRepository.save(new Player("stock-trade-test", "hash"));
+		player.addCash(10_000_000L);
+		player.unlockStockContent();
+		stockService.ensureMarketInitialized(player);
+
+		assertThat(gameService.buyStock(player.getId(), "bytecore", 1L)).isEqualTo("코인 부족 · 필요 8만2410코인 / 보유 0코인");
+		assertThat(gameService.sellStock(player.getId(), "bytecore", 5L)).isEqualTo("보유 수량 부족 · 보유 0주 / 매도 요청 5주");
+
+		assertThat(gameService.exchangeCashToCoin(player.getId(), 100_000L)).isEqualTo("10만코인 교환");
+		assertThat(player.getCash()).isEqualTo(0L);
+		assertThat(player.getCoin()).isEqualTo(100_000L);
+
+		assertThat(gameService.buyStock(player.getId(), "bytecore", 1L)).isEqualTo("바이트코어 1주 매수");
+		assertThat(player.getCoin()).isEqualTo(17_590L);
+		assertThat(stockService.stockQuotes(player).stream()
+				.filter(quote -> quote.stock().key().equals("bytecore"))
+				.findFirst()
+				.orElseThrow()
+				.quantity()).isEqualTo(1L);
+
+		assertThat(gameService.sellStock(player.getId(), "bytecore", 1L)).isEqualTo("바이트코어 1주 매도");
+		assertThat(player.getCoin()).isEqualTo(99_180L);
+
+		assertThat(gameService.buyMaxStock(player.getId(), "bytecore")).isEqualTo("바이트코어 1주 매수");
+		assertThat(player.getCoin()).isEqualTo(16_770L);
+		assertThat(gameService.sellAllStock(player.getId(), "bytecore")).isEqualTo("바이트코어 1주 매도");
+		assertThat(player.getCoin()).isEqualTo(98_360L);
+		assertThat(gameService.stockTradeHistories(player)).hasSize(4);
+	}
+
+	@Test
+	@Transactional
+	void stockViewTickDefersDueCityEventWithoutPausing() {
+		Player player = playerRepository.save(new Player("stock-view-defer-event-test", "hash"));
+		player.completeStory();
+		player.unlockStockContent();
+
+		assertThat(gameService.tick(player.getId(), true)).isBlank();
+		assertThat(gameService.tick(player.getId(), true)).isBlank();
+
+		Player updatedPlayer = playerRepository.findById(player.getId()).orElseThrow();
+		assertThat(updatedPlayer.getMonth()).isEqualTo(1);
+		assertThat(updatedPlayer.getDay()).isEqualTo(3);
+		assertThat(updatedPlayer.isPaused()).isFalse();
+		assertThat(gameService.activeEvent(updatedPlayer)).isPresent();
 	}
 
 	@Test

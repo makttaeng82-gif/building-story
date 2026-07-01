@@ -16,6 +16,7 @@ public class MainPageModelAssembler {
 
     public void addMainPageAttributes(long playerId, Player player, Model model) {
         gameService.ensureOffers(player);
+        gameService.ensureStockUnlockSchedule(player);
         gameService.evaluateSecretaryTenantEvents(player);
         var loans = gameService.loans(player);
         model.addAttribute("player", player);
@@ -31,6 +32,14 @@ public class MainPageModelAssembler {
         model.addAttribute("secretaryOffer", null);
         model.addAttribute("luxuryItems", gameService.luxuryItems());
         model.addAttribute("giftItems", gameService.giftItems());
+        model.addAttribute("stockSpecs", gameService.stockSpecs());
+        model.addAttribute("stockContentUnlocked", gameService.stockContentUnlocked(player));
+        model.addAttribute("stockContentStatus", gameService.stockContentStatusText(player));
+        gameService.ensureStockMarketInitialized(player);
+        model.addAttribute("stockQuotes", gameService.stockQuotes(player));
+        model.addAttribute("stockMarketStatus", gameService.stockMarketStatus(player));
+        model.addAttribute("stockTradeHistories", gameService.stockTradeHistories(player));
+        model.addAttribute("stockHoldingSummary", gameService.stockHoldingSummary(player));
         model.addAttribute("cities", gameService.cities());
         model.addAttribute("cityUnlocks", gameService.cityUnlocks(player));
         model.addAttribute("repairCountsByCity", gameService.repairRequestCountsByCity(player));

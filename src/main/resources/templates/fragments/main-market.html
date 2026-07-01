@@ -4,7 +4,13 @@
 <section th:fragment="market" class="panel market-panel">
     <div class="section-head">
         <div>
-            <h2 th:text="${player.currentCity} + ' 매물'">매물</h2>
+            <div class="market-title-row">
+                <h2 th:text="${player.currentCity} + ' 매물'">매물</h2>
+                <span class="badge market-news-badge"
+                      th:if="${!@gameService.marketNewsStatusText(player, player.currentCity).isBlank()}"
+                      th:classappend="${player.activeMarketNewsTrend == 'RISE'} ? ' danger' : ' good'"
+                      th:text="${@gameService.marketNewsStatusText(player, player.currentCity)}">뉴스</span>
+            </div>
             <p th:text="'건물 종류별 매물 · 5일마다 가격 갱신 · 다음 갱신 ' + ${player.ddayText(player.offerRefreshDday())}">매물 갱신</p>
         </div>
         <div class="refresh-progress-card" aria-label="매물 갱신 진행률">

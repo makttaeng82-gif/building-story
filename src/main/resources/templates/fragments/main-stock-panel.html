@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="stockPanel" class="panel city-panel stock-panel"
+         th:attr="data-player-cash=${player.cash},data-player-coin=${player.coin}">
+    <div class="section-head">
+        <div>
+            <h2>주식</h2>
+            <p>회사 선택 후 주가 확인 · 주가는 5일마다 갱신</p>
+        </div>
+        <div class="refresh-progress-card" aria-label="다음 날 진행률">
+            <span>주가 갱신</span>
+            <strong th:text="${stockMarketStatus.nextUpdateDateText()} + ' · D-' + ${stockMarketStatus.daysUntilNextUpdate()}">다음 갱신</strong>
+            <div class="refresh-progress">
+                <span id="stockDayProgress" th:style="'width:' + ${stockMarketStatus.progressPercent()} + '%'"></span>
+            </div>
+            <small>5일마다 갱신</small>
+        </div>
+    </div>
+
+    <div class="stock-app">
+        <aside class="stock-sidebar">
+            <div class="stock-filter-tabs" role="tablist" aria-label="종목 필터">
+                <button type="button" class="active" data-stock-filter="all">전체종목</button>
+                <button type="button" data-stock-filter="owned">내종목</button>
+            </div>
+            <p class="stock-empty-message" hidden>보유중인 종목 없음</p>
+            <div class="stock-company-list">
+            <button th:each="quote : ${stockQuotes}" th:with="stock=${quote.stock()}" type="button" class="stock-company-button"
+                    th:classappend="${quoteStat.index == 0} ? ' selected'"
+                    th:attr="data-stock-key=${stock.key()},data-owned-quantity=${quote.quantity()}">
+                <span th:text="${stock.industry()}">업계</span>
+                <em th:classappend="${quote.changeDirection()}"
+                    th:text="${quote.changePercentText()}">0%</em>
+                <strong th:text="${stock.name()}">회사</strong>
+                <small>현재 <b th:text="${quote.currentPriceText()}">0원</b></small>
+                <small>전일 <b th:text="${quote.previousPriceText()}">0원</b></small>
+            </button>
+            </div>
+        </aside>
+        <section class="stock-detail-list">
+            <article th:each="quote : ${stockQuotes}" th:with="stock=${quote.stock()}" class="stock-detail"
+                     th:classappend="${quoteStat.index == 0} ? ' active'"
+                     th:attr="data-stock-detail=${stock.key()},data-stock-price=${quote.currentPrice()},data-owned-quantity=${quote.quantity()}">
+                <div class="stock-detail-head">
+                    <div>
+                        <span class="badge" th:text="${stock.industry()}">업계</span>
+                        <h3 th:text="${stock.name()}">회사명</h3>
+                        <strong class="stock-price" th:text="${quote.currentPriceText()}">현재가</strong>
+                    </div>
+                </div>
+                <div class="stock-chart-shell">
+                    <svg class="stock-candle-chart" viewBox="0 0 860 300" preserveAspectRatio="none" aria-label="주가 차트">
+                        <line class="chart-grid-line" x1="20" y1="24" x2="700" y2="24"></line>
+                        <line class="chart-grid-line" x1="20" y1="91" x2="700" y2="91"></line>
+                        <line class="chart-grid-line" x1="20" y1="158" x2="700" y2="158"></line>
+                        <line class="chart-grid-line" x1="20" y1="226" x2="700" y2="226"></line>
+                        <g th:each="candle : ${quote.candles()}" th:classappend="${candle.rising()} ? ' candle-up' : ' candle-down'">
+                            <line class="candle-wick"
+                                  th:attr="x1=${candle.x()},x2=${candle.x()},y1=${candle.highY()},y2=${candle.lowY()}"></line>
+                            <rect class="candle-body" width="7"
+                                  th:attr="x=${candle.x() - 3},y=${candle.bodyY()},height=${candle.bodyHeight()}"></rect>
+                        </g>
+                        <line class="current-price-line" x1="20" x2="700"
+                              th:attr="y1=${quote.currentPriceY()},y2=${quote.currentPriceY()}"></line>
+                        <text class="chart-price-label" x="710" th:attr="y=${quote.currentPriceY()}" th:text="${quote.currentChartPriceText()}">0원</text>
+                        <text class="chart-axis-label" x="710" y="28" th:text="${quote.maxPriceText()}">최고가</text>
+                        <text class="chart-axis-label" x="710" y="230" th:text="${quote.minPriceText()}">최저가</text>
+                    </svg>
+                </div>
+                <dl class="stock-summary-grid">
+                    <div>
+                        <dt>현재가</dt>
+                        <dd th:text="${quote.currentPriceText()}">가격</dd>
+                    </div>
+                    <div>
+                        <dt>직전가</dt>
+                        <dd th:text="${quote.previousPriceText()}">가격</dd>
+                    </div>
+                    <div>
+                        <dt>5일 변동</dt>
+                        <dd th:class="${quote.changeDirection()}" th:text="${quote.changePercentText()} + ' · ' + ${quote.changeAmountText()}">0%</dd>
+                    </div>
+                    <div>
+                        <dt>보유수량</dt>
+                        <dd th:text="${quote.quantity()} + '주'">0주</dd>
+                    </div>
+                    <div>
+                        <dt>평균단가</dt>
+                        <dd th:text="${quote.averagePriceText()}">0원</dd>
+                    </div>
+                    <div>
+                        <dt>평가손익</dt>
+                        <dd th:text="${quote.valuationProfitText()}">0원</dd>
+                    </div>
+                </dl>
+                <div class="stock-trade-panel">
+                    <form class="stock-order-form" data-stock-buy-form method="post" th:action="@{/stocks/{key}/buy(key=${stock.key()})}">
+                        <label>
+                            매수 수량
+                            <input type="number" name="quantity" min="1" value="1">
+                        </label>
+                        <div class="stock-quick-buttons" aria-label="매수 수량 빠른 선택">
+                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="1">+1</button>
+                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="10">+10</button>
+                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="100">+100</button>
+                            <button class="secondary" type="button" data-quantity-action="half">50%</button>
+                            <button class="secondary" type="button" data-quantity-action="max">최대</button>
+                        </div>
+                        <div class="stock-order-preview" data-stock-buy-preview>예상 비용 계산중</div>
+                        <button type="submit">매수</button>
+                    </form>
+                    <form class="stock-order-form" data-stock-sell-form method="post" th:action="@{/stocks/{key}/sell(key=${stock.key()})}">
+                        <label>
+                            매도 수량
+                            <input type="number" name="quantity" min="1" value="1">
+                        </label>
+                        <div class="stock-quick-buttons" aria-label="매도 수량 빠른 선택">
+                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="1">+1</button>
+                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="10">+10</button>
+                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="100">+100</button>
+                            <button class="secondary" type="button" data-quantity-action="half">50%</button>
+                            <button class="secondary" type="button" data-quantity-action="max">최대</button>
+                        </div>
+                        <div class="stock-order-preview" data-stock-sell-preview>예상 수령 계산중</div>
+                        <button class="secondary" type="submit" th:disabled="${quote.quantity() <= 0}">매도</button>
+                    </form>
+                </div>
+            </article>
+        </section>
+    </div>
+    <div class="stock-bottom-grid">
+        <article class="stock-exchange-panel">
+            <h3>현금 · 코인 교환</h3>
+            <p>1코인 = 현금 100원</p>
+            <form data-stock-exchange-form data-exchange-type="cash-to-coin" method="post" action="/stocks/exchange/cash-to-coin">
+                <label>
+                    구매 코인
+                    <input type="number" name="coinAmount" min="1" value="10000">
+                </label>
+                <div class="stock-exchange-quick-buttons" aria-label="구매 코인 빠른 선택">
+                    <button class="secondary" type="button" data-exchange-action="max">전액</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="100000">10만</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="1000000">100만</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="10000000">1000만</button>
+                </div>
+                <div class="stock-order-preview" data-exchange-preview>예상 교환액 계산중</div>
+                <button type="submit">현금 → 코인</button>
+            </form>
+            <form data-stock-exchange-form data-exchange-type="coin-to-cash" method="post" action="/stocks/exchange/coin-to-cash">
+                <label>
+                    환전 코인
+                    <input type="number" name="coinAmount" min="1" value="10000">
+                </label>
+                <div class="stock-exchange-quick-buttons" aria-label="환전 코인 빠른 선택">
+                    <button class="secondary" type="button" data-exchange-action="max">전액</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="100000">10만</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="1000000">100만</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="10000000">1000만</button>
+                </div>
+                <div class="stock-order-preview" data-exchange-preview>예상 교환액 계산중</div>
+                <button class="secondary" type="submit">코인 → 현금</button>
+            </form>
+        </article>
+        <article class="stock-history-panel" data-stock-history-panel>
+            <div class="stock-history-head">
+                <h3>거래내역</h3>
+                <div class="stock-history-filter-tabs" role="tablist" aria-label="거래 유형 필터">
+                    <button type="button" class="active" data-trade-filter="all">전체</button>
+                    <button type="button" data-trade-filter="매수">매수</button>
+                    <button type="button" data-trade-filter="매도">매도</button>
+                </div>
+                <label>
+                    종목별
+                    <select data-trade-stock-filter>
+                        <option value="all">전체 종목</option>
+                        <option th:each="stock : ${stockSpecs}" th:value="${stock.key()}" th:text="${stock.name()}">종목</option>
+                    </select>
+                </label>
+            </div>
+            <ul class="stock-trade-history" th:if="${!stockTradeHistories.isEmpty()}">
+                <li th:each="trade : ${stockTradeHistories}"
+                    th:attr="data-trade-type=${trade.tradeType},data-trade-stock-key=${trade.stockKey}">
+                    <b th:text="${trade.month} + '월 ' + ${trade.day} + '일'">날짜</b>
+                    <span th:text="${trade.tradeType} + ' · ' + ${trade.stockName} + ' ' + ${trade.quantity} + '주'">거래</span>
+                    <small th:text="'단가 ' + ${@gameService.stockCoinText(trade.price)} + ' · 수수료 ' + ${@gameService.stockCoinText(trade.fee)} + ' · ' + ${@gameService.stockCoinText(trade.netAmount)}">금액</small>
+                </li>
+            </ul>
+            <p class="stock-trade-empty-message" hidden>조건에 맞는 거래내역 없음</p>
+            <p th:if="${stockTradeHistories.isEmpty()}">거래내역 없음</p>
+        </article>
+    </div>
+</section>
+</body>
+</html>

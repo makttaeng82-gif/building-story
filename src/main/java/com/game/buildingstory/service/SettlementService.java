@@ -22,6 +22,9 @@ import java.util.Random;
 public class SettlementService {
     private static final long MONTHLY_JOB_SALARY = 3_000_000L;
     private static final int RECORD_RETENTION_DAYS = 62;
+    private static final int MARKET_NEWS_CHANCE_PERCENT = 15;
+    public static final String MARKET_NEWS_RISE = "RISE";
+    public static final String MARKET_NEWS_FALL = "FALL";
 
     private final Random random = new Random();
     private final OwnedBuildingRepository ownedBuildingRepository;
@@ -135,6 +138,7 @@ public class SettlementService {
 
     private void ensureMonthlyEventSchedule(Player player) {
         if (player.hasEventScheduleForCurrentMonth()) {
+            ensureMonthlyMarketNewsSchedule(player);
             return;
         }
         int firstMoveInDay = randomEventDay(player);
@@ -144,6 +148,19 @@ public class SettlementService {
         int firstRepairDay = randomEventDay(player);
         int secondRepairDay = randomDistinctEventDay(player, firstRepairDay);
         player.scheduleMonthlyRandomEvents(firstMoveInDay, secondMoveInDay, firstMoveOutDay, secondMoveOutDay, firstRepairDay, secondRepairDay);
+        ensureMonthlyMarketNewsSchedule(player);
+    }
+
+    private void ensureMonthlyMarketNewsSchedule(Player player) {
+        if (player.hasMarketNewsScheduleForCurrentMonth()) {
+            return;
+        }
+        if (!rollPercent(MARKET_NEWS_CHANCE_PERCENT)) {
+            player.scheduleNoMonthlyMarketNews();
+            return;
+        }
+        String trend = random.nextBoolean() ? MARKET_NEWS_RISE : MARKET_NEWS_FALL;
+        player.scheduleMonthlyMarketNews(randomEventDay(player), player.getCurrentCity(), trend);
     }
 
     private int randomEventDay(Player player) {
@@ -160,8 +177,11 @@ public class SettlementService {
 
     private String runMonthlyRandomBuildingEvent(Player player) {
         String notice = "";
+        if (player.isMarketNewsEventDay()) {
+            notice = activateMarketNews(player);
+        }
         if (player.isMoveInEventDay()) {
-            notice = attemptMoveIn(player);
+            notice = appendNotice(notice, attemptMoveIn(player));
         }
         if (player.isMoveOutEventDay()) {
             String moveOutNotice = attemptMoveOut(player);
@@ -172,6 +192,35 @@ public class SettlementService {
             notice = appendNotice(notice, repairNotice);
         }
         return notice;
+    }
+
+    private String activateMarketNews(Player player) {
+        if (activeEvent(player).isPresent()) {
+            return "";
+        }
+        String trend = player.getMarketNewsEventTrend();
+        String city = player.getMarketNewsEventCity();
+        player.activateMarketNews();
+        String trendLabel = MARKET_NEWS_RISE.equals(trend) ? "폭등" : "폭락";
+        saveRecord(player, RecordType.BUILDING_BUY, "부동산 " + trendLabel + " 뉴스", null, 0, city, "다음 매물갱신 2회 적용");
+        gameEventRepository.save(new GameEvent(
+                player,
+                "market_news_" + player.getId() + "_" + player.getElapsedDays() + "_" + trend,
+                city + " 부동산 " + trendLabel + " 뉴스",
+                MARKET_NEWS_RISE.equals(trend)
+                        ? "투자 수요가 몰리며 매물 평가가 2회 동안 고평가 쪽으로 기웁니다."
+                        : "시장 불안이 커지며 매물 평가가 2회 동안 저평가 쪽으로 기웁니다.",
+                marketNewsImagePath(city, trend),
+                "NONE",
+                "확인"
+        ));
+        player.pause();
+        return city + " 부동산 " + trendLabel + " 뉴스";
+    }
+
+    public String activateMarketNewsForTest(Player player, String trend) {
+        player.scheduleMonthlyMarketNews(player.getDay(), player.getCurrentCity(), trend);
+        return activateMarketNews(player);
     }
 
     private String attemptMoveIn(Player player) {
@@ -249,6 +298,9 @@ public class SettlementService {
         if (activeEvent(player).isPresent()) {
             return;
         }
+        if ("서울".equals(tier.unlockCity()) && tier.unlockBuildingSlot() >= 1) {
+            player.scheduleStockUnlock(player.getElapsedDays() + 2);
+        }
         gameEventRepository.save(new GameEvent(
                 player,
                 new GameEventDefinition(
@@ -278,6 +330,22 @@ public class SettlementService {
 
     private double clampPercent(double value) {
         return Math.max(0.0, Math.min(100.0, value));
+    }
+
+    private String marketNewsImagePath(String city, String trend) {
+        return "/assets/news/" + citySlug(city) + "-" + (MARKET_NEWS_RISE.equals(trend) ? "rise" : "fall") + ".jpg";
+    }
+
+    private String citySlug(String city) {
+        return switch (city) {
+            case "\uCCAD\uC8FC" -> "cheongju";
+            case "\uC138\uC885" -> "sejong";
+            case "\uB300\uC804" -> "daejeon";
+            case "\uBD80\uC0B0" -> "busan";
+            case "\uC778\uCC9C" -> "incheon";
+            case "\uC11C\uC6B8" -> "seoul";
+            default -> "cheongju";
+        };
     }
 
     private String appendNotice(String base, String addition) {

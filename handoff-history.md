@@ -1,5 +1,59 @@
 # Handoff History
 
+# 2026-07-01
+
+- Implemented stock price-history core.
+  - Added `OwnedStock` entity and repository.
+  - Added `StockPriceHistory` entity and repository.
+  - Added quote/candle view models for stock screen rendering.
+  - Stock unlock now seeds initial price history from `StockCatalog`.
+  - Stock screen opening also initializes missing stock history when unlocked.
+  - `/tick` now processes stock price updates after stock unlock handling.
+  - Stock updates run when 5 elapsed days have passed since the latest stock history row.
+  - Each update appends OHLCV rows for all 15 stocks.
+  - Normal random movement is -5% to +5%.
+  - H2 schema issue fixed by mapping stock history `day` and `month` to `record_day` and `record_month`.
+  - Main stock panel now uses `stockQuotes`.
+  - Left list shows current price, previous update price, change percent, and change amount.
+  - Detail panel renders server-side SVG candlesticks and volume bars.
+  - Up candles use red; down candles use blue.
+  - Added regression coverage for stock unlock seeding and 5-day price updates.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Confirmed next stock system implementation design.
+  - Stock is a strong supplemental system after Seoul unlock, not a replacement for real estate.
+  - Price update cadence: every 5 elapsed days.
+  - Normal movement: random -5% to +5%.
+  - Industry boom movement: random -3% to +15%.
+  - Industry recession movement: random -15% to +3%.
+  - Buy fee and sell fee are both 0.5%.
+  - Stock loss is principal-limited only; no margin, no debt, no negative cash from stock losses.
+  - All stocks use random movement; no per-stock volatility tiers.
+  - Future industry events should support boom/recession by industry.
+  - Left stock list should show company, current price, previous update price, and change rate/change amount.
+  - Previous update price means the close price from the last 5-day update.
+  - Up color should be red; down color should be blue.
+  - Chart target: candlestick chart like trading apps, with volume bars, right price axis, bottom date axis, and current price label.
+  - Needed data per price history row: stock key, elapsed day/month/day, open, high, low, close, volume.
+  - Recommended next implementation order:
+    - Add `OwnedStock` entity/repository.
+    - Add `StockPriceHistory` entity/repository.
+    - Seed initial history from `StockCatalog`.
+    - Update all stocks every 5 elapsed days in tick flow.
+    - Render current/previous/change values in the left list.
+    - Render chart from recent OHLCV history.
+    - Add buy/sell endpoints after history is stable.
+
+# 2026-06-30
+
+- Updated recent records panel.
+  - Recent records now default to a floating right-side panel on wide screens.
+  - The panel has a `고정` button that returns it to the original info-grid position.
+  - When docked, the button changes to `따라오기` and restores floating mode.
+  - Docked/floating state is persisted in localStorage.
+  - On narrower screens the panel stays in the original layout.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`; PID `55588`.
+
 # 2026-06-30
 
 - Updated UI/UX pass.
@@ -267,6 +321,73 @@
   - `GameService.java` line count changed from 1086 to 895.
   - Ran `.\gradlew.bat test --console=plain`; passed.
   - Restarted server on `http://localhost:8080` with the secretary operations refactor.
+- Updated stock panel for future price chart.
+  - Stock detail panel now reserves a fixed chart area.
+  - Header explains stock prices will update every 5 days.
+  - Detail summary includes 5-day change and next update placeholders.
+  - Chart placeholder is sized for future price history rendering.
+  - Buy/sell controls remain disabled placeholders.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Fixed stock tab placement and conditional rendering.
+  - Stock tab now appears between `서울` and `정보`.
+  - City fragments now render only in city view through `th:block`.
+  - Stock view no longer shows the city market/list below or above it.
+  - Stabilized stock unlock regression test by testing `StockService` directly instead of random tick flow.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Moved stock content into the main screen.
+  - `/main?view=stocks` now shows the stock view in the same main shell as city gameplay.
+  - `/stocks` redirects to `/main?view=stocks`.
+  - Stock view uses the same topbar, timer, event modals, and auction handling as the city view.
+  - City buttons are active only in city view; stock tab is active in stock view.
+  - Moved stock company list information into the info screen.
+  - Deleted the separate `stocks.html` page.
+  - Added `fragments/main-stock-panel.html`.
+  - Stock panel now behaves like a stock app skeleton: click a company to show that company's price/detail panel.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Added stock content skeleton.
+  - Added `StockSpec`, `StockCatalog`, and `StockService`.
+  - Stock content schedules when Seoul first building unlocks and opens 2 elapsed days later.
+  - Added one-time event modal titled `주식 투자 개방`.
+  - Added `/stocks` dedicated screen.
+  - Added 15 stock specs: 3 IT, 3 food, 3 distribution, 3 manufacturing, 3 telecom.
+  - Main nav now shows `주식` when unlocked, otherwise locked status text.
+  - Initial stock screen is list-only; buy/sell and price movement are not implemented yet.
+  - Added regression test `stockContentUnlocksTwoDaysAfterSeoulUnlockSchedule`.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Added market-panel news badge.
+  - Active current-city market news is now shown next to the market title.
+  - Rise news uses the danger badge style, fall news uses the good badge style.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Fixed market news QA 500 error.
+  - Cause: existing H2 DB enum constraint for `monthly_record.record_type` did not include newly added `MARKET_NEWS`.
+  - Fix: market news records now reuse existing `BUILDING_BUY` record type with title `부동산 폭등 뉴스` or `부동산 폭락 뉴스`.
+  - Removed the new `MARKET_NEWS` enum value to keep existing DB compatible.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+  - Restarted server on `http://localhost:8080`.
+- Added market news QA button.
+  - Test panel now has a `부동산 이벤트` selector with current-city rise/fall options.
+  - `/test/market-news` forces the selected current-city market news event.
+  - QA activation closes any active normal event first, resumes the player, then opens the news event modal.
+  - Added regression test `qaCanActivateCurrentCityMarketNews`.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Added current-city market news events.
+  - At monthly schedule creation, the current city has a 15% chance to schedule a real estate news event on a random later day.
+  - News type is rise or fall.
+  - The news opens a normal event modal and pauses the game.
+  - Rise news makes the next 2 offer refreshes use 10% undervalued, 20% fair, 70% overvalued.
+  - Fall news makes the next 2 offer refreshes use 70% undervalued, 20% fair, 10% overvalued.
+  - Existing offers are not repriced.
+  - City panel shows active news and remaining affected offer refresh count.
+  - Recent records store title `부동산 폭등 뉴스` or `부동산 폭락 뉴스`.
+  - Added 12 images under `src/main/resources/static/assets/news/`.
+  - Server-side tick now returns an active auction before advancing the day, preventing market news from overlapping an active auction.
+  - Added regression test `marketNewsAppliesForTwoOfferRefreshes`.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
+- Added collapsible panel state persistence.
+  - Donation, luxury, gift, and test panels now have stable `data-collapsible-key` values.
+  - `app.js` stores each collapsible panel open/closed state in `localStorage` under `buildingStory.collapsiblePanels`.
+  - Moving between cities or reloading preserves the user's folded/unfolded panel state.
+  - Ran `.\gradlew.bat test --console=plain`; passed.
 - Continued refactoring pass 6.
   - Extracted loan list, remaining repayment/principal, loan limit, available loan limit, immediate repayment, and maturity failure handling into `LoanService`.
   - Updated `BuildingTradeService` to use `LoanService` for loan limit/principal checks.
@@ -347,3 +468,21 @@
   - Append detailed records to `handoff-history.md`.
   - Use `handoff-history.md` or `git log` only when older context is needed.
   - Do not use mojibake-heavy `handoff-summary.txt` by default.
+- Stock industry news event work:
+  - Removed visible safe/normal/aggressive label from the stock list; internal risk type remains active.
+  - Added monthly 15% stock industry news scheduling after stock unlock.
+  - Added random industry and random boom/recession event activation.
+  - Added stock news modal images under `src/main/resources/static/assets/stock-news/`.
+  - Added active industry effect for next 2 stock price updates.
+  - Added `STOCK_EVENT` monthly record type.
+  - Added regression test `stockIndustryNewsActivatesAndAppliesForTwoPriceUpdates`.
+  - Verification: `.\gradlew.bat test --console=plain` passed.
+  - HTTP checks: `/login` returned 200 and `/assets/stock-news/it-boom.jpg` returned 200 image/jpeg.
+- Stock holding/filter/exchange UX work:
+  - Added right-side stock holding summary using the recent-record side area.
+  - Added `StockHoldingSummaryView` and `GameService.stockHoldingSummary`.
+  - Added trade history filters for all/buy/sell and stock select.
+  - Added cash/coin exchange quick buttons: all, 100k, 1m, 10m coin.
+  - Updated main script cache key to `app.js?v=stock-tools-1`.
+  - Verification: `.\gradlew.bat test --console=plain` passed.
+  - Server restarted on port 8080.

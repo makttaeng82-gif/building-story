@@ -25,5 +25,8 @@ public class InfoPageModelAssembler {
         model.addAttribute("buildingSpecs", gameService.buildingSpecs());
         model.addAttribute("reputationTiers", gameService.reputationTiers());
         model.addAttribute("secretarySpecs", gameService.secretarySpecs());
+        model.addAttribute("stockSpecs", gameService.stockSpecs());
+        model.addAttribute("stockContentUnlocked", gameService.stockContentUnlocked(player));
+        model.addAttribute("stockContentStatus", gameService.stockContentStatusText(player));
     }
 }

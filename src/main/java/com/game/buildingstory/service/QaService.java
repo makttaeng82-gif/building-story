@@ -35,6 +35,7 @@ public class QaService {
     private final SecretaryCatalog secretaryCatalog;
     private final LuxuryItemCatalog luxuryItemCatalog;
     private final SecretaryTenantEventService secretaryTenantEventService;
+    private final SettlementService settlementService;
 
     public QaService(
             PlayerRepository playerRepository,
@@ -48,7 +49,8 @@ public class QaService {
             ReputationCatalog reputationCatalog,
             SecretaryCatalog secretaryCatalog,
             LuxuryItemCatalog luxuryItemCatalog,
-            SecretaryTenantEventService secretaryTenantEventService
+            SecretaryTenantEventService secretaryTenantEventService,
+            SettlementService settlementService
     ) {
         this.playerRepository = playerRepository;
         this.ownedBuildingRepository = ownedBuildingRepository;
@@ -62,6 +64,7 @@ public class QaService {
         this.secretaryCatalog = secretaryCatalog;
         this.luxuryItemCatalog = luxuryItemCatalog;
         this.secretaryTenantEventService = secretaryTenantEventService;
+        this.settlementService = settlementService;
     }
 
     public String addTestCash(long playerId) {
@@ -92,6 +95,16 @@ public class QaService {
         }
         secretary.setProficiencyForTest(proficiency);
         return spec.name() + " 숙련도 변경 완료";
+    }
+
+    public String activateMarketNewsEvent(long playerId, String trend) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        gameEventRepository.findFirstByPlayerAndStatus(player, GameEventStatus.ACTIVE).ifPresent(GameEvent::complete);
+        player.resume();
+        String safeTrend = SettlementService.MARKET_NEWS_FALL.equals(trend)
+                ? SettlementService.MARKET_NEWS_FALL
+                : SettlementService.MARKET_NEWS_RISE;
+        return settlementService.activateMarketNewsForTest(player, safeTrend);
     }
 
     public String prepareSecretaryEventTestConditions(long playerId, String secretaryKey) {

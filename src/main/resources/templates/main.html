@@ -16,8 +16,8 @@
     </script>
     <link rel="stylesheet" href="/styles.css">
 </head>
-<body th:classappend="${activeEvent != null || activeAuction != null || player.paused} ? ' game-paused'"
-      th:attr="data-player-paused=${player.paused}">
+<body th:classappend="${screenPaused} ? ' game-paused'"
+      th:attr="data-player-paused=${screenPaused}">
 <div class="app">
     <header class="topbar">
         <div class="brand">
@@ -32,14 +32,15 @@
             <div class="status-card">
                 <span>현금</span>
                 <strong id="cashValue" class="money" th:text="${@moneyText.format(player.cash)}">0원</strong>
-            </div>
-            <div class="status-card">
-                <span>대출</span>
-                <strong class="money" th:text="${@moneyText.format(loanRemainingRepayment)}">0원</strong>
+                <small class="status-subline">대출 <b th:text="${@moneyText.format(loanRemainingRepayment)}">0원</b></small>
             </div>
             <div class="status-card">
                 <span>총 월세</span>
                 <strong id="totalMonthlyRentValue" class="money" th:text="${@moneyText.format(totalMonthlyRent)}">0원</strong>
+            </div>
+            <div class="status-card">
+                <span>코인</span>
+                <strong id="coinValue" class="money" th:text="${@gameService.stockCoinText(player.coin)}">0코인</strong>
             </div>
             <div class="status-card" th:if="${player.employed}">
                 <span>직장</span>
@@ -48,10 +49,7 @@
             <div class="status-card">
                 <span>평판</span>
                 <strong th:text="${@gameService.reputationText(player.reputation)}">0</strong>
-            </div>
-            <div class="status-card">
-                <span>칭호</span>
-                <strong th:text="${player.title}">칭호</strong>
+                <small class="status-subline">칭호 <b th:text="${player.title}">칭호</b></small>
             </div>
             <div class="status-card date-card">
                 <span>날짜</span>
@@ -71,25 +69,77 @@
             <input type="hidden" name="city" th:value="${city}">
             <button type="submit"
                     th:disabled="${cityUnlocks.get(city) != true}"
-                    th:classappend="${city == player.currentCity} ? ' active' : (${cityUnlocks.get(city) != true} ? ' locked' : '')">
+                    th:classappend="${cityUnlocks.get(city) != true} ? ' locked' : (${viewMode == 'city' && city == player.currentCity} ? ' active' : '')">
                 <span th:text="${city}">도시</span>
                 <span th:if="${cityUnlocks.get(city) != true}">잠김</span>
                 <span class="repair-count-badge" th:if="${repairCountsByCity.get(city) != null && repairCountsByCity.get(city) > 0}" th:text="${repairCountsByCity.get(city)}">0</span>
             </button>
         </form>
+        <a class="info-tab" th:if="${stockContentUnlocked}" href="/main?view=stocks" th:classappend="${viewMode == 'stocks'} ? ' active'">주식</a>
+        <span class="info-tab locked" th:if="${!stockContentUnlocked}" th:text="'주식 · ' + ${stockContentStatus}">주식</span>
         <a class="info-tab" href="/info">정보</a>
         <form class="tab-pause-form" method="post" action="/pause/toggle">
+            <input type="hidden" name="redirectView" th:value="${viewMode}">
             <button class="tab-pause-button" type="submit" th:text="${player.paused ? '진행 재개' : '일시정지'}">일시정지</button>
         </form>
     </nav>
 
-    <main class="layout">
-        <section th:replace="~{fragments/main-city-panel :: cityPanel}"></section>
-        <aside th:replace="~{fragments/main-secretary-panel :: secretaryPanel}"></aside>
-    </main>
-    <section th:replace="~{fragments/main-market :: market}"></section>
-
-    <section th:replace="~{fragments/main-info-grid :: infoGrid}"></section>
+    <th:block th:if="${viewMode == 'city'}">
+        <main class="layout">
+            <section th:replace="~{fragments/main-city-panel :: cityPanel}"></section>
+            <aside th:replace="~{fragments/main-secretary-panel :: secretaryPanel}"></aside>
+        </main>
+        <section th:replace="~{fragments/main-market :: market}"></section>
+        <section th:replace="~{fragments/main-info-grid :: infoGrid}"></section>
+    </th:block>
+    <th:block th:if="${viewMode == 'stocks'}">
+        <main class="stock-layout">
+            <section th:replace="~{fragments/main-stock-panel :: stockPanel}"></section>
+            <aside class="panel stock-record-panel">
+                <section class="stock-holding-summary">
+                    <h2>보유종목요약</h2>
+                    <dl>
+                        <div>
+                            <dt>보유 종목</dt>
+                            <dd th:text="${stockHoldingSummary.holdingCount()} + '개'">0개</dd>
+                        </div>
+                        <div>
+                            <dt>보유 주식</dt>
+                            <dd th:text="${stockHoldingSummary.totalQuantity()} + '주'">0주</dd>
+                        </div>
+                        <div>
+                            <dt>매입원금</dt>
+                            <dd th:text="${stockHoldingSummary.totalCostText()}">0코인</dd>
+                        </div>
+                        <div>
+                            <dt>평가금액</dt>
+                            <dd th:text="${stockHoldingSummary.totalValuationText()}">0코인</dd>
+                        </div>
+                        <div>
+                            <dt>평가손익</dt>
+                            <dd th:class="${stockHoldingSummary.profitDirection()}" th:text="${stockHoldingSummary.totalProfitText()}">0코인</dd>
+                        </div>
+                    </dl>
+                </section>
+                <section class="stock-side-records">
+                    <h2>최근 기록</h2>
+                    <ul class="event-list record-list" th:if="${!records.isEmpty()}">
+                        <li th:each="record : ${records}">
+                            <b th:text="${record.month} + '월 ' + ${record.day} + '일'">1월 1일</b>
+                            <span th:text="${record.title}">기록</span>
+                            <span th:if="${record.buildingName != null}" th:text="' · ' + ${record.buildingName}">건물</span>
+                            <span th:if="${record.amount != null}"
+                                  th:classappend="${record.amount > 0} ? ' money-in' : ' money-out'"
+                                  th:text="' · ' + ${record.amount > 0 ? '+' : '-'} + ${@moneyText.format(record.amount < 0 ? -record.amount : record.amount)}">금액</span>
+                            <span th:if="${record.reputationChange != 0}" th:text="' · 평판 ' + ${record.reputationChange > 0 ? '+' : ''} + ${@gameService.reputationText(record.reputationChange)}">평판</span>
+                            <small th:if="${record.memo != null}" th:text="${record.memo}">메모</small>
+                        </li>
+                    </ul>
+                    <p th:if="${records.isEmpty()}">최근 기록 없음</p>
+                </section>
+            </aside>
+        </main>
+    </th:block>
 
     <form class="logout-form" method="post" action="/logout">
         <button class="secondary" type="submit">로그아웃</button>
@@ -100,6 +150,6 @@
     <div th:replace="~{fragments/main-modals :: modals}"></div>
 </div>
 
-<script type="module" src="/app.js"></script>
+<script type="module" src="/app.js?v=stock-tools-1"></script>
 </body>
 </html>

@@ -62,7 +62,7 @@ public class GameController {
     }
 
     @GetMapping("/main")
-    public String main(HttpSession session, Model model) {
+    public String main(@RequestParam(defaultValue = "city") String view, HttpSession session, Model model) {
         Long playerId = currentPlayerId(session);
         if (playerId == null) {
             return "redirect:/login";
@@ -71,7 +71,17 @@ public class GameController {
         if (!player.isStorySeen()) {
             return "redirect:/story";
         }
+        String viewMode = "stocks".equals(view) && gameService.stockContentUnlocked(player) ? "stocks" : "city";
         mainPageModelAssembler.addMainPageAttributes(playerId, player, model);
+        boolean hiddenCityModal = false;
+        if ("stocks".equals(viewMode)) {
+            hiddenCityModal = model.asMap().get("activeEvent") != null || model.asMap().get("activeAuction") != null;
+            model.addAttribute("activeEvent", null);
+            model.addAttribute("activeAuction", null);
+        }
+        model.addAttribute("viewMode", viewMode);
+        model.addAttribute("screenPaused", ("city".equals(viewMode) && (model.asMap().get("activeEvent") != null || model.asMap().get("activeAuction") != null))
+                || (player.isPaused() && !hiddenCityModal));
         return "main";
     }
 
@@ -87,6 +97,15 @@ public class GameController {
         }
         infoPageModelAssembler.addInfoPageAttributes(player, model);
         return "info";
+    }
+
+    @GetMapping("/stocks")
+    public String stocks(HttpSession session, Model model) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return "redirect:/login";
+        }
+        return "redirect:/main?view=stocks";
     }
 
     @PostMapping("/side-job")
@@ -176,13 +195,96 @@ public class GameController {
     }
 
     @PostMapping("/pause/toggle")
-    public String togglePause(HttpSession session, RedirectAttributes redirectAttributes) {
+    public String togglePause(
+            @RequestParam(defaultValue = "city") String redirectView,
+            HttpSession session,
+            RedirectAttributes redirectAttributes
+    ) {
         Long playerId = currentPlayerId(session);
         if (playerId == null) {
             return "redirect:/login";
         }
         redirectAttributes.addFlashAttribute("notice", gameService.togglePause(playerId));
+        if ("stocks".equals(redirectView)) {
+            return "redirect:/main?view=stocks";
+        }
         return "redirect:/main";
+    }
+
+    @PostMapping("/stocks/exchange/cash-to-coin")
+    @ResponseBody
+    public Map<String, String> exchangeCashToCoin(@RequestParam long coinAmount, HttpSession session) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return Map.of("redirect", "/login");
+        }
+        String notice = gameService.exchangeCashToCoin(playerId, coinAmount);
+        Player player = gameService.player(playerId);
+        return Map.of(
+                "notice", notice,
+                "cash", String.format("%,d원", player.getCash()),
+                "cashRaw", String.valueOf(player.getCash()),
+                "coin", gameService.stockCoinText(player.getCoin()),
+                "coinRaw", String.valueOf(player.getCoin())
+        );
+    }
+
+    @PostMapping("/stocks/exchange/coin-to-cash")
+    @ResponseBody
+    public Map<String, String> exchangeCoinToCash(@RequestParam long coinAmount, HttpSession session) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return Map.of("redirect", "/login");
+        }
+        String notice = gameService.exchangeCoinToCash(playerId, coinAmount);
+        Player player = gameService.player(playerId);
+        return Map.of(
+                "notice", notice,
+                "cash", String.format("%,d원", player.getCash()),
+                "cashRaw", String.valueOf(player.getCash()),
+                "coin", gameService.stockCoinText(player.getCoin()),
+                "coinRaw", String.valueOf(player.getCoin())
+        );
+    }
+
+    @PostMapping("/stocks/{stockKey}/buy")
+    public String buyStock(@PathVariable String stockKey, @RequestParam(defaultValue = "1") long quantity, HttpSession session, RedirectAttributes redirectAttributes) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return "redirect:/login";
+        }
+        redirectAttributes.addFlashAttribute("notice", gameService.buyStock(playerId, stockKey, quantity));
+        return "redirect:/main?view=stocks";
+    }
+
+    @PostMapping("/stocks/{stockKey}/buy-max")
+    public String buyMaxStock(@PathVariable String stockKey, HttpSession session, RedirectAttributes redirectAttributes) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return "redirect:/login";
+        }
+        redirectAttributes.addFlashAttribute("notice", gameService.buyMaxStock(playerId, stockKey));
+        return "redirect:/main?view=stocks";
+    }
+
+    @PostMapping("/stocks/{stockKey}/sell")
+    public String sellStock(@PathVariable String stockKey, @RequestParam(defaultValue = "1") long quantity, HttpSession session, RedirectAttributes redirectAttributes) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return "redirect:/login";
+        }
+        redirectAttributes.addFlashAttribute("notice", gameService.sellStock(playerId, stockKey, quantity));
+        return "redirect:/main?view=stocks";
+    }
+
+    @PostMapping("/stocks/{stockKey}/sell-all")
+    public String sellAllStock(@PathVariable String stockKey, HttpSession session, RedirectAttributes redirectAttributes) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return "redirect:/login";
+        }
+        redirectAttributes.addFlashAttribute("notice", gameService.sellAllStock(playerId, stockKey));
+        return "redirect:/main?view=stocks";
     }
 
     @PostMapping("/donations")
@@ -318,12 +420,12 @@ public class GameController {
 
     @PostMapping("/tick")
     @ResponseBody
-    public Map<String, String> tick(HttpSession session) {
+    public Map<String, String> tick(@RequestParam(defaultValue = "city") String view, HttpSession session) {
         Long playerId = currentPlayerId(session);
         if (playerId == null) {
             return Map.of("redirect", "/login");
         }
-        String result = gameService.tick(playerId);
+        String result = gameService.tick(playerId, "stocks".equals(view));
         if (result.startsWith("EVENT:")) {
             return Map.of("event", result.substring("EVENT:".length()));
         }

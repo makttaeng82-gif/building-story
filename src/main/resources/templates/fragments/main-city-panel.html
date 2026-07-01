@@ -12,6 +12,7 @@
                 수리 <span th:text="${@gameService.effectiveRepairRequestChancePercentText(player, player.currentCity)}">35%</span>
                 <span th:if="${@gameService.rentBonusPercent(player, player.currentCity) > 0}" th:text="' · 월세 +' + ${@gameService.rentBonusPercentText(player, player.currentCity)}">월세</span>
                 <span th:if="${@gameService.buildingWaitReductionPercent(player, player.currentCity) > 0}" th:text="' · 건물대기시간 -' + ${@gameService.buildingWaitReductionPercentText(player, player.currentCity)}">대기</span>
+                <span th:if="${!@gameService.marketNewsStatusText(player, player.currentCity).isBlank()}" th:text="' · ' + ${@gameService.marketNewsStatusText(player, player.currentCity)}">뉴스</span>
             </p>
         </div>
         <div class="quick-actions">

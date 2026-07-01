@@ -51,6 +51,16 @@ public class QaController {
         return "redirect:/main";
     }
 
+    @PostMapping("/test/market-news")
+    public String activateMarketNews(@RequestParam String trend, HttpSession session, RedirectAttributes redirectAttributes) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return "redirect:/login";
+        }
+        redirectAttributes.addFlashAttribute("notice", qaService.activateMarketNewsEvent(playerId, trend));
+        return "redirect:/main";
+    }
+
     @PostMapping("/test/secretary-proficiency")
     public String updateTestSecretaryProficiency(
             @RequestParam String secretaryKey,

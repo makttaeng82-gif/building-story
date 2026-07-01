@@ -23,6 +23,7 @@ public class Player {
     private String passwordHash;
 
     private long cash;
+    private Long coin = 0L;
     private boolean storySeen;
     private Boolean firstTenantEventDone = false;
     private Boolean paused = false;
@@ -56,6 +57,25 @@ public class Player {
     private Integer moveOutChancePercent = 25;
     private Integer repairRequestChancePercent = 35;
     private String dismissedSecretaryOfferKeys = "";
+    private Integer marketNewsScheduleMonth;
+    private Integer marketNewsScheduleCycle;
+    private Integer marketNewsEventDay;
+    private String marketNewsEventCity;
+    private String marketNewsEventTrend;
+    private String activeMarketNewsCity;
+    private String activeMarketNewsTrend;
+    private Integer activeMarketNewsRefreshesLeft = 0;
+    private Integer stockUnlockAvailableDay;
+    private Boolean stockContentUnlocked = false;
+    private Boolean stockUnlockNoticeShown = false;
+    private Integer stockNewsScheduleMonth;
+    private Integer stockNewsScheduleCycle;
+    private Integer stockNewsEventDay;
+    private String stockNewsEventIndustry;
+    private String stockNewsEventTrend;
+    private String activeStockNewsIndustry;
+    private String activeStockNewsTrend;
+    private Integer activeStockNewsRefreshesLeft = 0;
 
     protected Player() {
     }
@@ -81,6 +101,10 @@ public class Player {
         return cash;
     }
 
+    public long getCoin() {
+        return coin == null ? 0L : coin;
+    }
+
     public void addCash(long amount) {
         this.cash += amount;
     }
@@ -90,6 +114,18 @@ public class Player {
             return false;
         }
         cash -= amount;
+        return true;
+    }
+
+    public void addCoin(long amount) {
+        this.coin = getCoin() + amount;
+    }
+
+    public boolean spendCoin(long amount) {
+        if (getCoin() < amount) {
+            return false;
+        }
+        coin = getCoin() - amount;
         return true;
     }
 
@@ -373,6 +409,186 @@ public class Player {
 
     public boolean isRepairEventDay() {
         return day == valueOrImpossible(repairEventDay) || day == valueOrImpossible(repairEventDayTwo);
+    }
+
+    public boolean hasMarketNewsScheduleForCurrentMonth() {
+        return marketNewsScheduleMonth != null && marketNewsScheduleMonth == month
+                && marketNewsScheduleCycle != null && marketNewsScheduleCycle == currentScheduleCycle()
+                && marketNewsEventDay != null;
+    }
+
+    public void scheduleNoMonthlyMarketNews() {
+        this.marketNewsScheduleMonth = month;
+        this.marketNewsScheduleCycle = currentScheduleCycle();
+        this.marketNewsEventDay = -1;
+        this.marketNewsEventCity = null;
+        this.marketNewsEventTrend = null;
+    }
+
+    public void scheduleMonthlyMarketNews(int eventDay, String city, String trend) {
+        this.marketNewsScheduleMonth = month;
+        this.marketNewsScheduleCycle = currentScheduleCycle();
+        this.marketNewsEventDay = eventDay;
+        this.marketNewsEventCity = city;
+        this.marketNewsEventTrend = trend;
+    }
+
+    public boolean isMarketNewsEventDay() {
+        return day == valueOrImpossible(marketNewsEventDay)
+                && marketNewsEventCity != null
+                && marketNewsEventTrend != null;
+    }
+
+    public String getMarketNewsEventCity() {
+        return marketNewsEventCity;
+    }
+
+    public String getMarketNewsEventTrend() {
+        return marketNewsEventTrend;
+    }
+
+    public void activateMarketNews() {
+        this.activeMarketNewsCity = marketNewsEventCity;
+        this.activeMarketNewsTrend = marketNewsEventTrend;
+        this.activeMarketNewsRefreshesLeft = 2;
+        this.marketNewsEventDay = -1;
+    }
+
+    public boolean hasActiveMarketNewsForCity(String city) {
+        return city != null
+                && city.equals(activeMarketNewsCity)
+                && activeMarketNewsTrend != null
+                && getActiveMarketNewsRefreshesLeft() > 0;
+    }
+
+    public String getActiveMarketNewsCity() {
+        return activeMarketNewsCity;
+    }
+
+    public String getActiveMarketNewsTrend() {
+        return activeMarketNewsTrend;
+    }
+
+    public int getActiveMarketNewsRefreshesLeft() {
+        return activeMarketNewsRefreshesLeft == null ? 0 : activeMarketNewsRefreshesLeft;
+    }
+
+    public void consumeMarketNewsRefresh(String city) {
+        if (!hasActiveMarketNewsForCity(city)) {
+            return;
+        }
+        activeMarketNewsRefreshesLeft = getActiveMarketNewsRefreshesLeft() - 1;
+        if (activeMarketNewsRefreshesLeft <= 0) {
+            activeMarketNewsCity = null;
+            activeMarketNewsTrend = null;
+            activeMarketNewsRefreshesLeft = 0;
+        }
+    }
+
+    public void scheduleStockUnlock(int availableDay) {
+        if (stockUnlockAvailableDay == null) {
+            stockUnlockAvailableDay = Math.max(getElapsedDays(), availableDay);
+        }
+    }
+
+    public boolean hasStockUnlockSchedule() {
+        return stockUnlockAvailableDay != null;
+    }
+
+    public boolean isStockContentUnlocked() {
+        return Boolean.TRUE.equals(stockContentUnlocked);
+    }
+
+    public boolean isStockUnlockNoticeShown() {
+        return Boolean.TRUE.equals(stockUnlockNoticeShown);
+    }
+
+    public boolean isStockUnlockDue() {
+        return !isStockContentUnlocked()
+                && stockUnlockAvailableDay != null
+                && getElapsedDays() >= stockUnlockAvailableDay;
+    }
+
+    public void unlockStockContent() {
+        stockContentUnlocked = true;
+    }
+
+    public void markStockUnlockNoticeShown() {
+        stockUnlockNoticeShown = true;
+    }
+
+    public boolean hasStockNewsScheduleForCurrentMonth() {
+        return stockNewsScheduleMonth != null && stockNewsScheduleMonth == month
+                && stockNewsScheduleCycle != null && stockNewsScheduleCycle == currentScheduleCycle()
+                && stockNewsEventDay != null;
+    }
+
+    public void scheduleNoMonthlyStockNews() {
+        this.stockNewsScheduleMonth = month;
+        this.stockNewsScheduleCycle = currentScheduleCycle();
+        this.stockNewsEventDay = -1;
+        this.stockNewsEventIndustry = null;
+        this.stockNewsEventTrend = null;
+    }
+
+    public void scheduleMonthlyStockNews(int eventDay, String industry, String trend) {
+        this.stockNewsScheduleMonth = month;
+        this.stockNewsScheduleCycle = currentScheduleCycle();
+        this.stockNewsEventDay = eventDay;
+        this.stockNewsEventIndustry = industry;
+        this.stockNewsEventTrend = trend;
+    }
+
+    public boolean isStockNewsEventDay() {
+        return day == valueOrImpossible(stockNewsEventDay)
+                && stockNewsEventIndustry != null
+                && stockNewsEventTrend != null;
+    }
+
+    public String getStockNewsEventIndustry() {
+        return stockNewsEventIndustry;
+    }
+
+    public String getStockNewsEventTrend() {
+        return stockNewsEventTrend;
+    }
+
+    public void activateStockNews() {
+        this.activeStockNewsIndustry = stockNewsEventIndustry;
+        this.activeStockNewsTrend = stockNewsEventTrend;
+        this.activeStockNewsRefreshesLeft = 2;
+        this.stockNewsEventDay = -1;
+    }
+
+    public boolean hasActiveStockNewsForIndustry(String industry) {
+        return industry != null
+                && industry.equals(activeStockNewsIndustry)
+                && activeStockNewsTrend != null
+                && getActiveStockNewsRefreshesLeft() > 0;
+    }
+
+    public String getActiveStockNewsIndustry() {
+        return activeStockNewsIndustry;
+    }
+
+    public String getActiveStockNewsTrend() {
+        return activeStockNewsTrend;
+    }
+
+    public int getActiveStockNewsRefreshesLeft() {
+        return activeStockNewsRefreshesLeft == null ? 0 : activeStockNewsRefreshesLeft;
+    }
+
+    public void consumeStockNewsRefresh() {
+        if (getActiveStockNewsRefreshesLeft() <= 0) {
+            return;
+        }
+        activeStockNewsRefreshesLeft = getActiveStockNewsRefreshesLeft() - 1;
+        if (activeStockNewsRefreshesLeft <= 0) {
+            activeStockNewsIndustry = null;
+            activeStockNewsTrend = null;
+            activeStockNewsRefreshesLeft = 0;
+        }
     }
 
     private int valueOrImpossible(Integer value) {

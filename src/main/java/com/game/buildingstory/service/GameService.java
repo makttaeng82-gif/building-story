@@ -11,6 +11,7 @@ import com.game.buildingstory.domain.OwnedSecretary;
 import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.SecretaryTenantEvent;
 import com.game.buildingstory.domain.SecretaryTenantEventStatus;
+import com.game.buildingstory.domain.StockTradeHistory;
 import com.game.buildingstory.repo.GameEventRepository;
 import com.game.buildingstory.repo.MonthlyRecordRepository;
 import com.game.buildingstory.repo.OwnedBuildingRepository;
@@ -45,6 +46,7 @@ public class GameService {
     private final SecretaryOperationsService secretaryOperationsService;
     private final SettlementService settlementService;
     private final EventFlowService eventFlowService;
+    private final StockService stockService;
 
     public GameService(
             PlayerRepository playerRepository,
@@ -63,7 +65,8 @@ public class GameService {
             LoanService loanService,
             SecretaryOperationsService secretaryOperationsService,
             SettlementService settlementService,
-            EventFlowService eventFlowService
+            EventFlowService eventFlowService,
+            StockService stockService
     ) {
         this.playerRepository = playerRepository;
         this.ownedBuildingRepository = ownedBuildingRepository;
@@ -82,6 +85,7 @@ public class GameService {
         this.secretaryOperationsService = secretaryOperationsService;
         this.settlementService = settlementService;
         this.eventFlowService = eventFlowService;
+        this.stockService = stockService;
     }
 
     @Transactional(readOnly = true)
@@ -113,9 +117,18 @@ public class GameService {
 
     @Transactional
     public String tick(long playerId) {
+        return tick(playerId, false);
+    }
+
+    @Transactional
+    public String tick(long playerId, boolean deferCityEvents) {
         Player player = playerRepository.findById(playerId).orElseThrow();
         if (player.isPaused()) {
             return "";
+        }
+        Optional<AuctionEvent> existingAuction = deferCityEvents ? Optional.empty() : activeAuction(player);
+        if (existingAuction.isPresent()) {
+            return "AUCTION:" + existingAuction.get().getId();
         }
         player.advanceDay();
         settlementService.clearVacantRepairRequests(player);
@@ -129,6 +142,19 @@ public class GameService {
         Optional<AuctionEvent> activeAuction = activeAuction(player);
         if (activeAuction.isPresent()) {
             return "AUCTION:" + activeAuction.get().getId();
+        }
+        if (stockService.activateUnlockNoticeIfDue(player)) {
+            return "EVENT:" + activeEvent(player).orElseThrow().getId();
+        }
+        stockService.processPriceUpdates(player);
+        if (stockService.activateIndustryNewsIfDue(player)) {
+            return "EVENT:" + activeEvent(player).orElseThrow().getId();
+        }
+        if (deferCityEvents) {
+            gameEventCatalog.findDueEvent(player.getMonth(), player.getDay())
+                    .filter(definition -> !gameEventRepository.existsByPlayerAndEventKey(player, definition.key()))
+                    .ifPresent(definition -> eventFlowService.activateEvent(player, definition, false));
+            return dailyNotice;
         }
         Optional<GameEvent> activeEvent = activeEvent(player);
         if (activeEvent.isPresent()) {
@@ -385,6 +411,15 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
+    public String marketNewsStatusText(Player player, String city) {
+        if (!player.hasActiveMarketNewsForCity(city)) {
+            return "";
+        }
+        String trendLabel = SettlementService.MARKET_NEWS_RISE.equals(player.getActiveMarketNewsTrend()) ? "폭등" : "폭락";
+        return "부동산 " + trendLabel + " · 매물갱신 " + player.getActiveMarketNewsRefreshesLeft() + "회";
+    }
+
+    @Transactional(readOnly = true)
     public String appliedSecretarySpecialEffectSummary(OwnedSecretary secretary) {
         return secretaryOperationsService.appliedSpecialEffectSummary(secretary);
     }
@@ -447,6 +482,93 @@ public class GameService {
     @Transactional(readOnly = true)
     public List<GiftItemSpec> giftItems() {
         return shopService.giftItems();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockSpec> stockSpecs() {
+        return stockService.stocks();
+    }
+
+    @Transactional
+    public void ensureStockMarketInitialized(Player player) {
+        if (stockService.isUnlocked(player)) {
+            stockService.ensureMarketInitialized(player);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockQuoteView> stockQuotes(Player player) {
+        return stockService.stockQuotes(player);
+    }
+
+    @Transactional(readOnly = true)
+    public StockMarketStatusView stockMarketStatus(Player player) {
+        return stockService.marketStatus(player);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockTradeHistory> stockTradeHistories(Player player) {
+        return stockService.tradeHistories(player);
+    }
+
+    @Transactional(readOnly = true)
+    public StockHoldingSummaryView stockHoldingSummary(Player player) {
+        return stockService.holdingSummary(player);
+    }
+
+    @Transactional
+    public String exchangeCashToCoin(long playerId, long coinAmount) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return stockService.exchangeCashToCoin(player, coinAmount);
+    }
+
+    @Transactional
+    public String exchangeCoinToCash(long playerId, long coinAmount) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return stockService.exchangeCoinToCash(player, coinAmount);
+    }
+
+    @Transactional
+    public String buyStock(long playerId, String stockKey, long quantity) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return stockService.buyStock(player, stockKey, quantity);
+    }
+
+    @Transactional
+    public String buyMaxStock(long playerId, String stockKey) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return stockService.buyMaxStock(player, stockKey);
+    }
+
+    @Transactional
+    public String sellStock(long playerId, String stockKey, long quantity) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return stockService.sellStock(player, stockKey, quantity);
+    }
+
+    @Transactional
+    public String sellAllStock(long playerId, String stockKey) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return stockService.sellAllStock(player, stockKey);
+    }
+
+    public String stockCoinText(long amount) {
+        return stockService.coinText(amount);
+    }
+
+    @Transactional
+    public void ensureStockUnlockSchedule(Player player) {
+        stockService.ensureUnlockSchedule(player);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean stockContentUnlocked(Player player) {
+        return stockService.isUnlocked(player);
+    }
+
+    @Transactional(readOnly = true)
+    public String stockContentStatusText(Player player) {
+        return stockService.statusText(player);
     }
 
     @Transactional(readOnly = true)

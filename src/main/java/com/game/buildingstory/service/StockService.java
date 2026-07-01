@@ -173,7 +173,9 @@ public class StockService {
         return new StockMarketStatusView(
                 player.dateTextAfterDays(daysUntilNextUpdate),
                 daysUntilNextUpdate,
-                progressPercent
+                progressPercent,
+                activeStockNewsText(player),
+                activeStockNewsDirection(player)
         );
     }
 
@@ -227,7 +229,7 @@ public class StockService {
                 totalProfit,
                 stockPriceText(totalCost),
                 stockPriceText(totalValuation),
-                signedPrice(totalProfit),
+                profitText(totalProfit, totalCost),
                 changeDirection(totalProfit)
         );
     }
@@ -405,6 +407,28 @@ public class StockService {
         return 0.0;
     }
 
+    private String activeStockNewsText(Player player) {
+        if (player.getActiveStockNewsRefreshesLeft() <= 0 || player.getActiveStockNewsIndustry() == null) {
+            return "";
+        }
+        String trendLabel = STOCK_NEWS_BOOM.equals(player.getActiveStockNewsTrend()) ? "호황" : "불황";
+        return player.getActiveStockNewsIndustry() + " " + trendLabel + " 적용중 · "
+                + player.getActiveStockNewsRefreshesLeft() + "회 남음";
+    }
+
+    private String activeStockNewsDirection(Player player) {
+        if (player.getActiveStockNewsRefreshesLeft() <= 0) {
+            return "flat";
+        }
+        if (STOCK_NEWS_BOOM.equals(player.getActiveStockNewsTrend())) {
+            return "up";
+        }
+        if (STOCK_NEWS_RECESSION.equals(player.getActiveStockNewsTrend())) {
+            return "down";
+        }
+        return "flat";
+    }
+
     private void ensureMonthlyIndustryNewsSchedule(Player player) {
         if (player.hasStockNewsScheduleForCurrentMonth()) {
             return;
@@ -494,7 +518,7 @@ public class StockService {
                 averagePrice,
                 stockPriceText(averagePrice),
                 valuationProfit,
-                signedPrice(valuationProfit),
+                profitText(valuationProfit, averagePrice * quantity),
                 candleViews(history, scale),
                 stockPriceText(scale.minPrice()),
                 stockPriceText(scale.maxPrice()),
@@ -604,6 +628,22 @@ public class StockService {
     private String signedPercent(double percent) {
         String sign = percent > 0 ? "+" : "";
         return sign + String.format(Locale.ROOT, "%.2f%%", percent);
+    }
+
+    private String profitText(long profit, long costBasis) {
+        if (costBasis <= 0) {
+            return signedPrice(profit);
+        }
+        return "(" + compactSignedPercent(profit * 100.0 / costBasis) + ") " + signedPrice(profit);
+    }
+
+    private String compactSignedPercent(double percent) {
+        String sign = percent > 0 ? "+" : "";
+        double rounded = Math.round(percent * 10.0) / 10.0;
+        if (rounded == Math.rint(rounded)) {
+            return sign + String.format(Locale.ROOT, "%.0f%%", rounded);
+        }
+        return sign + String.format(Locale.ROOT, "%.1f%%", rounded);
     }
 
     private String signedPrice(long amount) {

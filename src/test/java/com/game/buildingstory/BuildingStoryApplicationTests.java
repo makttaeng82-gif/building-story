@@ -9,6 +9,7 @@ import com.game.buildingstory.domain.OwnedBuilding;
 import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.SecretaryTenantEvent;
 import com.game.buildingstory.domain.SecretaryTenantEventStatus;
+import com.game.buildingstory.domain.StockPriceHistory;
 import com.game.buildingstory.domain.ValuationStatus;
 import com.game.buildingstory.repo.AuctionEventRepository;
 import com.game.buildingstory.repo.BuildingOfferRepository;
@@ -593,6 +594,8 @@ class BuildingStoryApplicationTests {
 		assertThat(stockService.activateIndustryNewsIfDue(player)).isTrue();
 		assertThat(player.hasActiveStockNewsForIndustry("IT")).isTrue();
 		assertThat(player.getActiveStockNewsRefreshesLeft()).isEqualTo(2);
+		assertThat(stockService.marketStatus(player).activeNewsText()).isEqualTo("IT 호황 적용중 · 2회 남음");
+		assertThat(stockService.marketStatus(player).activeNewsDirection()).isEqualTo("up");
 		assertThat(gameEventRepository.findFirstByPlayerAndStatus(player, com.game.buildingstory.domain.GameEventStatus.ACTIVE))
 				.isPresent()
 				.get()
@@ -610,6 +613,7 @@ class BuildingStoryApplicationTests {
 		}
 		stockService.processPriceUpdates(player);
 		assertThat(player.hasActiveStockNewsForIndustry("IT")).isFalse();
+		assertThat(stockService.marketStatus(player).hasActiveNews()).isFalse();
 	}
 
 	@Test
@@ -643,6 +647,26 @@ class BuildingStoryApplicationTests {
 		assertThat(gameService.sellAllStock(player.getId(), "bytecore")).isEqualTo("바이트코어 1주 매도");
 		assertThat(player.getCoin()).isEqualTo(98_360L);
 		assertThat(gameService.stockTradeHistories(player)).hasSize(4);
+	}
+
+	@Test
+	@Transactional
+	void stockProfitTextShowsPercentAndCoinAmount() {
+		Player player = playerRepository.save(new Player("stock-profit-text-test", "hash"));
+		player.addCash(10_000_000L);
+		player.unlockStockContent();
+		stockService.ensureMarketInitialized(player);
+
+		gameService.exchangeCashToCoin(player.getId(), 100_000L);
+		gameService.buyStock(player.getId(), "bytecore", 1L);
+		stockPriceHistoryRepository.save(new StockPriceHistory(player, "bytecore", 82_000L, 92_660L, 82_000L, 92_660L, 100L));
+
+		assertThat(stockService.stockQuotes(player).stream()
+				.filter(quote -> quote.stock().key().equals("bytecore"))
+				.findFirst()
+				.orElseThrow()
+				.valuationProfitText()).isEqualTo("(+13%) +1만660코인");
+		assertThat(stockService.holdingSummary(player).totalProfitText()).isEqualTo("(+13%) +1만660코인");
 	}
 
 	@Test

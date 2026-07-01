@@ -7,6 +7,10 @@
         <div>
             <h2>주식</h2>
             <p>회사 선택 후 주가 확인 · 주가는 5일마다 갱신</p>
+            <span th:if="${stockMarketStatus.hasActiveNews()}"
+                  class="stock-news-status"
+                  th:classappend="${stockMarketStatus.activeNewsDirection()}"
+                  th:text="${stockMarketStatus.activeNewsText()}">업종 이벤트 적용중</span>
         </div>
         <div class="refresh-progress-card" aria-label="다음 날 진행률">
             <span>주가 갱신</span>

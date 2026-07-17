@@ -7,6 +7,12 @@ import java.util.Optional;
 
 @Component
 public class BuildingCatalog {
+    /*
+     * 게임에 존재하는 건물 원본 목록이다.
+     *
+     * 이 목록은 DB에 저장되는 플레이어 상태가 아니라, 게임 밸런스 데이터다.
+     * 매물을 만들거나 경매를 만들 때 여기서 BuildingSpec을 찾아 가격/월세/쿨다운을 복사한다.
+     */
     private final List<BuildingSpec> specs = List.of(
             new BuildingSpec("청주", 1, "원룸", "사창동 12평 원룸", 30_000_000L, rent(200_000L), cooldown(4)),
             new BuildingSpec("청주", 2, "구식 오피스텔", "복대동 구식 오피스텔", 65_000_000L, rent(400_000L), cooldown(8)),

@@ -1,3 +1,10 @@
+/*
+ * app-ui.js는 메인 화면 여러 곳에서 재사용하는 UI 상호작용을 모은 모듈이다.
+ *
+ * app.js가 게임 시간, 주식, 건물 선택처럼 화면별 기능을 담당한다면,
+ * 이 파일은 확인 모달, 이미지 모달, 도움말 팝오버, 선물 수량 입력처럼
+ * 여러 화면 요소가 공통으로 쓰는 동작을 초기화한다.
+ */
 export function setupUiInteractions({ syncGamePauseState }) {
     const imageModal = document.querySelector("#imageModal");
     const imageModalImg = document.querySelector("#imageModalImg");
@@ -14,6 +21,7 @@ export function setupUiInteractions({ syncGamePauseState }) {
     let pendingConfirmForm = null;
 
     function closeConfirmModal() {
+        // 확인 모달이 닫히면 보류 중인 form 참조를 반드시 비운다. 그렇지 않으면 이전 form이 다시 제출될 수 있다.
         pendingConfirmForm = null;
         if (confirmModal) {
             confirmModal.hidden = true;
@@ -23,6 +31,7 @@ export function setupUiInteractions({ syncGamePauseState }) {
 
     document.querySelectorAll(".confirm-form[data-confirm-message]").forEach((form) => {
         form.addEventListener("submit", (event) => {
+            // 첫 submit은 막고 확인 모달을 띄운다. 사용자가 확인하면 dataset.confirmed를 표시하고 다시 submit한다.
             if (!confirmModal || form.dataset.confirmed === "true") {
                 form.dataset.confirmed = "";
                 return;
@@ -77,6 +86,7 @@ export function setupUiInteractions({ syncGamePauseState }) {
 }
 
 function setupImageModal({ imageModal, imageModalImg, imageModalTitle, imageModalClose }) {
+    // data-full-image가 붙은 버튼을 누르면 작은 카드 이미지를 큰 모달 이미지로 보여준다.
     function closeImageModal() {
         if (!imageModal || !imageModalImg) {
             return;
@@ -110,6 +120,7 @@ function setupImageModal({ imageModal, imageModalImg, imageModalTitle, imageModa
 }
 
 function setupHelpPopovers() {
+    // 도움말 팝오버는 aria-controls로 연결된 요소를 열고 닫는다. 다른 곳을 클릭하면 모두 닫힌다.
     document.querySelectorAll(".help-dot[aria-controls]").forEach((button) => {
         button.addEventListener("click", (event) => {
             event.stopPropagation();

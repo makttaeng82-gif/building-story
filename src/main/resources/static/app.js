@@ -1,5 +1,14 @@
 import { setupUiInteractions } from "./app-ui.js";
 
+/*
+ * app.js는 서버가 렌더링한 HTML 위에 상호작용을 붙이는 파일이다.
+ *
+ * 서버가 가격, 보유 수량, 이벤트 상태 같은 핵심 데이터를 계산하고,
+ * 이 파일은 클릭 처리, 선택 상태 저장, 미리보기 계산, 자동 시간 진행을 담당한다.
+ * 게임 날짜를 실제로 증가시키는 곳은 서버의 /tick API이며, 브라우저는 일정 시간마다
+ * 그 API를 한 번 호출할 뿐이다.
+ */
+
 const buildingSlots = document.querySelectorAll(".building-slot[data-building]");
 const buildingDetails = document.querySelectorAll(".building-detail[data-building-detail-id]");
 const toast = document.querySelector("#toast");
@@ -23,7 +32,9 @@ const STOCK_EXCHANGE_QUANTITY_KEY = "buildingStory.stockExchangeQuantities";
 const RECORD_PANEL_DOCKED_KEY = "buildingStory.recordPanelDocked";
 const COLLAPSIBLE_PANEL_STATE_KEY = "buildingStory.collapsiblePanels";
 let tickStartedAt = Date.now();
+// ticking은 /tick 중복 호출을 막는 플래그다. 이 값이 없으면 느린 네트워크에서 하루가 2번 지날 수 있다.
 let ticking = false;
+// navigating은 reload/redirect가 예정된 상태다. 화면 전환 중 새 tick이나 UI 갱신이 끼어드는 것을 막는다.
 let navigating = false;
 
 if ("scrollRestoration" in window.history) {
@@ -121,6 +132,10 @@ function setupCollapsiblePanels() {
 setupCollapsiblePanels();
 
 function setupStockPanel() {
+    /*
+     * 주식 목록과 상세 패널은 서버가 모든 종목 HTML을 미리 렌더링한다.
+     * JS는 사용자가 고른 종목만 active로 표시하고, 선택값을 localStorage에 저장해 새로고침 후에도 복원한다.
+     */
     const buttons = document.querySelectorAll(".stock-company-button[data-stock-key]");
     const details = document.querySelectorAll(".stock-detail[data-stock-detail]");
     const list = document.querySelector(".stock-company-list");
@@ -309,6 +324,7 @@ function restoreStockExchangeQuantities() {
 }
 
 function updateStockTradeEstimates() {
+    // 매수/매도 미리보기는 클라이언트에서 즉시 계산한다. 실제 체결 가능 여부는 서버가 다시 검증한다.
     document.querySelectorAll(".stock-detail[data-stock-detail]").forEach((detail) => {
         const price = Number(detail.dataset.stockPrice || 0);
         const ownedQuantity = Number(detail.dataset.ownedQuantity || 0);
@@ -480,6 +496,7 @@ function setupStockTradeHistoryFilters() {
 setupStockTradeHistoryFilters();
 
 function setupStockExchangeForms() {
+    // 현금/코인 교환은 fetch로 처리해 페이지 전체를 새로고침하지 않고 상단 잔액과 미리보기만 갱신한다.
     document.querySelectorAll("[data-stock-exchange-form]").forEach((form) => {
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -633,13 +650,21 @@ if (sideJobButton) {
 }
 
 async function advanceDay() {
+    /*
+     * 공통 시간 진행 함수다.
+     *
+     * 도시 화면과 주식 화면이 같은 함수를 사용해야 날짜가 한 번만 흐른다.
+     * 주식 화면이면 view=stocks를 보내 서버가 도시 이벤트 표시만 지연시키고,
+     * 날짜/정산/주가 갱신은 그대로 진행한다.
+     */
     if (navigating || ticking || document.body.classList.contains("game-paused")) {
         return;
     }
     ticking = true;
     try {
         const view = document.querySelector(".stock-panel") ? "stocks" : "city";
-        const response = await fetch(`/tick?view=${view}`, { method: "POST" });
+        const expectedElapsedDays = Number(document.body.dataset.elapsedDays);
+        const response = await fetch(`/tick?view=${view}&expectedElapsedDays=${expectedElapsedDays}`, { method: "POST" });
         const result = await response.json();
         if (result.redirect) {
             navigating = true;
@@ -673,6 +698,7 @@ async function advanceDay() {
 }
 
 function updateDayProgress() {
+    // 100ms마다 진행률 막대를 갱신하고, 5초가 지나면 advanceDay()를 호출한다.
     if (navigating) {
         return;
     }

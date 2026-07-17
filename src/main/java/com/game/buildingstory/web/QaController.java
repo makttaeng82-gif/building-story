@@ -9,6 +9,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class QaController {
+    /*
+     * 개발/테스트 편의를 위한 QA 엔드포인트다.
+     *
+     * 실제 게임 규칙을 우회해 현금, 평판, 이벤트 상태를 빠르게 조정한다.
+     * 수동 테스트에서 특정 후반 컨텐츠를 확인하려면 정상 플레이로 오래 진행해야 하므로,
+     * 이 컨트롤러가 테스트 시간을 줄여준다.
+     */
     private final QaService qaService;
 
     public QaController(QaService qaService) {

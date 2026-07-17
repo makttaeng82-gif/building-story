@@ -7,6 +7,11 @@ import java.util.Optional;
 
 @Component
 public class LuxuryItemCatalog {
+    /*
+     * 명품/고가 소비 아이템 목록이다.
+     *
+     * 플레이어가 현금을 평판이나 장기 목표 달성으로 전환할 때 사용하는 상점 데이터다.
+     */
     private final List<LuxuryItemSpec> items = List.of(
             new LuxuryItemSpec("bicycle", "자전거", 300_000L, "/assets/shop/bicycle.png"),
             new LuxuryItemSpec("k5-ilguner", "K5-ilguner", 30_000_000L, "/assets/shop/k5-ilguner.png"),

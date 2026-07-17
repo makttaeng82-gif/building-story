@@ -4,6 +4,11 @@ import org.springframework.stereotype.Component;
 
 @Component("moneyText")
 public class MoneyText {
+    /*
+     * 화면 표시용 금액 문자열 변환 유틸리티다.
+     *
+     * 내부 계산은 long 원 단위로 하지만, 화면에는 1억/1만 단위처럼 읽기 쉬운 한국식 단위를 쓴다.
+     */
     public String format(long amount) {
         if (amount == 0) {
             return "0원";

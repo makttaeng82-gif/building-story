@@ -9,6 +9,13 @@ import jakarta.persistence.ManyToOne;
 
 @Entity
 public class OwnedBuilding {
+    /*
+     * 플레이어가 실제로 소유한 건물이다.
+     *
+     * BuildingSpec/BuildingOffer가 "살 수 있는 후보"라면 OwnedBuilding은 구매 후 저장되는 결과다.
+     * 입주 여부, 수리 요청, 매각 가능일, 보호 임차인/비서 거주 상태처럼 시간이 지나며 변하는 값은
+     * 이 엔티티에 저장된다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

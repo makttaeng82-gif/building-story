@@ -8,6 +8,11 @@ import java.util.Optional;
 
 @Component
 public class GameEventCatalog {
+    /*
+     * 날짜가 되면 자동으로 발생하는 고정 이벤트 목록이다.
+     *
+     * 이벤트 정의는 변하지 않는 원본 데이터이고, 실제 플레이어에게 뜬 이벤트는 GameEvent 엔티티로 저장된다.
+     */
     public static final String EFFECT_FIRST_TENANT_MOVE_IN = "FIRST_TENANT_MOVE_IN";
 
     private final List<GameEventDefinition> definitions = List.of(

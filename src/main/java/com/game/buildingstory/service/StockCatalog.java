@@ -7,6 +7,12 @@ import java.util.Optional;
 
 @Component
 public class StockCatalog {
+    /*
+     * 주식 종목 원본 목록이다.
+     *
+     * 각 종목은 업종, 이름, 위험도, 최초 기준가를 가진다.
+     * 가격 이력은 플레이어별 StockPriceHistory에 저장되므로 이 카탈로그 값은 초기 생성 기준으로만 사용된다.
+     */
     private final List<StockSpec> specs = List.of(
             new StockSpec("bytecore", "IT", "바이트코어", StockRiskType.SAFE, 82_000L),
             new StockSpec("neonsoft", "IT", "네온소프트", StockRiskType.NORMAL, 64_000L),

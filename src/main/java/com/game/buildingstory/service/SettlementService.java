@@ -20,6 +20,13 @@ import java.util.Random;
 @Service
 @Transactional
 public class SettlementService {
+    /*
+     * 하루가 지날 때 발생하는 정산과 월간 이벤트를 담당한다.
+     *
+     * GameService.tick()이 날짜를 하루 증가시킨 뒤 이 서비스를 호출한다.
+     * 월초 월세/월급/대출 상환, 수리 방치 패널티, 부동산 뉴스 예약처럼
+     * "시간이 지나면 자동으로 일어나는 일"이 이곳에 모여 있다.
+     */
     private static final long MONTHLY_JOB_SALARY = 3_000_000L;
     private static final int RECORD_RETENTION_DAYS = 62;
     private static final int MARKET_NEWS_CHANCE_PERCENT = 15;
@@ -54,9 +61,11 @@ public class SettlementService {
     }
 
     public String runDailySettlement(Player player) {
+        // 랜덤 입주/퇴거/수리 이벤트 날짜는 매달 한 번만 확정한다.
         ensureMonthlyEventSchedule(player);
         String notice = "";
         if (player.getDay() == 1) {
+            // 월초에는 지난 달 누적 상태를 기록하고, 이번 달 고정 수입/지출을 반영한다.
             notice = processRepairNeglect(player);
             if (player.isEmployed()) {
                 player.addSalaryIncome(MONTHLY_JOB_SALARY);

@@ -10,6 +10,12 @@ import java.util.Optional;
 
 @Service
 public class AuthService {
+    /*
+     * 사용자 가입과 로그인 검증을 담당한다.
+     *
+     * 컨트롤러는 입력값을 받고, 이 서비스는 사용자명 중복, 비밀번호 해시 비교,
+     * 새 Player 생성 같은 인증 규칙을 처리한다.
+     */
     private final PlayerRepository playerRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 

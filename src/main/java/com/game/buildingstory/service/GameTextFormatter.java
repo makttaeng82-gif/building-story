@@ -3,6 +3,11 @@ package com.game.buildingstory.service;
 import java.util.Locale;
 
 final class GameTextFormatter {
+    /*
+     * 게임 화면에서 반복되는 표시 문자열을 만드는 내부 유틸리티다.
+     *
+     * 금액, 평판, 퍼센트처럼 여러 서비스에서 같은 형식으로 보여줘야 하는 텍스트를 이곳에서 만든다.
+     */
     private GameTextFormatter() {
     }
 

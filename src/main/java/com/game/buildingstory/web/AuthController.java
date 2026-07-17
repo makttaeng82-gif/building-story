@@ -12,6 +12,12 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class AuthController {
+    /*
+     * 로그인, 회원가입, 로그아웃 요청을 처리한다.
+     *
+     * 인증 성공 시 세션에 playerId를 저장한다. 이후 GameController는 세션의 playerId로
+     * 현재 플레이어를 찾기 때문에, 세션은 브라우저와 플레이어 데이터를 연결하는 열쇠 역할을 한다.
+     */
     private final AuthService authService;
 
     public AuthController(AuthService authService) {

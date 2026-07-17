@@ -7,6 +7,11 @@ import java.util.List;
 
 @Component
 public class ReputationCatalog {
+    /*
+     * 평판에 따른 칭호와 도시 해금 조건을 관리한다.
+     *
+     * 플레이어의 reputation 숫자를 사람이 읽을 수 있는 칭호와 컨텐츠 해금 여부로 변환한다.
+     */
     private final List<ReputationTier> tiers = List.of(
             new ReputationTier("회사의 최하급노예", 0, false, null, 0),
             new ReputationTier("회사의 하급노예", 200, false, "청주", 2),

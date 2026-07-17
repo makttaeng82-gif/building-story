@@ -19,6 +19,12 @@ import java.util.Random;
 
 @Service
 public class AuctionService {
+    /*
+     * 경매 이벤트의 생성, 입찰, 결과 처리를 담당한다.
+     *
+     * 경매는 일반 매물과 달리 제한 시간 안에 입찰해야 한다.
+     * ACTIVE 상태로 생성되고, 시간이 지나면 결과 상태로 바뀐다.
+     */
     private static final int CITY_BUILDING_LIMIT = 8;
     private static final int RECORD_RETENTION_DAYS = 62;
     private static final int AUCTION_CHANCE_PERCENT = 3;
@@ -49,6 +55,7 @@ public class AuctionService {
     }
 
     public Optional<AuctionEvent> activeAuction(Player player) {
+        // 조회 시점에 만료 여부도 함께 정리한다. 별도 스케줄러 없이 화면 진입만으로 상태가 최신화된다.
         Optional<AuctionEvent> auction = auctionEventRepository.findFirstByPlayerAndStatusInOrderByIdDesc(
                 player,
                 List.of(AuctionStatus.ACTIVE, AuctionStatus.RESULT)
@@ -60,6 +67,7 @@ public class AuctionService {
     }
 
     public Optional<AuctionEvent> tryActivate(Player player) {
+        // 하루 진행 마지막에 낮은 확률로 경매를 연다. 현재 도시 보유 한도에 도달하면 생성하지 않는다.
         if (!rollPercent(AUCTION_CHANCE_PERCENT)) {
             return Optional.empty();
         }

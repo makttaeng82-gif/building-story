@@ -24,6 +24,12 @@ import java.util.Optional;
 
 @Service
 public class SecretaryTenantEventService {
+    /*
+     * 비서 임차인 이벤트의 등장 조건, 요청 처리, 임대료 감면 상태를 담당한다.
+     *
+     * 비서별 시나리오는 SecretaryTenantScenarioCatalog에 있고, 이 서비스는 실제 플레이어 상태와
+     * 보유 건물을 비교해 이벤트를 만들거나 완료 상태로 전환한다.
+     */
     static final String INTRO_EFFECT_PREFIX = "SECRETARY_TENANT_INTRO:";
     static final String REQUEST_EFFECT_PREFIX = "SECRETARY_TENANT_REQUEST:";
     static final String HIRE_EFFECT_PREFIX = "SECRETARY_TENANT_HIRE:";

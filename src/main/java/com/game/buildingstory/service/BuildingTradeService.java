@@ -27,6 +27,13 @@ import java.util.Random;
 @Service
 @Transactional
 public class BuildingTradeService {
+    /*
+     * 부동산 매물과 보유 건물의 거래 규칙을 담당한다.
+     *
+     * Offer는 아직 사지 않은 시장 매물이고, OwnedBuilding은 구매 후 실제 보유 건물이다.
+     * 구매하면 Offer의 가격/월세/쿨다운 정보가 OwnedBuilding으로 복사되고,
+     * 대출 구매라면 Loan도 함께 생성된다.
+     */
     private static final int CITY_BUILDING_LIMIT = 8;
     private static final int REPAIR_REPUTATION_REWARD = 3;
     private static final int RECORD_RETENTION_DAYS = 62;
@@ -81,6 +88,7 @@ public class BuildingTradeService {
     }
 
     public String buyOffer(long playerId, long offerId, boolean loanPurchase) {
+        // 구매 요청은 현금구매와 대출구매를 같은 흐름으로 처리한다. 차이는 cashCost와 Loan 생성 여부다.
         Player player = playerRepository.findById(playerId).orElseThrow();
         if (player.isPaused()) {
             return pausedActionMessage();
@@ -127,6 +135,7 @@ public class BuildingTradeService {
     }
 
     public String sellBuilding(long playerId, long buildingId) {
+        // 판매가는 매각 시점에 무작위 평가 상태를 뽑아 결정한다. 그래서 같은 건물도 매각 타이밍마다 가격이 달라질 수 있다.
         Player player = playerRepository.findById(playerId).orElseThrow();
         if (player.isPaused()) {
             return pausedActionMessage();

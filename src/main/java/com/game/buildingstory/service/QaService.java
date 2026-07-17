@@ -21,6 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 public class QaService {
+    /*
+     * QAController가 사용하는 테스트 보조 로직이다.
+     *
+     * 플레이 중 특정 조건을 빠르게 만들기 위해 현금, 평판, 이벤트, 비서 상태를 직접 조정한다.
+     * 운영용 게임 규칙이 아니라 개발 검증 시간을 줄이기 위한 우회 도구다.
+     */
     private static final long TEST_CASH_AMOUNT = 30_000_000L;
 
     private final PlayerRepository playerRepository;

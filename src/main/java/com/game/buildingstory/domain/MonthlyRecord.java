@@ -12,6 +12,12 @@ import jakarta.persistence.Column;
 
 @Entity
 public class MonthlyRecord {
+    /*
+     * 월세, 구매, 판매, 이벤트 같은 게임 로그를 저장한다.
+     *
+     * 화면의 최근 기록 패널은 이 엔티티를 날짜 역순으로 읽는다. 금액 변화와 평판 변화를 함께 저장해
+     * 플레이어가 왜 자금/평판이 바뀌었는지 추적할 수 있게 한다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

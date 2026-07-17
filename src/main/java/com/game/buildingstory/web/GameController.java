@@ -16,6 +16,17 @@ import java.util.Map;
 
 @Controller
 public class GameController {
+    /*
+     * GameController는 브라우저가 호출하는 URL을 서비스 메서드에 연결한다.
+     *
+     * 규칙:
+     * - GET 요청은 화면을 보여준다.
+     * - POST 요청은 게임 상태를 바꾼 뒤 redirect 또는 JSON을 돌려준다.
+     * - 현재 로그인 사용자는 HttpSession의 playerId로 찾는다.
+     *
+     * 컨트롤러에는 계산 규칙을 넣지 않는다. 계산은 GameService가 담당하고,
+     * 컨트롤러는 입력값을 전달하고 결과 메시지를 화면으로 보내는 역할만 한다.
+     */
     private final GameService gameService;
     private final MainPageModelAssembler mainPageModelAssembler;
     private final InfoPageModelAssembler infoPageModelAssembler;
@@ -71,10 +82,12 @@ public class GameController {
         if (!player.isStorySeen()) {
             return "redirect:/story";
         }
+        // view 파라미터는 사용자가 보고 싶은 화면이다. 주식이 아직 잠겨 있으면 강제로 도시 화면을 보여준다.
         String viewMode = "stocks".equals(view) && gameService.stockContentUnlocked(player) ? "stocks" : "city";
         mainPageModelAssembler.addMainPageAttributes(playerId, player, model);
         boolean hiddenCityModal = false;
         if ("stocks".equals(viewMode)) {
+            // 주식 화면에서는 도시 이벤트/경매 모달을 즉시 띄우지 않는다. 시간은 흐르지만 표시만 도시 화면으로 미룬다.
             hiddenCityModal = model.asMap().get("activeEvent") != null || model.asMap().get("activeAuction") != null;
             model.addAttribute("activeEvent", null);
             model.addAttribute("activeAuction", null);
@@ -121,6 +134,7 @@ public class GameController {
     @PostMapping("/side-job/quick")
     @ResponseBody
     public Map<String, String> sideJobQuick(HttpSession session) {
+        // quick 엔드포인트는 전체 페이지 새로고침 없이 상단 현금/월세 표시만 갱신하기 위한 JSON API다.
         Long playerId = currentPlayerId(session);
         if (playerId == null) {
             return Map.of("redirect", "/login");
@@ -420,12 +434,17 @@ public class GameController {
 
     @PostMapping("/tick")
     @ResponseBody
-    public Map<String, String> tick(@RequestParam(defaultValue = "city") String view, HttpSession session) {
+    public Map<String, String> tick(
+            @RequestParam(defaultValue = "city") String view,
+            @RequestParam int expectedElapsedDays,
+            HttpSession session
+    ) {
+        // 프론트의 공통 시간 루프가 호출한다. view=stocks면 도시 이벤트 표시를 지연시키는 모드로 하루를 진행한다.
         Long playerId = currentPlayerId(session);
         if (playerId == null) {
             return Map.of("redirect", "/login");
         }
-        String result = gameService.tick(playerId, "stocks".equals(view));
+        String result = gameService.tick(playerId, "stocks".equals(view), expectedElapsedDays);
         if (result.startsWith("EVENT:")) {
             return Map.of("event", result.substring("EVENT:".length()));
         }

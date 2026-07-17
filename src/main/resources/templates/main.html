@@ -17,7 +17,12 @@
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body th:classappend="${screenPaused} ? ' game-paused'"
-      th:attr="data-player-paused=${screenPaused}">
+      th:attr="data-player-paused=${screenPaused},data-elapsed-days=${player.elapsedDays}">
+<!--
+main.html은 로그인 후 플레이어가 가장 오래 머무는 메인 화면이다.
+MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})으로 읽어
+도시/주식/비서/이벤트 상태를 한 번에 렌더링한다.
+-->
 <div class="app">
     <header class="topbar">
         <div class="brand">

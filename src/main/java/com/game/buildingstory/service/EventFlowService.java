@@ -18,6 +18,12 @@ import java.util.Optional;
 @Service
 @Transactional
 public class EventFlowService {
+    /*
+     * 게임 이벤트 모달의 생성과 완료 처리를 담당한다.
+     *
+     * 이벤트는 GameEvent 엔티티로 저장되고, 사용자가 버튼을 누르면 effect 문자열에 따라
+     * 현금 지급, 퇴사, 비서 고용 가능 상태 변경 같은 후속 처리가 실행된다.
+     */
     private static final int AUTO_RESIGN_DAY = 181;
     private static final int RECORD_RETENTION_DAYS = 62;
     private static final long SEVERANCE_PER_DAY = 400_000L;

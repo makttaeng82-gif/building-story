@@ -7,6 +7,11 @@ import java.util.Optional;
 
 @Component
 public class SecretaryCatalog {
+    /*
+     * 비서 원본 스펙 목록이다.
+     *
+     * 실제 보유 상태는 OwnedSecretary에 저장되고, 이름/출신/이미지/기본 능력 같은 변하지 않는 정보는 여기서 가져온다.
+     */
     private static final String COMMON_EFFECT = "수리요청 자동확인";
     private static final String PROFICIENCY_BONUS = "자동확인 주기 30일 -> 7일";
     private static final String PROFICIENCY_DETAIL = "숙련도 1 기준 30일, 숙련도 30 기준 7일. 공식: 30 - floor((숙련도 - 1) * 23 / 29)";

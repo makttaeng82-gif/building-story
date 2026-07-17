@@ -2,6 +2,10 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
 <section th:fragment="infoGrid" class="info-grid">
+    <!--
+    메인 화면의 보조 정보 그리드다.
+    선택한 건물 상세, 대출 현황, 상점/기부/선물 같은 부가 행동 패널을 배치한다.
+    -->
     <article class="panel">
         <h2>선택 건물</h2>
         <div class="building-detail" th:each="building : ${buildings}" th:classappend="${buildingStat.index == 0} ? ' active'" th:attr="data-building-detail-id=${building.id}">

@@ -29,6 +29,19 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class StockService {
+    /*
+     * StockService는 주식 컨텐츠의 서버 규칙을 담당한다.
+     *
+     * 주요 책임:
+     * 1. 서울 진출 후 주식 기능 개방 예약/이벤트 표시
+     * 2. 종목별 가격 이력 생성과 5일 주기 가격 갱신
+     * 3. 현금 <-> 코인 교환
+     * 4. 현재가 기준 즉시 매수/매도
+     * 5. 업종 호황/불황 뉴스 효과 적용
+     *
+     * 주식은 부동산과 별도 재화인 코인을 사용한다. 현금과 주식을 직접 섞지 않으면
+     * 주식 손실이 부동산 구매력 전체를 즉시 망가뜨리는 상황을 줄일 수 있다.
+     */
     private static final String STOCK_UNLOCK_EFFECT = "NONE";
     private static final String STOCK_UNLOCK_IMAGE = "AI 주식 이미지";
     public static final String STOCK_NEWS_BOOM = "BOOM";
@@ -75,6 +88,7 @@ public class StockService {
     }
 
     public void ensureUnlockSchedule(Player player) {
+        // 주식은 서울 해금 후 2 elapsedDays 뒤에 열린다. 조건을 만족한 최초 1회만 예약한다.
         if (player.isStockContentUnlocked() || player.hasStockUnlockSchedule()) {
             return;
         }
@@ -84,6 +98,7 @@ public class StockService {
     }
 
     public boolean activateUnlockNoticeIfDue(Player player) {
+        // 개방일이 되었더라도 이미 다른 이벤트 모달이 떠 있으면 새 이벤트를 겹치지 않는다.
         ensureUnlockSchedule(player);
         if (!player.isStockUnlockDue() || player.isStockUnlockNoticeShown()) {
             return false;
@@ -108,6 +123,7 @@ public class StockService {
     }
 
     public void processPriceUpdates(Player player) {
+        // 모든 종목의 가격은 같은 날 한 번에 갱신된다. 일부 종목만 갱신되면 차트 기준일이 어긋난다.
         if (!player.isStockContentUnlocked()) {
             return;
         }
@@ -118,12 +134,15 @@ public class StockService {
         if (player.getElapsedDays() - lastUpdateDay < UPDATE_INTERVAL_DAYS) {
             return;
         }
+        // marketEffectPercent는 이번 5일 구간의 시장 분위기다. 한 번 뽑아 모든 종목에 공통 적용한다.
         double marketEffectPercent = marketEffectPercent();
         stockCatalog.all().forEach(stock -> appendNextHistory(player, stock, marketEffectPercent));
+        // 업종 뉴스 효과는 "주가 갱신 횟수" 기준으로 줄어든다. 날짜 기준으로 줄이면 갱신 없는 날에도 효과가 사라진다.
         player.consumeStockNewsRefresh();
     }
 
     public boolean activateIndustryNewsIfDue(Player player) {
+        // 업종 뉴스는 월별로 미리 예약해 두고, 예약일이 되면 active 상태로 전환한다.
         if (!player.isStockContentUnlocked()) {
             return false;
         }
@@ -180,6 +199,8 @@ public class StockService {
     }
 
     public void ensureMarketInitialized(Player player) {
+        // 새로 주식이 열린 플레이어에게 종목별 최초 가격 행을 만든다.
+        // 이미 존재하는 종목은 건드리지 않아 기존 차트 이력을 보존한다.
         stockCatalog.all().forEach(stock -> {
             if (!stockPriceHistoryRepository.existsByPlayerAndStockKey(player, stock.key())) {
                 stockPriceHistoryRepository.save(new StockPriceHistory(
@@ -214,6 +235,7 @@ public class StockService {
 
     @Transactional(readOnly = true)
     public StockHoldingSummaryView holdingSummary(Player player) {
+        // 보유요약은 현재가 기준 평가금액과 평균단가 기준 원가를 비교해 전체 손익을 계산한다.
         List<StockQuoteView> ownedQuotes = stockQuotes(player).stream()
                 .filter(quote -> quote.quantity() > 0)
                 .toList();
@@ -235,10 +257,14 @@ public class StockService {
     }
 
     public String exchangeCashToCoin(Player player, long coinAmount) {
+        // 주식 거래는 코인으로만 한다. 현금을 코인으로 바꿀 때 고정 환율을 적용한다.
         if (coinAmount <= 0) {
             return "교환 수량 오류";
         }
-        long cashCost = coinAmount * CASH_PER_COIN;
+        Long cashCost = safeMultiply(coinAmount, CASH_PER_COIN);
+        if (cashCost == null || safeAdd(player.getCoin(), coinAmount) == null) {
+            return "교환 수량 오류";
+        }
         if (!player.spendCash(cashCost)) {
             return "현금 부족";
         }
@@ -250,14 +276,19 @@ public class StockService {
         if (coinAmount <= 0) {
             return "교환 수량 오류";
         }
+        Long cashPayout = safeMultiply(coinAmount, CASH_PER_COIN);
+        if (cashPayout == null || safeAdd(player.getCash(), cashPayout) == null) {
+            return "환전 수량 오류";
+        }
         if (!player.spendCoin(coinAmount)) {
             return "코인 부족";
         }
-        player.addCash(coinAmount * CASH_PER_COIN);
+        player.addCash(cashPayout);
         return coinText(coinAmount) + " 환전";
     }
 
     public String buyStock(Player player, String stockKey, long quantity) {
+        // 매수는 현재가 시장가 주문으로 처리한다. 지정가 주문이나 주문 대기열은 없다.
         if (quantity <= 0) {
             return "매수 수량 오류";
         }
@@ -266,14 +297,31 @@ public class StockService {
         }
         StockSpec stock = stockCatalog.find(stockKey).orElseThrow();
         long price = currentPrice(player, stock);
-        long grossAmount = price * quantity;
+        Long grossAmount = safeMultiply(price, quantity);
+        if (grossAmount == null) {
+            return "매수 수량 오류";
+        }
         long fee = tradeFee(grossAmount);
-        long totalCost = grossAmount + fee;
+        Long totalCost = safeAdd(grossAmount, fee);
+        if (totalCost == null) {
+            return "매수 수량 오류";
+        }
+        OwnedStock ownedStock = ownedStockRepository.findByPlayerAndStockKey(player, stockKey).orElse(null);
+        long ownedQuantity = ownedStock == null ? 0 : ownedStock.getQuantity();
+        long ownedAveragePrice = ownedStock == null ? 0 : ownedStock.getAveragePrice();
+        Long existingCostBasis = safeMultiply(ownedAveragePrice, ownedQuantity);
+        if (safeAdd(ownedQuantity, quantity) == null
+                || existingCostBasis == null
+                || safeAdd(existingCostBasis, grossAmount) == null) {
+            return "매수 수량 오류";
+        }
+        // 코인이 부족하면 보유 수량이나 거래 이력은 변경하지 않고 메시지만 반환한다.
         if (!player.spendCoin(totalCost)) {
             return "코인 부족 · 필요 " + coinText(totalCost) + " / 보유 " + coinText(player.getCoin());
         }
-        OwnedStock ownedStock = ownedStockRepository.findByPlayerAndStockKey(player, stockKey)
-                .orElseGet(() -> ownedStockRepository.save(new OwnedStock(player, stockKey)));
+        if (ownedStock == null) {
+            ownedStock = ownedStockRepository.save(new OwnedStock(player, stockKey));
+        }
         ownedStock.buy(quantity, price);
         stockTradeHistoryRepository.save(new StockTradeHistory(player, stock.key(), stock.name(), "매수", quantity, price, grossAmount, fee, totalCost));
         return stock.name() + " " + quantity + "주 매수";
@@ -294,6 +342,7 @@ public class StockService {
     }
 
     public String sellStock(Player player, String stockKey, long quantity) {
+        // 매도도 현재가 시장가 주문이다. 공매도/마진이 없으므로 보유 수량보다 많이 팔 수 없다.
         if (quantity <= 0) {
             return "매도 수량 오류";
         }
@@ -307,9 +356,15 @@ public class StockService {
             return "보유 수량 부족 · 보유 " + ownedQuantity + "주 / 매도 요청 " + quantity + "주";
         }
         long price = currentPrice(player, stock);
-        long grossAmount = price * quantity;
+        Long grossAmount = safeMultiply(price, quantity);
+        if (grossAmount == null) {
+            return "매도 수량 오류";
+        }
         long fee = tradeFee(grossAmount);
         long payout = Math.max(0, grossAmount - fee);
+        if (safeAdd(player.getCoin(), payout) == null) {
+            return "매도 수량 오류";
+        }
         ownedStock.sell(quantity);
         player.addCoin(payout);
         stockTradeHistoryRepository.save(new StockTradeHistory(player, stock.key(), stock.name(), "매도", quantity, price, grossAmount, fee, payout));
@@ -344,6 +399,7 @@ public class StockService {
     }
 
     private void appendNextHistory(Player player, StockSpec stock, double marketEffectPercent) {
+        // OHLC 한 줄은 5일 단위 캔들 하나다. open은 직전 close, close는 이번 변동률을 적용한 가격이다.
         StockPriceHistory latest = stockPriceHistoryRepository.findFirstByPlayerAndStockKeyOrderByElapsedDaysDescIdDesc(player, stock.key())
                 .orElseGet(() -> stockPriceHistoryRepository.save(new StockPriceHistory(
                         player,
@@ -366,6 +422,7 @@ public class StockService {
     }
 
     private StockChange stockChangePercent(Player player, StockSpec stock, double marketEffectPercent) {
+        // 가격 변동률은 시장 공통 효과 + 업종 뉴스 + 추세 + 종목 위험도별 노이즈 + 희귀 충격을 합산한다.
         double shockEffectPercent = 0.0;
         boolean hasShock = false;
         double shockRoll = random.nextDouble();
@@ -395,6 +452,7 @@ public class StockService {
     }
 
     private double industryEffectPercent(Player player, StockSpec stock) {
+        // active 뉴스의 업종과 종목 업종이 일치할 때만 효과를 준다.
         if (!player.hasActiveStockNewsForIndustry(stock.industry())) {
             return 0.0;
         }
@@ -430,6 +488,8 @@ public class StockService {
     }
 
     private void ensureMonthlyIndustryNewsSchedule(Player player) {
+        // 매월 처음 확인할 때 이번 달 주식 뉴스 발생 여부와 날짜를 확정한다.
+        // 확정값을 저장해야 새로고침이나 서버 재시작 후에도 같은 달 이벤트가 유지된다.
         if (player.hasStockNewsScheduleForCurrentMonth()) {
             return;
         }
@@ -489,6 +549,8 @@ public class StockService {
     }
 
     private StockQuoteView quote(Player player, StockSpec stock, OwnedStock ownedStock) {
+        // 화면에 필요한 주식 정보는 엔티티 그대로 넘기지 않고 View record로 조립한다.
+        // 이렇게 하면 템플릿은 계산 없이 표시만 담당하고, 계산 규칙은 서비스에 남는다.
         List<StockPriceHistory> latestRows = stockPriceHistoryRepository.findTop2ByPlayerAndStockKeyOrderByElapsedDaysDescIdDesc(player, stock.key());
         StockPriceHistory current = latestRows.isEmpty()
                 ? new StockPriceHistory(player, stock.key(), stock.basePrice(), stock.basePrice(), stock.basePrice(), stock.basePrice(), initialVolume(stock))
@@ -537,7 +599,28 @@ public class StockService {
         return (long) Math.ceil(grossAmount * TRADE_FEE_RATE);
     }
 
+    private Long safeMultiply(long left, long right) {
+        // 사용자가 요청 파라미터를 직접 조작하면 일반 곱셈은 long 범위를 넘어 음수로 순환할 수 있다.
+        // exact 연산은 범위를 넘을 때 예외를 발생시키며, 서비스는 null을 수량 오류 메시지로 변환한다.
+        try {
+            return Math.multiplyExact(left, right);
+        } catch (ArithmeticException exception) {
+            return null;
+        }
+    }
+
+    private Long safeAdd(long left, long right) {
+        // 거래 원금과 수수료 또는 기존 잔액과 지급액을 합칠 때도 같은 방식으로 범위를 검사한다.
+        try {
+            return Math.addExact(left, right);
+        } catch (ArithmeticException exception) {
+            return null;
+        }
+    }
+
     private long maxAffordableQuantity(long coin, long price) {
+        // 수수료가 수량에 비례해 붙기 때문에 단순 coin / price로는 최대 매수 가능 수량이 틀릴 수 있다.
+        // 이분 탐색으로 "수수료 포함 총액이 보유 코인 이하인 가장 큰 수량"을 찾는다.
         long low = 0;
         long high = Math.max(0, coin / price);
         while (low < high) {
@@ -553,6 +636,7 @@ public class StockService {
     }
 
     private List<StockCandleView> candleViews(List<StockPriceHistory> history, ChartScale scale) {
+        // 서버에서 SVG 좌표를 미리 계산한다. 브라우저는 좌표를 받아 그리기만 하므로 JS 차트 라이브러리가 필요 없다.
         if (history.isEmpty()) {
             return List.of();
         }

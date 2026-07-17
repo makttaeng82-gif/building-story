@@ -15,6 +15,11 @@ import java.util.List;
 @Service
 @Transactional
 public class LoanService {
+    /*
+     * 대출 한도와 상환 금액 계산을 담당한다.
+     *
+     * 건물 구매 서비스는 대출을 만들지만, 총 한도와 남은 원금 계산은 이 서비스에 위임한다.
+     */
     private static final int RECORD_RETENTION_DAYS = 62;
 
     private final PlayerRepository playerRepository;

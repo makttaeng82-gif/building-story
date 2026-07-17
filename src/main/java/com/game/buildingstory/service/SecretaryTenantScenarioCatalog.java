@@ -4,6 +4,12 @@ import java.util.List;
 import java.util.Optional;
 
 final class SecretaryTenantScenarioCatalog {
+    /*
+     * 비서 임차인 이벤트 시나리오 목록이다.
+     *
+     * 각 시나리오는 "어떤 도시의 몇 번째 건물에 어떤 비서가 등장하는지"와
+     * 요청 조건/비용/보상 흐름을 정의한다.
+     */
     private static final List<SecretaryTenantScenario> SCENARIOS = List.of(
             new SecretaryTenantScenario(
                     "secretary-1", "청주", 1,

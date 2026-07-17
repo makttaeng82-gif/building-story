@@ -7,6 +7,12 @@ import java.util.Optional;
 
 @Service
 public class GiftItemCatalog {
+    /*
+     * 비서에게 줄 수 있는 선물 목록이다.
+     *
+     * 선물마다 가격, 호감도 증가량, 사용할 수 있는 호감도 구간이 다르다.
+     * ShopService는 이 카탈로그를 보고 구매/선물 가능 여부를 판단한다.
+     */
     private final List<GiftItemSpec> items = List.of(
             new GiftItemSpec("coffee-beans", "고급 원두세트", 150_000L, "/assets/shop/gift-coffee-beans.png", 1, 10, 1),
             new GiftItemSpec("fountain-pen", "만년필", 1_000_000L, "/assets/shop/gift-fountain-pen.png", 11, 15, 1),

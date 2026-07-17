@@ -10,6 +10,12 @@ import jakarta.persistence.Column;
 
 @Entity
 public class StockPriceHistory {
+    /*
+     * 종목별 가격 캔들 이력이다.
+     *
+     * 한 행은 한 번의 주가 갱신 결과를 뜻한다. open/high/low/close/volume 구조를 쓰기 때문에
+     * 나중에 차트, 수익률, 추세 계산을 같은 데이터로 처리할 수 있다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

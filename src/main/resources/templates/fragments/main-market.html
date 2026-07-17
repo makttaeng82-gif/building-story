@@ -2,6 +2,10 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
 <section th:fragment="market" class="panel market-panel">
+    <!--
+    현재 도시의 부동산 매물 목록이다.
+    offers는 아직 구매하지 않은 BuildingOffer이고, 구매 버튼은 현금/대출 모드를 서버로 POST한다.
+    -->
     <div class="section-head">
         <div>
             <div class="market-title-row">

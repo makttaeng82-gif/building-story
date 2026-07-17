@@ -10,6 +10,12 @@ import jakarta.persistence.ManyToOne;
 
 @Entity
 public class StockTradeHistory {
+    /*
+     * 주식 매수/매도 체결 기록이다.
+     *
+     * 보유 수량 계산은 OwnedStock이 담당하지만, 사용자가 무엇을 언제 얼마에 거래했는지
+     * 보여주려면 별도 히스토리가 필요하다. 그래서 단가, 수수료, 순금액을 체결 시점 값으로 저장한다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

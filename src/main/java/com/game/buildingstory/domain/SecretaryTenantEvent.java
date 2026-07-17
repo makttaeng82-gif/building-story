@@ -8,9 +8,18 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
+@Table(name = "secretary_tenant_event", uniqueConstraints =
+        @UniqueConstraint(name = "uk_secretary_tenant_player_key", columnNames = {"player_id", "secretary_key"}))
 public class SecretaryTenantEvent {
+    /*
+     * 비서가 임차인으로 등장하는 장기 이벤트 상태다.
+     *
+     * 특정 건물에 비서가 거주하고, 플레이어가 요청을 해결하면 고용 가능 상태로 전환된다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

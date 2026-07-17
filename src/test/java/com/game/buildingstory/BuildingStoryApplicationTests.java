@@ -29,6 +29,7 @@ import com.game.buildingstory.service.SecretaryOperationsService;
 import com.game.buildingstory.service.SettlementService;
 import com.game.buildingstory.service.StockService;
 import com.game.buildingstory.repo.OwnedLuxuryItemRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 		"spring.jpa.hibernate.ddl-auto=create-drop"
 })
 class BuildingStoryApplicationTests {
+	/*
+	 * 통합 테스트 모음이다.
+	 *
+	 * 실제 Spring Bean과 H2 인메모리 DB를 띄워 서비스, 엔티티, Repository가 함께 동작하는지 검증한다.
+	 * 이 프로젝트는 게임 규칙이 여러 서비스와 엔티티에 걸쳐 있으므로 단위 테스트만으로는
+	 * "하루 진행 후 DB 상태가 맞는지"를 확인하기 어렵다. 그래서 주요 회귀는 여기서 실제 흐름으로 검증한다.
+	 */
 
 	@Autowired
 	private GameService gameService;
@@ -94,8 +102,13 @@ class BuildingStoryApplicationTests {
 	@Autowired
 	private SecretaryCatalog secretaryCatalog;
 
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+
 	@BeforeEach
 	void cleanDatabase() {
+		// 테스트는 실행 순서에 의존하면 안 된다. 각 테스트 전에 모든 테이블을 비워 독립성을 보장한다.
+		// 자식 테이블을 먼저 지우는 이유는 JPA 외래키 제약 때문에 부모 Player를 먼저 삭제할 수 없기 때문이다.
 		monthlyRecordRepository.deleteAll();
 		auctionEventRepository.deleteAll();
 		gameEventRepository.deleteAll();
@@ -651,6 +664,60 @@ class BuildingStoryApplicationTests {
 
 	@Test
 	@Transactional
+	void stockMoneyOperationsRejectOverflowWithoutChangingBalances() {
+		Player player = playerRepository.save(new Player("stock-overflow-test", "hash"));
+		player.addCash(1_000_000L);
+		player.unlockStockContent();
+		stockService.ensureMarketInitialized(player);
+
+		assertThat(gameService.exchangeCashToCoin(player.getId(), Long.MAX_VALUE)).isEqualTo("교환 수량 오류");
+		assertThat(player.getCash()).isEqualTo(1_000_000L);
+		assertThat(player.getCoin()).isZero();
+		assertThat(player.spendCash(-1L)).isFalse();
+		assertThat(player.getCash()).isEqualTo(1_000_000L);
+
+		player.addCoin(Long.MAX_VALUE);
+		assertThat(gameService.buyStock(player.getId(), "bytecore", Long.MAX_VALUE)).isEqualTo("매수 수량 오류");
+		assertThat(player.getCoin()).isEqualTo(Long.MAX_VALUE);
+	}
+
+	@Test
+	@Transactional
+	void staleTickRequestDoesNotAdvancePlayerTwice() {
+		Player player = playerRepository.save(new Player("stale-tick-test", "hash"));
+		player.completeStory();
+		player.scheduleNoMonthlyStockNews();
+		int renderedElapsedDays = player.getElapsedDays();
+
+		gameService.tick(player.getId(), false, renderedElapsedDays);
+		assertThat(player.getElapsedDays()).isEqualTo(renderedElapsedDays + 1);
+
+		assertThat(gameService.tick(player.getId(), false, renderedElapsedDays)).isBlank();
+		assertThat(player.getElapsedDays()).isEqualTo(renderedElapsedDays + 1);
+	}
+
+	@Test
+	void naturalKeyUniqueConstraintsAreCreated() {
+		Integer constraintCount = jdbcTemplate.queryForObject("""
+				SELECT COUNT(*)
+				FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+				WHERE CONSTRAINT_TYPE = 'UNIQUE'
+				  AND CONSTRAINT_NAME IN (
+				      'UK_OWNED_STOCK_PLAYER_KEY',
+				      'UK_OWNED_SECRETARY_PLAYER_KEY',
+				      'UK_OWNED_GIFT_PLAYER_KEY',
+				      'UK_OWNED_LUXURY_PLAYER_KEY',
+				      'UK_SECRETARY_TENANT_PLAYER_KEY',
+				      'UK_GAME_EVENT_PLAYER_KEY',
+				      'UK_PURCHASE_COOLDOWN_PLAYER_SLOT'
+				  )
+				""", Integer.class);
+
+		assertThat(constraintCount).isEqualTo(7);
+	}
+
+	@Test
+	@Transactional
 	void stockProfitTextShowsPercentAndCoinAmount() {
 		Player player = playerRepository.save(new Player("stock-profit-text-test", "hash"));
 		player.addCash(10_000_000L);
@@ -675,6 +742,7 @@ class BuildingStoryApplicationTests {
 		Player player = playerRepository.save(new Player("stock-view-defer-event-test", "hash"));
 		player.completeStory();
 		player.unlockStockContent();
+		player.scheduleNoMonthlyStockNews();
 
 		assertThat(gameService.tick(player.getId(), true)).isBlank();
 		assertThat(gameService.tick(player.getId(), true)).isBlank();

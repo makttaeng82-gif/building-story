@@ -9,9 +9,18 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
+@Table(name = "game_event", uniqueConstraints =
+        @UniqueConstraint(name = "uk_game_event_player_key", columnNames = {"player_id", "event_key"}))
 public class GameEvent {
+    /*
+     * 화면에 표시되는 이벤트 모달 한 건이다.
+     *
+     * title/body/imagePath는 표시용이고, effect는 확인 버튼을 눌렀을 때 어떤 후속 처리를 할지 알려주는 코드다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

@@ -27,6 +27,13 @@ import java.util.stream.Collectors;
 
 @Service
 public class GameService {
+    /*
+     * GameService는 "게임 전체 진행 순서"를 조립하는 파사드 서비스다.
+     *
+     * 컨트롤러가 여러 세부 서비스를 직접 호출하면 화면 요청마다 규칙 순서가 달라질 수 있다.
+     * 그래서 날짜 진행, 이벤트 처리, 구매/판매 같은 외부 진입점은 대부분 이 클래스에 모아두고,
+     * 실제 세부 계산은 BuildingTradeService, SettlementService, StockService 같은 전용 서비스에 위임한다.
+     */
     private static final long SIDE_JOB_REWARD = 10_000L;
     private static final int RECORD_RETENTION_DAYS = 62;
     private final PlayerRepository playerRepository;
@@ -97,6 +104,8 @@ public class GameService {
     public void completeStory(long playerId) {
         Player player = playerRepository.findById(playerId).orElseThrow();
         if (!player.isStorySeen()) {
+            // 스토리 완료는 메인 게임 최초 진입점이다.
+            // 플레이어 상태 초기화, 첫 건물 지급, 첫 매물 생성이 한 트랜잭션에서 끝나야 중간 저장 오류가 없다.
             player.completeStory();
             playerRepository.save(player);
             BuildingSpec starter = buildingCatalog.firstCheongjuRoom().orElseThrow();
@@ -123,18 +132,45 @@ public class GameService {
     @Transactional
     public String tick(long playerId, boolean deferCityEvents) {
         Player player = playerRepository.findById(playerId).orElseThrow();
+        return processTick(player, deferCityEvents);
+    }
+
+    @Transactional
+    public String tick(long playerId, boolean deferCityEvents, int expectedElapsedDays) {
+        // 화면이 렌더링될 때 본 elapsedDays와 DB의 최신 값을 비교한다.
+        // 다른 탭이 이미 하루를 진행했다면 값이 달라지므로 같은 화면에서 온 오래된 요청은 아무 작업도 하지 않는다.
+        Player player = playerRepository.findByIdForUpdate(playerId).orElseThrow();
+        if (player.getElapsedDays() != expectedElapsedDays) {
+            return "";
+        }
+        return processTick(player, deferCityEvents);
+    }
+
+    private String processTick(Player player, boolean deferCityEvents) {
         if (player.isPaused()) {
             return "";
         }
+        /*
+         * tick은 브라우저의 자동 시간 루프가 호출하는 "하루 진행" 함수다.
+         *
+         * deferCityEvents=true는 주식 화면에서 온 tick을 의미한다.
+         * 주식 화면에서도 날짜, 월세, 주가 갱신은 진행되어야 하지만, 도시 이벤트 모달이
+         * 주식 화면을 덮어버리면 사용자가 주식 흐름을 잃는다. 그래서 도시 이벤트는 생성만 해두고
+         * 응답 신호는 보내지 않는다. 사용자가 도시 화면으로 돌아오면 이미 생성된 이벤트가 표시된다.
+         */
         Optional<AuctionEvent> existingAuction = deferCityEvents ? Optional.empty() : activeAuction(player);
         if (existingAuction.isPresent()) {
             return "AUCTION:" + existingAuction.get().getId();
         }
+        // 날짜는 반드시 한 번만 증가해야 한다. 프론트가 중복 tick을 막고, 서버도 이 메서드 한 곳에서만 advanceDay를 호출한다.
         player.advanceDay();
+        // 공실 건물의 수리 요청처럼 매일 자연스럽게 정리되는 상태를 먼저 정리한다.
         settlementService.clearVacantRepairRequests(player);
+        // 일일 정산은 월세, 월급, 대출, 월말 기록 같은 경제 흐름을 처리한다.
         String dailyNotice = settlementService.runDailySettlement(player);
         dailyNotice = appendNotice(dailyNotice, eventFlowService.processAutoResignation(player));
         if (player.getElapsedDays() >= player.getNextOfferRefreshDay()) {
+            // 매물 갱신은 elapsedDays 기준이다. 월/일이 1월로 순환해도 쿨다운이 꼬이지 않는다.
             buildingTradeService.refreshOffers(player);
             player.scheduleNextOfferRefresh();
         }
@@ -146,11 +182,13 @@ public class GameService {
         if (stockService.activateUnlockNoticeIfDue(player)) {
             return "EVENT:" + activeEvent(player).orElseThrow().getId();
         }
+        // 주식 가격은 주식 화면과 도시 화면 모두에서 같은 시간 축을 공유한다.
         stockService.processPriceUpdates(player);
         if (stockService.activateIndustryNewsIfDue(player)) {
             return "EVENT:" + activeEvent(player).orElseThrow().getId();
         }
         if (deferCityEvents) {
+            // 주식 화면에서는 도시 이벤트를 DB에만 준비하고, 클라이언트에는 EVENT 응답을 보내지 않는다.
             gameEventCatalog.findDueEvent(player.getMonth(), player.getDay())
                     .filter(definition -> !gameEventRepository.existsByPlayerAndEventKey(player, definition.key()))
                     .ifPresent(definition -> eventFlowService.activateEvent(player, definition, false));

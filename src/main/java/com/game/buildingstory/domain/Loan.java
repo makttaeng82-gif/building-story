@@ -9,6 +9,12 @@ import jakarta.persistence.ManyToOne;
 
 @Entity
 public class Loan {
+    /*
+     * 건물 대출 한 건이다.
+     *
+     * principal은 남은 원금이고, monthlyPayment는 매월 상환되는 금액이다.
+     * 월초 정산에서 상환 후 원금이 0이 되면 대출은 종료된다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

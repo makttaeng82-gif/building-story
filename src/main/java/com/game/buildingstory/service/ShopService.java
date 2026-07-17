@@ -17,6 +17,12 @@ import java.util.List;
 
 @Service
 public class ShopService {
+    /*
+     * 명품, 기부, 선물 구매/사용을 담당한다.
+     *
+     * 상점 기능은 현금을 평판, 비서 호감도, 보유 아이템으로 바꾸는 역할을 한다.
+     * 실제 보유 수량은 OwnedLuxuryItem/OwnedGiftItem 엔티티에 저장된다.
+     */
     private static final int RECORD_RETENTION_DAYS = 62;
 
     private final PlayerRepository playerRepository;

@@ -2,6 +2,10 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
 <section th:fragment="cityPanel" class="city-panel">
+    <!--
+    도시 보유 건물 패널이다.
+    buildings는 OwnedBuilding 목록이며 입주, 수리, 매각 가능 상태는 엔티티 상태와 서비스 계산값으로 표시된다.
+    -->
     <div class="section-head">
         <div>
             <h2 th:text="${player.currentCity}">청주</h2>

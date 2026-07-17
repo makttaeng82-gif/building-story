@@ -11,6 +11,12 @@ import jakarta.persistence.ManyToOne;
 
 @Entity
 public class BuildingOffer {
+    /*
+     * 현재 시장에 나온 부동산 매물이다.
+     *
+     * 매물은 일정 주기로 새로 생성된다. 플레이어가 구매하면 이 정보가 OwnedBuilding으로 복사되고,
+     * 해당 offer는 더 이상 의미가 없어 다음 갱신 때 사라진다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

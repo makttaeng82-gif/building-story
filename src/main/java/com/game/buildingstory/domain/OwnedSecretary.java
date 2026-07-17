@@ -6,9 +6,19 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
+@Table(name = "owned_secretary", uniqueConstraints =
+        @UniqueConstraint(name = "uk_owned_secretary_player_key", columnNames = {"player_id", "secretary_key"}))
 public class OwnedSecretary {
+    /*
+     * 플레이어가 고용한 비서의 성장 상태다.
+     *
+     * SecretarySpec은 변하지 않는 카탈로그 정보이고, OwnedSecretary는 플레이어별 숙련도,
+     * 호감도, 배치 도시, 자동 수리 쿨다운처럼 플레이 중 변하는 값을 저장한다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

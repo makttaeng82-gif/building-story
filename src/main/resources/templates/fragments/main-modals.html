@@ -2,6 +2,10 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="modals">
+    <!--
+    메인 화면에서 재사용하는 모달 묶음이다.
+    서버 이벤트, 비서 상세, 선물 선택, 확인 대화상자처럼 화면 위에 떠야 하는 UI를 한 fragment로 관리한다.
+    -->
     <div id="secretaryModal" class="image-modal-backdrop" hidden>
         <section class="secretary-modal">
             <div class="section-head">

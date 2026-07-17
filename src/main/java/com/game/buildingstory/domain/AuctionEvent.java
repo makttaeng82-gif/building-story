@@ -13,6 +13,12 @@ import java.time.LocalDateTime;
 
 @Entity
 public class AuctionEvent {
+    /*
+     * 플레이어에게 열린 경매 한 건이다.
+     *
+     * 일반 매물과 달리 제한 시간이 있고, 입찰 성공/실패 결과를 화면에 보여줘야 하므로
+     * status와 endsAt을 함께 저장한다.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

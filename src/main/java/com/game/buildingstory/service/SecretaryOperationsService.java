@@ -19,6 +19,12 @@ import java.util.Random;
 @Service
 @Transactional
 public class SecretaryOperationsService {
+    /*
+     * 비서 고용, 배치, 숙련도/호감도 성장, 자동 수리 같은 운영 규칙을 담당한다.
+     *
+     * 비서는 assignedCity가 있을 때만 해당 도시의 건물 운영에 영향을 준다.
+     * 숙련도는 관리 가능한 건물 수와 자동 수리 성능을, 호감도는 월세/쿨다운 보너스 같은 효과를 강화한다.
+     */
     private static final int REPAIR_REPUTATION_REWARD = 3;
     private static final int RECORD_RETENTION_DAYS = 62;
 
@@ -50,6 +56,7 @@ public class SecretaryOperationsService {
     }
 
     public String hireFirstSecretary(long playerId) {
+        // 첫 비서는 청주 보호 임차인 이벤트와 연결된다. 후배가 거주 중이어야 고용 가능하다.
         Player player = playerRepository.findById(playerId).orElseThrow();
         if (player.isPaused()) {
             return pausedActionMessage();

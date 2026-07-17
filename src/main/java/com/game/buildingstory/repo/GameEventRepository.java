@@ -11,6 +11,12 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 스토리/뉴스/비서 이벤트 모달 저장소다.
+ *
+ * <p>이벤트는 DB에 저장된 뒤 화면에서 ACTIVE 상태로 표시되고, 사용자가 확인하면
+ * COMPLETED가 된다. 중복 이벤트 방지를 위해 eventKey 기반 존재 여부 조회도 제공한다.</p>
+ */
 public interface GameEventRepository extends JpaRepository<GameEvent, Long> {
     boolean existsByPlayerAndEventKey(Player player, String eventKey);
 

@@ -3,6 +3,11 @@
 <body>
 <section th:fragment="stockPanel" class="panel city-panel stock-panel"
          th:attr="data-player-cash=${player.cash},data-player-coin=${player.coin}">
+    <!--
+    주식 화면 fragment다.
+    서버가 stockQuotes, stockMarketStatus, stockTradeHistories를 미리 계산해 넘기고,
+    app.js는 선택 탭, 수량 버튼, 교환 미리보기 같은 상호작용만 담당한다.
+    -->
     <div class="section-head">
         <div>
             <h2>주식</h2>
@@ -23,6 +28,7 @@
     </div>
 
     <div class="stock-app">
+        <!-- 왼쪽 목록은 모든 종목 버튼을 렌더링하고, JS가 전체/내종목 필터에 따라 hidden을 토글한다. -->
         <aside class="stock-sidebar">
             <div class="stock-filter-tabs" role="tablist" aria-label="종목 필터">
                 <button type="button" class="active" data-stock-filter="all">전체종목</button>
@@ -43,6 +49,7 @@
             </div>
         </aside>
         <section class="stock-detail-list">
+            <!-- 각 종목 상세는 모두 HTML에 존재한다. 선택된 종목 하나만 .active 클래스로 보이게 한다. -->
             <article th:each="quote : ${stockQuotes}" th:with="stock=${quote.stock()}" class="stock-detail"
                      th:classappend="${quoteStat.index == 0} ? ' active'"
                      th:attr="data-stock-detail=${stock.key()},data-stock-price=${quote.currentPrice()},data-owned-quantity=${quote.quantity()}">
@@ -54,6 +61,7 @@
                     </div>
                 </div>
                 <div class="stock-chart-shell">
+                    <!-- 캔들 차트는 StockService가 계산한 SVG 좌표를 사용한다. 브라우저 차트 라이브러리가 필요 없다. -->
                     <svg class="stock-candle-chart" viewBox="0 0 860 300" preserveAspectRatio="none" aria-label="주가 차트">
                         <line class="chart-grid-line" x1="20" y1="24" x2="700" y2="24"></line>
                         <line class="chart-grid-line" x1="20" y1="91" x2="700" y2="91"></line>
@@ -99,6 +107,7 @@
                     </div>
                 </dl>
                 <div class="stock-trade-panel">
+                    <!-- 매수/매도 form은 서버 POST가 최종 검증을 한다. JS 미리보기는 사용자 편의를 위한 보조 계산이다. -->
                     <form class="stock-order-form" data-stock-buy-form method="post" th:action="@{/stocks/{key}/buy(key=${stock.key()})}">
                         <label>
                             매수 수량

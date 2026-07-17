@@ -14,20 +14,19 @@
 
 ## Current State
 
-- Current branch: `codex/refactor-building-story`
-- Latest pushed commit: `64456f4 add stock market systems and events`
-- Remote: `origin/codex/refactor-building-story`
-- Working tree was clean immediately after push.
+- Current branch: `codex/economy-rebalance`
+- Remote: `origin/codex/economy-rebalance`
+- Latest pushed work includes economy balance v3, city market indexes, and the won-based securities account.
 - Server is stopped. Port 8080 has no listener.
 - Last verification before push: `.\gradlew.bat test --console=plain` passed.
 
-## Recent GitHub Push
+## Shared Daily Time Flow
 
-- Pushed to GitHub:
-  - Branch: `codex/refactor-building-story`
-  - Commit: `64456f4`
-  - Message: `add stock market systems and events`
-- `gh` CLI is not installed in this environment, so no PR was created.
+- `GameService.processTick()` is the only place that calls `player.advanceDay()`.
+- Date-dependent content is executed by `DailyGameOrchestrator`.
+- Processor order is fixed as settlement, auction gate, stock, then city events.
+- New content that shares game time should implement `DailyGameProcessor`; it must not advance the date itself.
+- `DailyProcessResult` separates combinable notices from terminal `EVENT:` and `AUCTION:` signals.
 
 ## Recent Stock Work
 
@@ -43,8 +42,7 @@
   - Safe/normal/aggressive labels are not shown in the stock list.
 - Stock prices update every 5 elapsed days.
 - Stock chart is server-rendered SVG candlestick.
-- Stock prices use coin values.
-- Coin exchange rate: `1 coin = 100 won`.
+- Stock prices and the securities account use won.
 - Buy/sell fee: 0.5%, rounded up.
 - Buy/sell are immediate market-price actions.
 - Loss is limited to principal; no margin/debt stock trading.
@@ -55,7 +53,7 @@
   - buy
   - sell
   - by stock
-- Cash/coin exchange has quick buttons:
+- Securities deposit/withdrawal has quick buttons:
   - all available
   - 100k
   - 1m
@@ -103,6 +101,8 @@
 - Controller: `src/main/java/com/game/buildingstory/web/GameController.java`
 - Model assembler: `src/main/java/com/game/buildingstory/web/MainPageModelAssembler.java`
 - Tests: `src/test/java/com/game/buildingstory/BuildingStoryApplicationTests.java`
+- Daily time processors: `src/main/java/com/game/buildingstory/service/time/`
+- Daily orchestrator tests: `src/test/java/com/game/buildingstory/service/time/DailyGameOrchestratorTests.java`
 
 ## Validation Notes
 
@@ -113,7 +113,7 @@
   - stock-view deferred city events
   - stock industry news activation and 2-update duration
   - real-estate news 2-refresh duration
-- Last full test before push passed.
+- Last full test run passed 61 tests.
 
 ## Known Tooling Notes
 

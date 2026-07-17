@@ -102,16 +102,10 @@ player.addSideIncome(SIDE_JOB_REWARD);
 1. 플레이어 조회.
 2. 일시정지면 종료.
 3. 경매가 이미 있으면 경매 신호 반환.
-4. `player.advanceDay()`로 날짜 증가.
-5. 수리 요청 정리.
-6. 월세/월급/대출 등 정산.
-7. 매물 갱신일이면 매물 갱신.
-8. 칭호 갱신.
-9. 주식 개방 이벤트 확인.
-10. 주가 갱신.
-11. 주식 업종 뉴스 확인.
-12. 주식 화면이면 도시 이벤트 표시만 지연.
-13. 도시 이벤트, 비서 이벤트, 경매 이벤트 확인.
+4. `player.advanceDay()`로 날짜를 정확히 한 번 증가.
+5. `DailyGameOrchestrator`에 날짜 이후 처리를 위임.
+6. 정산, 경매 차단, 주식, 도시 이벤트 프로세서를 순서대로 실행.
+7. 프로세서가 `EVENT:` 또는 `AUCTION:` 신호를 반환하면 이후 단계를 중단.
 
 핵심 코드:
 
@@ -119,19 +113,25 @@ player.addSideIncome(SIDE_JOB_REWARD);
 player.advanceDay();
 ```
 
-서버에서 하루를 증가시키는 유일한 핵심 지점이다.
+날짜 증가는 `GameService`만 담당한다. 각 콘텐츠 프로세서는 날짜를 직접 증가시키지 않는다.
 
 ```java
-stockService.processPriceUpdates(player);
+return dailyGameOrchestrator.process(player, deferCityEvents);
 ```
 
-주식 화면이 아니어도 주식 가격은 같은 시간축으로 갱신된다.
+`DailyGameOrchestrator`는 `DailyGameProcessor.order()` 값으로 실행 순서를 고정한다.
 
-```java
-if (deferCityEvents) {
-```
+| 순서 | 프로세서 | 역할 |
+| --- | --- | --- |
+| 100 | `DailySettlementProcessor` | 정산, 자동 퇴사, 매물과 칭호 갱신 |
+| 200 | `DailyAuctionGateProcessor` | 이미 활성화된 경매 우선 처리 |
+| 300 | `DailyStockProcessor` | 주식 해금, 주가 갱신, 업종 뉴스 |
+| 400 | `DailyCityEventProcessor` | 도시·비서 이벤트와 신규 경매 |
 
-주식 화면에서 도시 이벤트 모달을 바로 띄우지 않기 위한 분기다.
+새 콘텐츠가 같은 날짜 흐름을 사용하려면 `DailyGameProcessor` 구현을 추가한다. 이 방식은
+`GameService`의 날짜 증가 코드를 복제하지 않으므로 하루가 두 번 지나는 문제를 예방한다.
+
+주식 화면의 도시 이벤트 지연 분기는 `DailyCityEventProcessor`가 담당한다.
 
 ### 위임 메서드들
 
@@ -155,4 +155,3 @@ public String buyOffer(long playerId, long offerId, boolean loanPurchase) {
 - `tick` 순서를 바꾸면 게임 밸런스가 바뀐다.
 - `player.advanceDay()`를 다른 곳에서 또 호출하면 하루가 2번 지날 수 있다.
 - 주식 화면에서 도시 이벤트를 지연시키는 `deferCityEvents` 규칙을 유지해야 한다.
-

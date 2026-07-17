@@ -13,7 +13,6 @@ package com.game.buildingstory.service;
 import com.game.buildingstory.domain.AuctionEvent;
 import com.game.buildingstory.domain.BuildingOffer;
 import com.game.buildingstory.domain.GameEvent;
-import com.game.buildingstory.domain.GameEventDefinition;
 import com.game.buildingstory.domain.Loan;
 import com.game.buildingstory.domain.MonthlyRecord;
 import com.game.buildingstory.domain.OwnedBuilding;
@@ -22,11 +21,11 @@ import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.SecretaryTenantEvent;
 import com.game.buildingstory.domain.SecretaryTenantEventStatus;
 import com.game.buildingstory.domain.StockTradeHistory;
-import com.game.buildingstory.repo.GameEventRepository;
 import com.game.buildingstory.repo.MonthlyRecordRepository;
 import com.game.buildingstory.repo.OwnedBuildingRepository;
 import com.game.buildingstory.repo.PlayerRepository;
 import com.game.buildingstory.repo.SecretaryTenantEventRepository;
+import com.game.buildingstory.service.time.DailyGameOrchestrator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,8 +50,6 @@ public class GameService {
     private final OwnedBuildingRepository ownedBuildingRepository;
     private final MonthlyRecordRepository monthlyRecordRepository;
     private final SecretaryTenantEventRepository secretaryTenantEventRepository;
-    private final GameEventRepository gameEventRepository;
-    private final GameEventCatalog gameEventCatalog;
     private final BuildingCatalog buildingCatalog;
     private final ReputationCatalog reputationCatalog;
     private final SecretaryCatalog secretaryCatalog;
@@ -65,6 +62,8 @@ public class GameService {
     private final SettlementService settlementService;
     private final EventFlowService eventFlowService;
     private final StockService stockService;
+    private final CityMarketIndexService cityMarketIndexService;
+    private final DailyGameOrchestrator dailyGameOrchestrator;
 
     public GameService(
     // 해설: Spring이 생성자를 통해 Repository와 세부 서비스를 주입한다. 이 클래스는 직접 계산하기보다 각 전용 서비스에 일을 나눠 맡긴다.
@@ -72,8 +71,6 @@ public class GameService {
             OwnedBuildingRepository ownedBuildingRepository,
             MonthlyRecordRepository monthlyRecordRepository,
             SecretaryTenantEventRepository secretaryTenantEventRepository,
-            GameEventRepository gameEventRepository,
-            GameEventCatalog gameEventCatalog,
             BuildingCatalog buildingCatalog,
             ReputationCatalog reputationCatalog,
             SecretaryCatalog secretaryCatalog,
@@ -85,14 +82,14 @@ public class GameService {
             SecretaryOperationsService secretaryOperationsService,
             SettlementService settlementService,
             EventFlowService eventFlowService,
-            StockService stockService
+            StockService stockService,
+            CityMarketIndexService cityMarketIndexService,
+            DailyGameOrchestrator dailyGameOrchestrator
     ) {
         this.playerRepository = playerRepository;
         this.ownedBuildingRepository = ownedBuildingRepository;
         this.monthlyRecordRepository = monthlyRecordRepository;
         this.secretaryTenantEventRepository = secretaryTenantEventRepository;
-        this.gameEventRepository = gameEventRepository;
-        this.gameEventCatalog = gameEventCatalog;
         this.buildingCatalog = buildingCatalog;
         this.reputationCatalog = reputationCatalog;
         this.secretaryCatalog = secretaryCatalog;
@@ -105,6 +102,8 @@ public class GameService {
         this.settlementService = settlementService;
         this.eventFlowService = eventFlowService;
         this.stockService = stockService;
+        this.cityMarketIndexService = cityMarketIndexService;
+        this.dailyGameOrchestrator = dailyGameOrchestrator;
     }
 
     @Transactional(readOnly = true)
@@ -181,90 +180,11 @@ public class GameService {
             return "AUCTION:" + existingAuction.get().getId();
             // 해설: 프론트가 경매 모달을 열 수 있도록 경매 id를 포함한 신호를 반환한다.
         }
-        // 날짜는 반드시 한 번만 증가해야 한다. 프론트가 중복 tick을 막고, 서버도 이 메서드 한 곳에서만 advanceDay를 호출한다.
+        // 날짜 증가는 이 진입점에서만 수행한다. 각 콘텐츠 프로세서는 이미 증가한 날짜를 읽기만 한다.
         player.advanceDay();
         // 해설: 서버 기준으로 날짜를 하루 증가시킨다. 시간 경과는 이 위치에서만 일어나야 중복 진행을 막을 수 있다.
-        // 공실 건물의 수리 요청처럼 매일 자연스럽게 정리되는 상태를 먼저 정리한다.
-        settlementService.clearVacantRepairRequests(player);
-        // 해설: 공실 건물의 수리 요청처럼 하루가 지나며 정리되어야 할 상태를 먼저 정리한다.
-        // 일일 정산은 월세, 월급, 대출, 월말 기록 같은 경제 흐름을 처리한다.
-        String dailyNotice = settlementService.runDailySettlement(player);
-        // 해설: 월세, 월급, 대출, 월말 처리 등 하루 경제 정산을 실행하고 안내 문구를 받는다.
-        dailyNotice = appendNotice(dailyNotice, eventFlowService.processAutoResignation(player));
-        // 해설: 자동 퇴사 같은 이벤트성 안내가 있으면 기존 일일 안내 문구에 이어 붙인다.
-        if (player.getElapsedDays() >= player.getNextOfferRefreshDay()) {
-        // 해설: 누적 경과일이 다음 매물 갱신일에 도달했는지 확인한다.
-            // 매물 갱신은 elapsedDays 기준이다. 월/일이 1월로 순환해도 쿨다운이 꼬이지 않는다.
-            buildingTradeService.refreshOffers(player);
-            // 해설: 게임 시작 직후 살 수 있는 매물을 생성한다.
-            player.scheduleNextOfferRefresh();
-            // 해설: 이번 갱신이 끝났으므로 다음 매물 갱신일을 다시 예약한다.
-        }
-        refreshTitle(player);
-        // 해설: 현재 평판과 고용 상태에 맞는 칭호를 갱신한다.
-        Optional<AuctionEvent> activeAuction = activeAuction(player);
-        // 해설: 정산이나 매물 갱신 이후 새로 활성화된 경매가 있는지 다시 확인한다.
-        if (activeAuction.isPresent()) {
-            return "AUCTION:" + activeAuction.get().getId();
-        }
-        if (stockService.activateUnlockNoticeIfDue(player)) {
-        // 해설: 주식 컨텐츠 해금 시점이면 해금 안내 이벤트를 활성화한다.
-            return "EVENT:" + activeEvent(player).orElseThrow().getId();
-            // 해설: 방금 활성화된 이벤트 id를 프론트에 알려 이벤트 모달을 열게 한다.
-        }
-        // 주식 가격은 주식 화면과 도시 화면 모두에서 같은 시간 축을 공유한다.
-        stockService.processPriceUpdates(player);
-        // 해설: 주식 가격을 현재 날짜 기준으로 갱신한다. 도시 화면과 주식 화면 모두 같은 호출을 사용한다.
-        if (stockService.activateIndustryNewsIfDue(player)) {
-        // 해설: 산업 뉴스 이벤트가 발생할 차례인지 확인하고 필요하면 이벤트를 활성화한다.
-            return "EVENT:" + activeEvent(player).orElseThrow().getId();
-            // 해설: 방금 활성화된 이벤트 id를 프론트에 알려 이벤트 모달을 열게 한다.
-        }
-        if (deferCityEvents) {
-        // 해설: 주식 화면에서 온 tick이면 도시 이벤트를 화면에 즉시 띄우지 않고 지연 처리한다.
-            // 주식 화면에서는 도시 이벤트를 DB에만 준비하고, 클라이언트에는 EVENT 응답을 보내지 않는다.
-            gameEventCatalog.findDueEvent(player.getMonth(), player.getDay())
-            // 해설: 오늘 날짜에 발생해야 하는 도시 이벤트 정의를 카탈로그에서 찾는다.
-                    .filter(definition -> !gameEventRepository.existsByPlayerAndEventKey(player, definition.key()))
-                    // 해설: 이미 생성된 이벤트는 다시 만들지 않는다.
-                    .ifPresent(definition -> eventFlowService.activateEvent(player, definition, false));
-                    // 해설: 이벤트가 있으면 DB에는 생성하되, 주식 화면 흐름을 방해하지 않도록 즉시 표시 신호는 보내지 않는다.
-            return dailyNotice;
-            // 해설: 주식 화면 tick에서는 도시 이벤트 신호 대신 정산 안내만 반환한다.
-        }
-        Optional<GameEvent> activeEvent = activeEvent(player);
-        // 해설: 이미 활성화된 일반 이벤트가 있는지 확인한다.
-        if (activeEvent.isPresent()) {
-            return "EVENT:" + activeEvent.get().getId();
-        }
-        secretaryTenantEventService.evaluate(player, activeAuction(player).isPresent());
-        // 해설: 비서 세입자 이벤트가 새로 열릴 조건인지 검사한다. 경매가 있으면 비서 이벤트와 겹치지 않게 한다.
-        activeEvent = activeEvent(player);
-        // 해설: 비서 이벤트 평가 후 새로 생긴 활성 이벤트가 있는지 다시 조회한다.
-        if (activeEvent.isPresent()) {
-            return "EVENT:" + activeEvent.get().getId();
-        }
-        Optional<GameEventDefinition> dueEvent = gameEventCatalog.findDueEvent(player.getMonth(), player.getDay())
-        // 해설: 오늘 날짜에 맞는 일반 도시 이벤트를 찾고, 중복이 아니면 활성화한다.
-                .filter(definition -> !gameEventRepository.existsByPlayerAndEventKey(player, definition.key()))
-                // 해설: 이미 생성된 이벤트는 다시 만들지 않는다.
-                .map(definition -> {
-                // 해설: 이벤트 정의가 있으면 실제 GameEvent를 만들고, Optional 흐름 안에서 같은 정의를 반환한다.
-                    eventFlowService.activateEvent(player, definition);
-                    // 해설: 도시 이벤트를 활성화하고 플레이어를 일시정지시키는 처리를 EventFlowService에 맡긴다.
-                    return definition;
-                });
-        if (dueEvent.isPresent()) {
-        // 해설: 새 도시 이벤트가 만들어졌으면 프론트에 EVENT 신호를 보낸다.
-            return "EVENT:" + activeEvent(player).orElseThrow().getId();
-            // 해설: 방금 활성화된 이벤트 id를 프론트에 알려 이벤트 모달을 열게 한다.
-        }
-        return auctionService.tryActivate(player)
-        // 해설: 이벤트가 없을 때 마지막으로 경매 활성화 조건을 검사한다.
-                .map(auction -> "AUCTION:" + auction.getId())
-                // 해설: 경매가 활성화되면 프론트가 경매 모달을 열 수 있는 응답 문자열로 바꾼다.
-                .orElse(dailyNotice);
-                // 해설: 경매도 없으면 하루 정산 안내 문구를 최종 응답으로 돌려준다.
+        return dailyGameOrchestrator.process(player, deferCityEvents);
+        // 해설: 날짜 이후의 정산, 경매, 주식, 도시 이벤트 처리를 순서가 고정된 공통 처리기에 위임한다.
     }
 
     @Transactional(readOnly = true)
@@ -893,26 +813,6 @@ public class GameService {
     private String pausedActionMessage() {
     // 해설: 일시정지 중 경제 행동을 막을 때 공통으로 쓰는 메시지를 반환한다.
         return "일시정지 중에는 경제 행동을 할 수 없음";
-    }
-
-    private String appendNotice(String base, String addition) {
-    // 해설: 두 안내 문구를 자연스럽게 합치는 내부 유틸리티다.
-        if (addition == null || addition.isBlank()) {
-        // 해설: 추가 안내가 없으면 기존 안내만 유지한다.
-            return base;
-        }
-        if (base == null || base.isBlank()) {
-        // 해설: 기존 안내가 없으면 추가 안내만 반환한다.
-            return addition;
-        }
-        return base + " · " + addition;
-        // 해설: 두 안내가 모두 있으면 가운데 구분자를 넣어 하나의 문구로 만든다.
-    }
-
-    private void refreshTitle(Player player) {
-    // 해설: 현재 평판 티어에 맞춰 플레이어 칭호를 갱신한다.
-        player.updateTitle(reputationCatalog.currentTier(player.getReputation(), !player.isEmployed()).title());
-        // 해설: 평판과 퇴사 여부로 현재 티어를 찾고, 그 티어의 칭호를 플레이어에 반영한다.
     }
 
 }

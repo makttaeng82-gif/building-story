@@ -39,6 +39,7 @@ public class AuctionService {
     private final BuildingCatalog buildingCatalog;
     private final SecretaryTenantEventService secretaryTenantEventService;
     private final ReputationCatalog reputationCatalog;
+    private final CityMarketIndexService cityMarketIndexService;
 
     public AuctionService(
             PlayerRepository playerRepository,
@@ -47,7 +48,8 @@ public class AuctionService {
             MonthlyRecordRepository monthlyRecordRepository,
             BuildingCatalog buildingCatalog,
             SecretaryTenantEventService secretaryTenantEventService,
-            ReputationCatalog reputationCatalog
+            ReputationCatalog reputationCatalog,
+            CityMarketIndexService cityMarketIndexService
     ) {
         this.playerRepository = playerRepository;
         this.auctionEventRepository = auctionEventRepository;
@@ -56,6 +58,7 @@ public class AuctionService {
         this.buildingCatalog = buildingCatalog;
         this.secretaryTenantEventService = secretaryTenantEventService;
         this.reputationCatalog = reputationCatalog;
+        this.cityMarketIndexService = cityMarketIndexService;
     }
 
     public Optional<AuctionEvent> activeAuction(Player player) {
@@ -89,7 +92,7 @@ public class AuctionService {
                 spec.slot(),
                 spec.typeName(),
                 spec.name(),
-                spec.marketPrice(),
+                cityMarketIndexService.marketValue(player, spec.city(), spec.slot(), spec.marketPrice()),
                 spec.monthlyRent(),
                 spec.tradeCooldownDays()
         )));

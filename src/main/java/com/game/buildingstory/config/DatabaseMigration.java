@@ -30,6 +30,9 @@ public class DatabaseMigration {
         return args -> {
             jdbcTemplate.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS coin BIGINT DEFAULT 0");
             jdbcTemplate.update("UPDATE players SET coin = 0 WHERE coin IS NULL");
+            jdbcTemplate.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS securities_cash BIGINT DEFAULT 0");
+            jdbcTemplate.update("UPDATE players SET securities_cash = 0 WHERE securities_cash IS NULL");
+            jdbcTemplate.execute("ALTER TABLE monthly_record ALTER COLUMN record_type VARCHAR(32)");
             addUniqueConstraint(jdbcTemplate, "owned_stock", "uk_owned_stock_player_key", "player_id, stock_key");
             addUniqueConstraint(jdbcTemplate, "owned_secretary", "uk_owned_secretary_player_key", "player_id, secretary_key");
             addUniqueConstraint(jdbcTemplate, "owned_gift_item", "uk_owned_gift_player_key", "player_id, gift_key");
@@ -40,8 +43,10 @@ public class DatabaseMigration {
             addUniqueConstraint(jdbcTemplate, "purchase_cooldown", "uk_purchase_cooldown_player_slot", "player_id, city, building_slot");
             jdbcTemplate.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS economy_version INTEGER DEFAULT 1");
             jdbcTemplate.update("UPDATE players SET economy_version = 1 WHERE economy_version IS NULL");
-            transactionTemplate.executeWithoutResult(status ->
-                    migrateEconomyVersionTwo(jdbcTemplate, buildingCatalog, reputationCatalog));
+            transactionTemplate.executeWithoutResult(status -> {
+                migrateEconomyVersionTwo(jdbcTemplate, buildingCatalog, reputationCatalog);
+                migrateEconomyVersionThree(jdbcTemplate, buildingCatalog);
+            });
         };
     }
 
@@ -163,6 +168,99 @@ public class DatabaseMigration {
                     delinquent_months = 0
                 WHERE player_id IN (SELECT id FROM players WHERE economy_version < 2)
                 """);
+    }
+
+    private void migrateEconomyVersionThree(JdbcTemplate jdbcTemplate, BuildingCatalog catalog) {
+        Integer pendingPlayers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM players WHERE economy_version < 3", Integer.class);
+        if (pendingPlayers == null || pendingPlayers == 0) {
+            return;
+        }
+
+        refreshOwnedBuildingBalance(jdbcTemplate, catalog);
+        refreshOfferBalance(jdbcTemplate, catalog);
+        refreshAuctionBalance(jdbcTemplate, catalog);
+        jdbcTemplate.update("""
+                UPDATE players
+                SET securities_cash = coin * 100,
+                    coin = 0
+                WHERE economy_version < 3
+                """);
+        jdbcTemplate.update("""
+                UPDATE owned_stock
+                SET quantity = quantity * 100
+                WHERE player_id IN (SELECT id FROM players WHERE economy_version < 3)
+                """);
+        jdbcTemplate.update("""
+                UPDATE stock_trade_history
+                SET quantity = quantity * 100,
+                    gross_amount = gross_amount * 100,
+                    fee = fee * 100,
+                    net_amount = net_amount * 100
+                WHERE player_id IN (SELECT id FROM players WHERE economy_version < 3)
+                """);
+        jdbcTemplate.update("UPDATE players SET economy_version = 3 WHERE economy_version < 3");
+    }
+
+    private void refreshOwnedBuildingBalance(JdbcTemplate jdbcTemplate, BuildingCatalog catalog) {
+        jdbcTemplate.query("""
+                SELECT b.id, b.city, b.building_slot, b.market_price
+                FROM owned_building b
+                JOIN players p ON p.id = b.player_id
+                WHERE p.economy_version < 3
+                """, resultSet -> {
+            String city = resultSet.getString("city");
+            int slot = resultSet.getObject("building_slot") == null
+                    ? inferLegacySlot(city, resultSet.getLong("market_price"))
+                    : resultSet.getInt("building_slot");
+            BuildingSpec spec = findSpec(catalog, city, slot);
+            jdbcTemplate.update("""
+                    UPDATE owned_building
+                    SET building_slot = ?, market_price = ?, monthly_rent = ?, trade_cooldown_days = ?
+                    WHERE id = ?
+                    """, slot, spec.marketPrice(), spec.monthlyRent(), spec.tradeCooldownDays(), resultSet.getLong("id"));
+        });
+    }
+
+    private void refreshOfferBalance(JdbcTemplate jdbcTemplate, BuildingCatalog catalog) {
+        jdbcTemplate.query("""
+                SELECT o.id, o.city, o.building_slot, o.market_price, o.offer_price
+                FROM building_offer o
+                JOIN players p ON p.id = o.player_id
+                WHERE p.economy_version < 3
+                """, resultSet -> {
+            String city = resultSet.getString("city");
+            long oldMarketPrice = resultSet.getLong("market_price");
+            int slot = resultSet.getObject("building_slot") == null
+                    ? inferLegacySlot(city, oldMarketPrice)
+                    : resultSet.getInt("building_slot");
+            BuildingSpec spec = findSpec(catalog, city, slot);
+            long offerPrice = scaleAmount(resultSet.getLong("offer_price"), oldMarketPrice, spec.marketPrice());
+            jdbcTemplate.update("""
+                    UPDATE building_offer
+                    SET building_slot = ?, market_price = ?, offer_price = ?, monthly_rent = ?, trade_cooldown_days = ?
+                    WHERE id = ?
+                    """, slot, spec.marketPrice(), offerPrice, spec.monthlyRent(), spec.tradeCooldownDays(), resultSet.getLong("id"));
+        });
+    }
+
+    private void refreshAuctionBalance(JdbcTemplate jdbcTemplate, BuildingCatalog catalog) {
+        jdbcTemplate.query("""
+                SELECT a.id, a.city, a.building_slot, a.market_price
+                FROM auction_event a
+                JOIN players p ON p.id = a.player_id
+                WHERE p.economy_version < 3
+                """, resultSet -> {
+            String city = resultSet.getString("city");
+            int slot = resultSet.getObject("building_slot") == null
+                    ? inferLegacySlot(city, resultSet.getLong("market_price"))
+                    : resultSet.getInt("building_slot");
+            BuildingSpec spec = findSpec(catalog, city, slot);
+            jdbcTemplate.update("""
+                    UPDATE auction_event
+                    SET building_slot = ?, market_price = ?, monthly_rent = ?, trade_cooldown_days = ?
+                    WHERE id = ?
+                    """, slot, spec.marketPrice(), spec.monthlyRent(), spec.tradeCooldownDays(), resultSet.getLong("id"));
+        });
     }
 
     private BuildingSpec findSpec(BuildingCatalog catalog, String city, int slot) {

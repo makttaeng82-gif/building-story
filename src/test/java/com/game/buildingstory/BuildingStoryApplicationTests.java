@@ -32,19 +32,26 @@ import com.game.buildingstory.service.SecretaryOperationsService;
 import com.game.buildingstory.service.SettlementService;
 import com.game.buildingstory.service.StockService;
 import com.game.buildingstory.repo.OwnedLuxuryItemRepository;
+import com.game.buildingstory.web.SessionKeys;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
 		"spring.datasource.url=jdbc:h2:mem:building-story-test;DB_CLOSE_DELAY=-1",
 		"spring.jpa.hibernate.ddl-auto=create-drop"
 })
+@AutoConfigureMockMvc
 class BuildingStoryApplicationTests {
 	/*
 	 * 통합 테스트 모음이다.
@@ -114,6 +121,9 @@ class BuildingStoryApplicationTests {
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
 
+	@Autowired
+	private MockMvc mockMvc;
+
 	@BeforeEach
 	void cleanDatabase() {
 		// 테스트는 실행 순서에 의존하면 안 된다. 각 테스트 전에 모든 테이블을 비워 독립성을 보장한다.
@@ -133,6 +143,21 @@ class BuildingStoryApplicationTests {
 
 	@Test
 	void contextLoads() {
+	}
+
+	@Test
+	@Transactional
+	void mainCityAndStockViewsRenderWithWonAccountAndMarketIndex() throws Exception {
+		Player player = playerRepository.save(new Player("main-render-test", "hash"));
+		gameService.completeStory(player.getId());
+		player.unlockStockContent();
+		MockHttpSession session = new MockHttpSession();
+		session.setAttribute(SessionKeys.PLAYER_ID, player.getId());
+
+		mockMvc.perform(get("/main").param("view", "city").session(session))
+				.andExpect(status().isOk());
+		mockMvc.perform(get("/main").param("view", "stocks").session(session))
+				.andExpect(status().isOk());
 	}
 
 	@Test
@@ -581,6 +606,18 @@ class BuildingStoryApplicationTests {
 
 	@Test
 	@Transactional
+	void stockUnlockScheduleUsesNetWorthAndReputationInsteadOfCity() {
+		Player player = playerRepository.save(new Player("stock-condition-test", "hash"));
+		player.addCash(100_000_000_000L);
+		player.addReputation(22_500);
+
+		stockService.ensureUnlockSchedule(player);
+
+		assertThat(player.hasStockUnlockSchedule()).isTrue();
+	}
+
+	@Test
+	@Transactional
 	void stockPricesUpdateEveryFiveElapsedDays() {
 		Player player = playerRepository.save(new Player("stock-price-update-test", "hash"));
 		player.unlockStockContent();
@@ -642,21 +679,21 @@ class BuildingStoryApplicationTests {
 
 	@Test
 	@Transactional
-	void stockExchangeAndImmediateTradeUseCoinWithFee() {
+	void securitiesAccountAndImmediateTradeUseWonWithFee() {
 		Player player = playerRepository.save(new Player("stock-trade-test", "hash"));
 		player.addCash(10_000_000L);
 		player.unlockStockContent();
 		stockService.ensureMarketInitialized(player);
 
-		assertThat(gameService.buyStock(player.getId(), "bytecore", 1L)).isEqualTo("코인 부족 · 필요 8만2410코인 / 보유 0코인");
+		assertThat(gameService.buyStock(player.getId(), "bytecore", 1L)).isEqualTo("예수금 부족 · 필요 8만2410원 / 보유 0원");
 		assertThat(gameService.sellStock(player.getId(), "bytecore", 5L)).isEqualTo("보유 수량 부족 · 보유 0주 / 매도 요청 5주");
 
-		assertThat(gameService.exchangeCashToCoin(player.getId(), 100_000L)).isEqualTo("10만코인 교환");
-		assertThat(player.getCash()).isEqualTo(0L);
-		assertThat(player.getCoin()).isEqualTo(100_000L);
+		assertThat(gameService.depositSecuritiesCash(player.getId(), 100_000L)).isEqualTo("10만원 입금");
+		assertThat(player.getCash()).isEqualTo(9_900_000L);
+		assertThat(player.getSecuritiesCash()).isEqualTo(100_000L);
 
 		assertThat(gameService.buyStock(player.getId(), "bytecore", 1L)).isEqualTo("바이트코어 1주 매수");
-		assertThat(player.getCoin()).isEqualTo(17_590L);
+		assertThat(player.getSecuritiesCash()).isEqualTo(17_590L);
 		assertThat(stockService.stockQuotes(player).stream()
 				.filter(quote -> quote.stock().key().equals("bytecore"))
 				.findFirst()
@@ -664,12 +701,12 @@ class BuildingStoryApplicationTests {
 				.quantity()).isEqualTo(1L);
 
 		assertThat(gameService.sellStock(player.getId(), "bytecore", 1L)).isEqualTo("바이트코어 1주 매도");
-		assertThat(player.getCoin()).isEqualTo(99_180L);
+		assertThat(player.getSecuritiesCash()).isEqualTo(99_180L);
 
 		assertThat(gameService.buyMaxStock(player.getId(), "bytecore")).isEqualTo("바이트코어 1주 매수");
-		assertThat(player.getCoin()).isEqualTo(16_770L);
+		assertThat(player.getSecuritiesCash()).isEqualTo(16_770L);
 		assertThat(gameService.sellAllStock(player.getId(), "bytecore")).isEqualTo("바이트코어 1주 매도");
-		assertThat(player.getCoin()).isEqualTo(98_360L);
+		assertThat(player.getSecuritiesCash()).isEqualTo(98_360L);
 		assertThat(gameService.stockTradeHistories(player)).hasSize(4);
 	}
 
@@ -681,15 +718,15 @@ class BuildingStoryApplicationTests {
 		player.unlockStockContent();
 		stockService.ensureMarketInitialized(player);
 
-		assertThat(gameService.exchangeCashToCoin(player.getId(), Long.MAX_VALUE)).isEqualTo("교환 수량 오류");
+		player.addSecuritiesCash(Long.MAX_VALUE);
+		assertThat(gameService.depositSecuritiesCash(player.getId(), 1L)).isEqualTo("입금액 오류");
 		assertThat(player.getCash()).isEqualTo(1_000_000L);
-		assertThat(player.getCoin()).isZero();
+		assertThat(player.getSecuritiesCash()).isEqualTo(Long.MAX_VALUE);
 		assertThat(player.spendCash(-1L)).isFalse();
 		assertThat(player.getCash()).isEqualTo(1_000_000L);
 
-		player.addCoin(Long.MAX_VALUE);
 		assertThat(gameService.buyStock(player.getId(), "bytecore", Long.MAX_VALUE)).isEqualTo("매수 수량 오류");
-		assertThat(player.getCoin()).isEqualTo(Long.MAX_VALUE);
+		assertThat(player.getSecuritiesCash()).isEqualTo(Long.MAX_VALUE);
 	}
 
 	@Test
@@ -729,13 +766,13 @@ class BuildingStoryApplicationTests {
 
 	@Test
 	@Transactional
-	void stockProfitTextShowsPercentAndCoinAmount() {
+	void stockProfitTextShowsPercentAndWonAmount() {
 		Player player = playerRepository.save(new Player("stock-profit-text-test", "hash"));
 		player.addCash(10_000_000L);
 		player.unlockStockContent();
 		stockService.ensureMarketInitialized(player);
 
-		gameService.exchangeCashToCoin(player.getId(), 100_000L);
+		gameService.depositSecuritiesCash(player.getId(), 100_000L);
 		gameService.buyStock(player.getId(), "bytecore", 1L);
 		stockPriceHistoryRepository.save(new StockPriceHistory(player, "bytecore", 82_000L, 92_660L, 82_000L, 92_660L, 100L));
 
@@ -743,8 +780,8 @@ class BuildingStoryApplicationTests {
 				.filter(quote -> quote.stock().key().equals("bytecore"))
 				.findFirst()
 				.orElseThrow()
-				.valuationProfitText()).isEqualTo("(+13%) +1만660코인");
-		assertThat(stockService.holdingSummary(player).totalProfitText()).isEqualTo("(+13%) +1만660코인");
+				.valuationProfitText()).isEqualTo("(+13%) +1만660원");
+		assertThat(stockService.holdingSummary(player).totalProfitText()).isEqualTo("(+13%) +1만660원");
 	}
 
 	@Test
@@ -777,9 +814,9 @@ class BuildingStoryApplicationTests {
 				.orElseThrow();
 
 		assertThat(cheongjuRoom.monthlyRent()).isEqualTo(250_000L);
-		assertThat(cheongjuRoom.tradeCooldownDays()).isEqualTo(5);
-		assertThat(seoulFinal.monthlyRent()).isEqualTo(1_537_500_000L);
-		assertThat(seoulFinal.tradeCooldownDays()).isEqualTo(264);
+		assertThat(cheongjuRoom.tradeCooldownDays()).isEqualTo(4);
+		assertThat(seoulFinal.monthlyRent()).isEqualTo(2_437_500_000L);
+		assertThat(seoulFinal.tradeCooldownDays()).isEqualTo(210);
 	}
 
 	@Test

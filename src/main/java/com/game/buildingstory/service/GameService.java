@@ -54,6 +54,7 @@ public class GameService {
     private final SettlementService settlementService;
     private final EventFlowService eventFlowService;
     private final StockService stockService;
+    private final CityMarketIndexService cityMarketIndexService;
 
     public GameService(
             PlayerRepository playerRepository,
@@ -73,7 +74,8 @@ public class GameService {
             SecretaryOperationsService secretaryOperationsService,
             SettlementService settlementService,
             EventFlowService eventFlowService,
-            StockService stockService
+            StockService stockService,
+            CityMarketIndexService cityMarketIndexService
     ) {
         this.playerRepository = playerRepository;
         this.ownedBuildingRepository = ownedBuildingRepository;
@@ -93,6 +95,7 @@ public class GameService {
         this.settlementService = settlementService;
         this.eventFlowService = eventFlowService;
         this.stockService = stockService;
+        this.cityMarketIndexService = cityMarketIndexService;
     }
 
     @Transactional(readOnly = true)
@@ -461,6 +464,21 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
+    public long currentBuildingValue(Player player, OwnedBuilding building) {
+        return cityMarketIndexService.marketValue(player, building);
+    }
+
+    @Transactional(readOnly = true)
+    public long buildingValuationProfit(Player player, OwnedBuilding building) {
+        return cityMarketIndexService.valuationProfit(player, building);
+    }
+
+    @Transactional(readOnly = true)
+    public String cityMarketIndexText(Player player, String city) {
+        return cityMarketIndexService.indexText(player, city);
+    }
+
+    @Transactional(readOnly = true)
     public String appliedSecretarySpecialEffectSummary(OwnedSecretary secretary) {
         return secretaryOperationsService.appliedSpecialEffectSummary(secretary);
     }
@@ -558,15 +576,15 @@ public class GameService {
     }
 
     @Transactional
-    public String exchangeCashToCoin(long playerId, long coinAmount) {
+    public String depositSecuritiesCash(long playerId, long amount) {
         Player player = playerRepository.findById(playerId).orElseThrow();
-        return stockService.exchangeCashToCoin(player, coinAmount);
+        return stockService.deposit(player, amount);
     }
 
     @Transactional
-    public String exchangeCoinToCash(long playerId, long coinAmount) {
+    public String withdrawSecuritiesCash(long playerId, long amount) {
         Player player = playerRepository.findById(playerId).orElseThrow();
-        return stockService.exchangeCoinToCash(player, coinAmount);
+        return stockService.withdraw(player, amount);
     }
 
     @Transactional
@@ -593,8 +611,8 @@ public class GameService {
         return stockService.sellAllStock(player, stockKey);
     }
 
-    public String stockCoinText(long amount) {
-        return stockService.coinText(amount);
+    public String stockMoneyText(long amount) {
+        return stockService.moneyText(amount);
     }
 
     @Transactional

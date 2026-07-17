@@ -32,8 +32,8 @@
                 <strong class="money" th:text="${@moneyText.format(totalMonthlyRent)}">0원</strong>
             </div>
             <div class="status-card">
-                <span>코인</span>
-                <strong class="money" th:text="${@gameService.stockCoinText(player.coin)}">0코인</strong>
+                <span>증권 예수금</span>
+                <strong class="money" th:text="${@gameService.stockMoneyText(player.securitiesCash)}">0원</strong>
             </div>
             <div class="status-card" th:if="${player.employed}">
                 <span>직장</span>
@@ -204,7 +204,7 @@
                         <td th:text="${stock.industry()}">업계</td>
                         <td th:text="${stock.riskType().label()}">성격</td>
                         <td th:text="${stock.name()}">기업</td>
-                        <td th:text="${@gameService.stockCoinText(stock.basePrice())}">가격</td>
+                        <td th:text="${@gameService.stockMoneyText(stock.basePrice())}">가격</td>
                     </tr>
                     </tbody>
                 </table>

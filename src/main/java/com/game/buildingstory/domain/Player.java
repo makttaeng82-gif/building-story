@@ -24,8 +24,8 @@ public class Player {
 
     // 현금은 부동산, 선물, 명품, 기부처럼 기본 경제 활동에 쓰는 메인 재화다.
     private long cash;
-    // 코인은 주식 거래 전용 재화다. 기존 저장 데이터에는 null일 수 있어 getter에서 0으로 보정한다.
-    private Long coin = 0L;
+    // 증권계좌 예수금은 주식 주문에만 쓰되, 단위는 개인 현금과 같은 원이다.
+    private Long securitiesCash = 0L;
     // 스토리를 완료해야 메인 게임이 열린다. 완료 시 초기 현금과 첫 건물이 지급된다.
     private boolean storySeen;
     // 첫 임차인 이벤트는 한 번만 발생해야 하므로 완료 여부를 플레이어 상태에 저장한다.
@@ -39,7 +39,7 @@ public class Player {
     private String title = "첫 건물주";
     private Long cumulativeDonation = 0L;
     private String rewardedBuildingMilestones = "";
-    private Integer economyVersion = 2;
+    private Integer economyVersion = 3;
     // 퇴사 전에는 월급을 받지만, 일부 평판 조건에는 고용 상태가 반대로 작동한다.
     private Boolean employed = true;
     private Boolean firstSecretaryHired = false;
@@ -120,8 +120,8 @@ public class Player {
         return cash;
     }
 
-    public long getCoin() {
-        return coin == null ? 0L : coin;
+    public long getSecuritiesCash() {
+        return securitiesCash == null ? 0L : securitiesCash;
     }
 
     public void addCash(long amount) {
@@ -140,18 +140,18 @@ public class Player {
         return true;
     }
 
-    public void addCoin(long amount) {
+    public void addSecuritiesCash(long amount) {
         if (amount < 0) {
-            throw new IllegalArgumentException("추가 코인은 음수일 수 없습니다");
+            throw new IllegalArgumentException("추가 예수금은 음수일 수 없습니다");
         }
-        this.coin = Math.addExact(getCoin(), amount);
+        this.securitiesCash = Math.addExact(getSecuritiesCash(), amount);
     }
 
-    public boolean spendCoin(long amount) {
-        if (amount < 0 || getCoin() < amount) {
+    public boolean spendSecuritiesCash(long amount) {
+        if (amount < 0 || getSecuritiesCash() < amount) {
             return false;
         }
-        coin = getCoin() - amount;
+        securitiesCash = getSecuritiesCash() - amount;
         return true;
     }
 

@@ -1,6 +1,7 @@
 package com.game.buildingstory.service;
 
 import com.game.buildingstory.domain.EconomyBalanceRules;
+import com.game.buildingstory.domain.CityMarketIndex;
 import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.ValuationStatus;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class EconomyBalanceRulesTests {
         for (BuildingSpec building : buildings) {
             double grossYieldPercent = building.monthlyRent() * 12.0 * 100.0 / building.marketPrice();
             assertThat(building.marketPrice()).isGreaterThan(previousPrice);
-            assertThat(grossYieldPercent).isBetween(4.09, 10.01);
+            assertThat(grossYieldPercent).isBetween(6.49, 10.01);
             assertThat(grossYieldPercent).isLessThanOrEqualTo(previousYield + 0.01);
             previousPrice = building.marketPrice();
             previousYield = grossYieldPercent;
@@ -75,6 +76,19 @@ class EconomyBalanceRulesTests {
                 .sum();
 
         assertThat(maximumPayroll).isEqualTo(196_000_000L);
+    }
+
+    @Test
+    void cityMarketIndexAppliesNewsOnceAndRespectsMonthlyLimit() {
+        Player player = new Player("index-rules", "hash");
+        CityMarketIndex index = new CityMarketIndex(player, "청주");
+        index.recordNewsImpact(150);
+
+        assertThat(index.updateMonthly(31, 60)).isTrue();
+        assertThat(index.getIndexPoints()).isEqualTo(10_200);
+        assertThat(index.getPendingNewsBasisPoints()).isZero();
+        assertThat(index.updateMonthly(31, -60)).isFalse();
+        assertThat(index.getIndexPoints()).isEqualTo(10_200);
     }
 
     private double atLeastOnceAcrossTwoChecks(int chancePercent) {

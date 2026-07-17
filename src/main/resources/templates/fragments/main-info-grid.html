@@ -16,9 +16,12 @@
                     <dt>구매가 / 시세</dt>
                     <dd class="price-split">
                         <span><b>구매가</b><em th:text="${@moneyText.format(building.purchasePrice)}">0원</em></span>
-                        <span><b>시세</b><em th:text="${@moneyText.format(building.marketPrice)}">0원</em></span>
-                    </dd>
-                </div>
+                        <span><b>시세</b><em th:text="${@moneyText.format(@gameService.currentBuildingValue(player, building))}">0원</em></span>
+                      </dd>
+                  </div>
+                  <div><dt>평가손익</dt><dd th:with="profit=${@gameService.buildingValuationProfit(player, building)}"
+                      th:classappend="${profit > 0 ? 'money-in' : (profit < 0 ? 'money-out' : '')}"
+                      th:text="${profit > 0 ? '+' : ''} + ${@moneyText.format(profit)}">0원</dd></div>
                 <div><dt>월세</dt><dd th:text="${@gameService.rentWaivedBySecretaryEvent(player, building) ? '월세 감면' : @moneyText.format(@gameService.effectiveMonthlyRent(player, building))}">0원</dd></div>
                 <div><dt>상태</dt><dd th:text="${@gameService.secretaryTenantStatusText(building).isBlank() ? (building.occupied ? (building.protectedTenant ? '후배 거주중' : (building.tenantProtectedDaysLeft(player.elapsedDays) > 0 ? '입주중 · 퇴거보호 ' + player.ddayText(building.tenantProtectedDaysLeft(player.elapsedDays)) : '입주중')) : '공실') : @gameService.secretaryTenantStatusText(building)}">상태</dd></div>
                 <div><dt>수리</dt><dd th:text="${building.repairRequested ? '요청중 · 비용 ' + @moneyText.format(building.repairCost()) : '요청 없음'}">수리</dd></div>

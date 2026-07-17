@@ -10,6 +10,8 @@ import com.game.buildingstory.domain.StockPriceHistory;
 import com.game.buildingstory.domain.StockTradeHistory;
 import com.game.buildingstory.repo.GameEventRepository;
 import com.game.buildingstory.repo.MonthlyRecordRepository;
+import com.game.buildingstory.repo.LoanRepository;
+import com.game.buildingstory.repo.OwnedBuildingRepository;
 import com.game.buildingstory.repo.OwnedStockRepository;
 import com.game.buildingstory.repo.StockPriceHistoryRepository;
 import com.game.buildingstory.repo.StockTradeHistoryRepository;
@@ -33,14 +35,13 @@ public class StockService {
      * StockService는 주식 컨텐츠의 서버 규칙을 담당한다.
      *
      * 주요 책임:
-     * 1. 서울 진출 후 주식 기능 개방 예약/이벤트 표시
+     * 1. 순자산과 평판 조건 달성 후 주식 기능 개방 예약/이벤트 표시
      * 2. 종목별 가격 이력 생성과 5일 주기 가격 갱신
-     * 3. 현금 <-> 코인 교환
+     * 3. 개인 현금과 증권계좌 예수금 사이의 입출금
      * 4. 현재가 기준 즉시 매수/매도
      * 5. 업종 호황/불황 뉴스 효과 적용
      *
-     * 주식은 부동산과 별도 재화인 코인을 사용한다. 현금과 주식을 직접 섞지 않으면
-     * 주식 손실이 부동산 구매력 전체를 즉시 망가뜨리는 상황을 줄일 수 있다.
+     * 예수금은 원 단위지만 개인 현금과 분리한다. 주문은 예수금 안에서만 체결된다.
      */
     private static final String STOCK_UNLOCK_EFFECT = "NONE";
     private static final String STOCK_UNLOCK_IMAGE = "AI 주식 이미지";
@@ -52,34 +53,41 @@ public class StockService {
     private static final double SHOCK_CHANCE = 0.02;
     private static final double NORMAL_LIMIT_PERCENT = 12.0;
     private static final double SHOCK_LIMIT_PERCENT = 25.0;
-    private static final int CASH_PER_COIN = 100;
     private static final double TRADE_FEE_RATE = 0.005;
+    private static final long STOCK_UNLOCK_NET_WORTH = 100_000_000_000L;
+    private static final int STOCK_UNLOCK_REPUTATION = 22_500;
 
     private final Random random = new Random();
     private final StockCatalog stockCatalog;
-    private final ReputationCatalog reputationCatalog;
     private final GameEventRepository gameEventRepository;
     private final MonthlyRecordRepository monthlyRecordRepository;
     private final OwnedStockRepository ownedStockRepository;
     private final StockPriceHistoryRepository stockPriceHistoryRepository;
     private final StockTradeHistoryRepository stockTradeHistoryRepository;
+    private final OwnedBuildingRepository ownedBuildingRepository;
+    private final LoanRepository loanRepository;
+    private final CityMarketIndexService cityMarketIndexService;
 
     public StockService(
             StockCatalog stockCatalog,
-            ReputationCatalog reputationCatalog,
             GameEventRepository gameEventRepository,
             MonthlyRecordRepository monthlyRecordRepository,
             OwnedStockRepository ownedStockRepository,
             StockPriceHistoryRepository stockPriceHistoryRepository,
-            StockTradeHistoryRepository stockTradeHistoryRepository
+            StockTradeHistoryRepository stockTradeHistoryRepository,
+            OwnedBuildingRepository ownedBuildingRepository,
+            LoanRepository loanRepository,
+            CityMarketIndexService cityMarketIndexService
     ) {
         this.stockCatalog = stockCatalog;
-        this.reputationCatalog = reputationCatalog;
         this.gameEventRepository = gameEventRepository;
         this.monthlyRecordRepository = monthlyRecordRepository;
         this.ownedStockRepository = ownedStockRepository;
         this.stockPriceHistoryRepository = stockPriceHistoryRepository;
         this.stockTradeHistoryRepository = stockTradeHistoryRepository;
+        this.ownedBuildingRepository = ownedBuildingRepository;
+        this.loanRepository = loanRepository;
+        this.cityMarketIndexService = cityMarketIndexService;
     }
 
     @Transactional(readOnly = true)
@@ -88,11 +96,11 @@ public class StockService {
     }
 
     public void ensureUnlockSchedule(Player player) {
-        // 주식은 서울 해금 후 2 elapsedDays 뒤에 열린다. 조건을 만족한 최초 1회만 예약한다.
+        // 순자산과 평판 조건을 충족하면 2일 뒤 계좌 개설 이벤트를 예약한다.
         if (player.isStockContentUnlocked() || player.hasStockUnlockSchedule()) {
             return;
         }
-        if (reputationCatalog.isCityUnlocked("서울", player.getReputation(), !player.isEmployed())) {
+        if (player.getReputation() >= STOCK_UNLOCK_REPUTATION && netWorth(player) >= STOCK_UNLOCK_NET_WORTH) {
             player.scheduleStockUnlock(player.getElapsedDays() + 2);
         }
     }
@@ -113,7 +121,7 @@ public class StockService {
                 player,
                 "stock_unlock_" + player.getId(),
                 "주식 투자 개방",
-                "서울 진출 이후 증권 계좌가 개설되었습니다. 이제 주식 투자를 할 수 있습니다.",
+                "자산과 신용 기준을 충족해 증권 계좌가 개설되었습니다. 이제 주식 투자를 할 수 있습니다.",
                 STOCK_UNLOCK_IMAGE,
                 STOCK_UNLOCK_EFFECT,
                 "확인"
@@ -256,35 +264,26 @@ public class StockService {
         );
     }
 
-    public String exchangeCashToCoin(Player player, long coinAmount) {
-        // 주식 거래는 코인으로만 한다. 현금을 코인으로 바꿀 때 고정 환율을 적용한다.
-        if (coinAmount <= 0) {
-            return "교환 수량 오류";
+    public String deposit(Player player, long amount) {
+        if (amount <= 0 || safeAdd(player.getSecuritiesCash(), amount) == null) {
+            return "입금액 오류";
         }
-        Long cashCost = safeMultiply(coinAmount, CASH_PER_COIN);
-        if (cashCost == null || safeAdd(player.getCoin(), coinAmount) == null) {
-            return "교환 수량 오류";
-        }
-        if (!player.spendCash(cashCost)) {
+        if (!player.spendCash(amount)) {
             return "현금 부족";
         }
-        player.addCoin(coinAmount);
-        return coinText(coinAmount) + " 교환";
+        player.addSecuritiesCash(amount);
+        return stockPriceText(amount) + " 입금";
     }
 
-    public String exchangeCoinToCash(Player player, long coinAmount) {
-        if (coinAmount <= 0) {
-            return "교환 수량 오류";
+    public String withdraw(Player player, long amount) {
+        if (amount <= 0 || safeAdd(player.getCash(), amount) == null) {
+            return "출금액 오류";
         }
-        Long cashPayout = safeMultiply(coinAmount, CASH_PER_COIN);
-        if (cashPayout == null || safeAdd(player.getCash(), cashPayout) == null) {
-            return "환전 수량 오류";
+        if (!player.spendSecuritiesCash(amount)) {
+            return "예수금 부족";
         }
-        if (!player.spendCoin(coinAmount)) {
-            return "코인 부족";
-        }
-        player.addCash(cashPayout);
-        return coinText(coinAmount) + " 환전";
+        player.addCash(amount);
+        return stockPriceText(amount) + " 출금";
     }
 
     public String buyStock(Player player, String stockKey, long quantity) {
@@ -315,9 +314,8 @@ public class StockService {
                 || safeAdd(existingCostBasis, grossAmount) == null) {
             return "매수 수량 오류";
         }
-        // 코인이 부족하면 보유 수량이나 거래 이력은 변경하지 않고 메시지만 반환한다.
-        if (!player.spendCoin(totalCost)) {
-            return "코인 부족 · 필요 " + coinText(totalCost) + " / 보유 " + coinText(player.getCoin());
+        if (!player.spendSecuritiesCash(totalCost)) {
+            return "예수금 부족 · 필요 " + stockPriceText(totalCost) + " / 보유 " + stockPriceText(player.getSecuritiesCash());
         }
         if (ownedStock == null) {
             ownedStock = ownedStockRepository.save(new OwnedStock(player, stockKey));
@@ -333,10 +331,10 @@ public class StockService {
         }
         StockSpec stock = stockCatalog.find(stockKey).orElseThrow();
         long price = currentPrice(player, stock);
-        long quantity = maxAffordableQuantity(player.getCoin(), price);
+        long quantity = maxAffordableQuantity(player.getSecuritiesCash(), price);
         if (quantity <= 0) {
             long minimumCost = price + tradeFee(price);
-            return "코인 부족 · 필요 " + coinText(minimumCost) + " / 보유 " + coinText(player.getCoin());
+            return "예수금 부족 · 필요 " + stockPriceText(minimumCost) + " / 보유 " + stockPriceText(player.getSecuritiesCash());
         }
         return buyStock(player, stockKey, quantity);
     }
@@ -362,11 +360,11 @@ public class StockService {
         }
         long fee = tradeFee(grossAmount);
         long payout = Math.max(0, grossAmount - fee);
-        if (safeAdd(player.getCoin(), payout) == null) {
+        if (safeAdd(player.getSecuritiesCash(), payout) == null) {
             return "매도 수량 오류";
         }
         ownedStock.sell(quantity);
-        player.addCoin(payout);
+        player.addSecuritiesCash(payout);
         stockTradeHistoryRepository.save(new StockTradeHistory(player, stock.key(), stock.name(), "매도", quantity, price, grossAmount, fee, payout));
         return stock.name() + " " + quantity + "주 매도";
     }
@@ -395,7 +393,7 @@ public class StockService {
         if (player.hasStockUnlockSchedule()) {
             return "개방 준비중";
         }
-        return "서울 해금 필요";
+        return "순자산 1,000억원 · 평판 22,500 필요";
     }
 
     private void appendNextHistory(Player player, StockSpec stock, double marketEffectPercent) {
@@ -618,15 +616,14 @@ public class StockService {
         }
     }
 
-    private long maxAffordableQuantity(long coin, long price) {
-        // 수수료가 수량에 비례해 붙기 때문에 단순 coin / price로는 최대 매수 가능 수량이 틀릴 수 있다.
-        // 이분 탐색으로 "수수료 포함 총액이 보유 코인 이하인 가장 큰 수량"을 찾는다.
+    private long maxAffordableQuantity(long securitiesCash, long price) {
+        // 이분 탐색으로 수수료 포함 총액이 예수금 이하인 가장 큰 수량을 찾는다.
         long low = 0;
-        long high = Math.max(0, coin / price);
+        long high = Math.max(0, securitiesCash / price);
         while (low < high) {
             long mid = (low + high + 1) / 2;
             long grossAmount = price * mid;
-            if (grossAmount + tradeFee(grossAmount) <= coin) {
+            if (grossAmount + tradeFee(grossAmount) <= securitiesCash) {
                 low = mid;
             } else {
                 high = mid - 1;
@@ -732,14 +729,14 @@ public class StockService {
 
     private String signedPrice(long amount) {
         if (amount == 0) {
-            return "0코인";
+            return "0원";
         }
         return (amount > 0 ? "+" : "-") + stockPriceText(Math.abs(amount));
     }
 
     private String stockPriceText(long amount) {
         if (amount == 0) {
-            return "0코인";
+            return "0원";
         }
         long eok = amount / 100_000_000L;
         amount %= 100_000_000L;
@@ -755,11 +752,22 @@ public class StockService {
         if (won > 0 || builder.isEmpty()) {
             builder.append(won);
         }
-        return builder.append("코인").toString();
+        return builder.append("원").toString();
     }
 
-    public String coinText(long amount) {
+    public String moneyText(long amount) {
         return stockPriceText(amount);
+    }
+
+    private long netWorth(Player player) {
+        long buildingValue = ownedBuildingRepository.findByPlayerOrderById(player).stream()
+                .mapToLong(building -> cityMarketIndexService.marketValue(player, building))
+                .sum();
+        long stockValue = stockQuotes(player).stream()
+                .mapToLong(quote -> quote.currentPrice() * quote.quantity())
+                .sum();
+        long debt = loanRepository.findByPlayer(player).stream().mapToLong(loan -> loan.getPrincipal()).sum();
+        return player.getCash() + player.getSecuritiesCash() + buildingValue + stockValue - debt;
     }
 
     private record ChartScale(long minPrice, long maxPrice) {

@@ -42,6 +42,7 @@ public class SettlementService {
     private final SecretaryTenantEventService secretaryTenantEventService;
     private final SecretaryOperationsService secretaryOperationsService;
     private final LoanService loanService;
+    private final CityMarketIndexService cityMarketIndexService;
 
     public SettlementService(
             OwnedBuildingRepository ownedBuildingRepository,
@@ -50,7 +51,8 @@ public class SettlementService {
             ReputationCatalog reputationCatalog,
             SecretaryTenantEventService secretaryTenantEventService,
             SecretaryOperationsService secretaryOperationsService,
-            LoanService loanService
+            LoanService loanService,
+            CityMarketIndexService cityMarketIndexService
     ) {
         this.ownedBuildingRepository = ownedBuildingRepository;
         this.monthlyRecordRepository = monthlyRecordRepository;
@@ -59,6 +61,7 @@ public class SettlementService {
         this.secretaryTenantEventService = secretaryTenantEventService;
         this.secretaryOperationsService = secretaryOperationsService;
         this.loanService = loanService;
+        this.cityMarketIndexService = cityMarketIndexService;
     }
 
     public String runDailySettlement(Player player) {
@@ -67,6 +70,7 @@ public class SettlementService {
         String notice = "";
         if (player.getDay() == 1) {
             // 월초에는 지난 달 누적 상태를 기록하고, 이번 달 고정 수입/지출을 반영한다.
+            cityMarketIndexService.updateMonthlyIndexes(player);
             notice = processRepairNeglect(player);
             if (player.isEmployed()) {
                 player.addSalaryIncome(MONTHLY_JOB_SALARY);
@@ -213,6 +217,7 @@ public class SettlementService {
         String trend = player.getMarketNewsEventTrend();
         String city = player.getMarketNewsEventCity();
         player.activateMarketNews();
+        cityMarketIndexService.recordNewsImpact(player, city, trend);
         String trendLabel = MARKET_NEWS_RISE.equals(trend) ? "폭등" : "폭락";
         saveRecord(player, RecordType.BUILDING_BUY, "부동산 " + trendLabel + " 뉴스", null, 0, city, "다음 매물갱신 2회 적용");
         gameEventRepository.save(new GameEvent(

@@ -30,19 +30,22 @@ public class LoanService {
     private final MonthlyRecordRepository monthlyRecordRepository;
     private final OwnedBuildingRepository ownedBuildingRepository;
     private final SecretaryTenantEventRepository secretaryTenantEventRepository;
+    private final CityMarketIndexService cityMarketIndexService;
 
     public LoanService(
             PlayerRepository playerRepository,
             LoanRepository loanRepository,
             MonthlyRecordRepository monthlyRecordRepository,
             OwnedBuildingRepository ownedBuildingRepository,
-            SecretaryTenantEventRepository secretaryTenantEventRepository
+            SecretaryTenantEventRepository secretaryTenantEventRepository,
+            CityMarketIndexService cityMarketIndexService
     ) {
         this.playerRepository = playerRepository;
         this.loanRepository = loanRepository;
         this.monthlyRecordRepository = monthlyRecordRepository;
         this.ownedBuildingRepository = ownedBuildingRepository;
         this.secretaryTenantEventRepository = secretaryTenantEventRepository;
+        this.cityMarketIndexService = cityMarketIndexService;
     }
 
     @Transactional(readOnly = true)
@@ -72,7 +75,7 @@ public class LoanService {
     @Transactional(readOnly = true)
     public long loanLimit(Player player) {
         return ownedBuildingRepository.findByPlayerOrderById(player).stream()
-                .mapToLong(building -> building.getMarketPrice() * 60 / 100)
+                .mapToLong(building -> cityMarketIndexService.marketValue(player, building) * 60 / 100)
                 .sum();
     }
 
@@ -123,7 +126,7 @@ public class LoanService {
         if (building == null || building.isProtectedTenant() || secretaryTenantEventRepository.existsByBuilding(building)) {
             return "담보 처분 보류";
         }
-        long forcedSalePrice = building.getMarketPrice() * 90 / 100;
+        long forcedSalePrice = cityMarketIndexService.marketValue(player, building) * 90 / 100;
         long payout = Math.max(0L, forcedSalePrice - loan.getPrincipal());
         if (payout > 0) {
             player.addCash(payout);

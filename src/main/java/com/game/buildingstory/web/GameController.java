@@ -225,39 +225,39 @@ public class GameController {
         return "redirect:/main";
     }
 
-    @PostMapping("/stocks/exchange/cash-to-coin")
+    @PostMapping("/stocks/account/deposit")
     @ResponseBody
-    public Map<String, String> exchangeCashToCoin(@RequestParam long coinAmount, HttpSession session) {
+    public Map<String, String> depositSecuritiesCash(@RequestParam long amount, HttpSession session) {
         Long playerId = currentPlayerId(session);
         if (playerId == null) {
             return Map.of("redirect", "/login");
         }
-        String notice = gameService.exchangeCashToCoin(playerId, coinAmount);
+        String notice = gameService.depositSecuritiesCash(playerId, amount);
         Player player = gameService.player(playerId);
         return Map.of(
                 "notice", notice,
                 "cash", String.format("%,d원", player.getCash()),
                 "cashRaw", String.valueOf(player.getCash()),
-                "coin", gameService.stockCoinText(player.getCoin()),
-                "coinRaw", String.valueOf(player.getCoin())
+                "securitiesCash", gameService.stockMoneyText(player.getSecuritiesCash()),
+                "securitiesCashRaw", String.valueOf(player.getSecuritiesCash())
         );
     }
 
-    @PostMapping("/stocks/exchange/coin-to-cash")
+    @PostMapping("/stocks/account/withdraw")
     @ResponseBody
-    public Map<String, String> exchangeCoinToCash(@RequestParam long coinAmount, HttpSession session) {
+    public Map<String, String> withdrawSecuritiesCash(@RequestParam long amount, HttpSession session) {
         Long playerId = currentPlayerId(session);
         if (playerId == null) {
             return Map.of("redirect", "/login");
         }
-        String notice = gameService.exchangeCoinToCash(playerId, coinAmount);
+        String notice = gameService.withdrawSecuritiesCash(playerId, amount);
         Player player = gameService.player(playerId);
         return Map.of(
                 "notice", notice,
                 "cash", String.format("%,d원", player.getCash()),
                 "cashRaw", String.valueOf(player.getCash()),
-                "coin", gameService.stockCoinText(player.getCoin()),
-                "coinRaw", String.valueOf(player.getCoin())
+                "securitiesCash", gameService.stockMoneyText(player.getSecuritiesCash()),
+                "securitiesCashRaw", String.valueOf(player.getSecuritiesCash())
         );
     }
 

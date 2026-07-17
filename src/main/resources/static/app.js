@@ -15,14 +15,13 @@ const toast = document.querySelector("#toast");
 const flashToast = document.querySelector("#flashToast");
 const sideJobButton = document.querySelector("#sideJobBtn");
 const cashValue = document.querySelector("#cashValue");
-const coinValue = document.querySelector("#coinValue");
+const securitiesCashValue = document.querySelector("#securitiesCashValue");
 const totalMonthlyRentValue = document.querySelector("#totalMonthlyRentValue");
 const dayProgress = document.querySelector("#dayProgress");
 const dayProgressText = document.querySelector("#dayProgressText");
 const auctionTimer = document.querySelector(".auction-timer[data-auction-seconds]");
 const TICK_DURATION_MS = 5000;
 const STOCK_FEE_RATE = 0.005;
-const CASH_PER_COIN = 100;
 const SCROLL_RESTORE_KEY = "buildingStory.scrollY";
 const SELECTED_BUILDING_KEY = "buildingStory.selectedBuildingId";
 const SELECTED_STOCK_KEY = "buildingStory.selectedStockKey";
@@ -230,13 +229,13 @@ function stockTradeFee(grossAmount) {
     return Math.ceil(Math.max(0, grossAmount) * STOCK_FEE_RATE);
 }
 
-function maxAffordableStockQuantity(coin, price) {
+function maxAffordableStockQuantity(securitiesCash, price) {
     let low = 0;
-    let high = Math.floor(Math.max(0, coin) / Math.max(1, price));
+    let high = Math.floor(Math.max(0, securitiesCash) / Math.max(1, price));
     while (low < high) {
         const mid = Math.floor((low + high + 1) / 2);
         const grossAmount = price * mid;
-        if (grossAmount + stockTradeFee(grossAmount) <= coin) {
+        if (grossAmount + stockTradeFee(grossAmount) <= securitiesCash) {
             low = mid;
         } else {
             high = mid - 1;
@@ -249,8 +248,8 @@ function stockPanelRoot() {
     return document.querySelector(".stock-panel");
 }
 
-function playerCoinBalance() {
-    return Number(stockPanelRoot()?.dataset.playerCoin || 0);
+function playerSecuritiesCashBalance() {
+    return Number(stockPanelRoot()?.dataset.securitiesCash || 0);
 }
 
 function playerCashBalance() {
@@ -315,7 +314,7 @@ function saveStockExchangeQuantity(form, value) {
 function restoreStockExchangeQuantities() {
     const saved = readStockExchangeQuantities();
     document.querySelectorAll("[data-stock-exchange-form]").forEach((form) => {
-        const input = form.querySelector("input[name='coinAmount']");
+        const input = form.querySelector("input[name='amount']");
         const value = saved[form.dataset.exchangeType];
         if (input && value) {
             input.value = value;
@@ -328,7 +327,7 @@ function updateStockTradeEstimates() {
     document.querySelectorAll(".stock-detail[data-stock-detail]").forEach((detail) => {
         const price = Number(detail.dataset.stockPrice || 0);
         const ownedQuantity = Number(detail.dataset.ownedQuantity || 0);
-        const maxBuyQuantity = maxAffordableStockQuantity(playerCoinBalance(), price);
+        const maxBuyQuantity = maxAffordableStockQuantity(playerSecuritiesCashBalance(), price);
 
         const buyInput = detail.querySelector("[data-stock-buy-form] input[name='quantity']");
         const buyPreview = detail.querySelector("[data-stock-buy-preview]");
@@ -336,7 +335,7 @@ function updateStockTradeEstimates() {
             const quantity = Math.max(0, Number(buyInput.value || 0));
             const grossAmount = price * quantity;
             const fee = stockTradeFee(grossAmount);
-            buyPreview.textContent = `최대 ${maxBuyQuantity}주 / 총 ${formatStockAmount(grossAmount + fee, "코인")} / 수수료 ${formatStockAmount(fee, "코인")}`;
+            buyPreview.textContent = `최대 ${maxBuyQuantity}주 / 총 ${formatStockAmount(grossAmount + fee, "원")} / 수수료 ${formatStockAmount(fee, "원")}`;
             buyInput.max = String(Math.max(1, maxBuyQuantity));
         }
 
@@ -347,7 +346,7 @@ function updateStockTradeEstimates() {
             const grossAmount = price * quantity;
             const fee = stockTradeFee(grossAmount);
             const payout = Math.max(0, grossAmount - fee);
-            sellPreview.textContent = `보유 ${ownedQuantity}주 / 수령 ${formatStockAmount(payout, "코인")} / 수수료 ${formatStockAmount(fee, "코인")}`;
+            sellPreview.textContent = `보유 ${ownedQuantity}주 / 수령 ${formatStockAmount(payout, "원")} / 수수료 ${formatStockAmount(fee, "원")}`;
             sellInput.max = String(Math.max(1, ownedQuantity));
         }
     });
@@ -355,20 +354,20 @@ function updateStockTradeEstimates() {
 
 function updateStockExchangeEstimates() {
     document.querySelectorAll("[data-stock-exchange-form]").forEach((form) => {
-        const input = form.querySelector("input[name='coinAmount']");
+        const input = form.querySelector("input[name='amount']");
         const preview = form.querySelector("[data-exchange-preview]");
         if (!input || !preview) {
             return;
         }
-        const coinAmount = Math.max(0, Number(input.value || 0));
-        const cashAmount = coinAmount * CASH_PER_COIN;
-        if (form.dataset.exchangeType === "cash-to-coin") {
-            const maxCoin = Math.floor(playerCashBalance() / CASH_PER_COIN);
-            preview.textContent = `최대 ${formatStockAmount(maxCoin, "코인")} / 필요 ${formatCashAmount(cashAmount)}`;
-            input.max = String(Math.max(1, maxCoin));
+        const amount = Math.max(0, Number(input.value || 0));
+        if (form.dataset.exchangeType === "deposit") {
+            const maximum = playerCashBalance();
+            preview.textContent = `입금 가능 ${formatCashAmount(maximum)} / 입금 ${formatCashAmount(amount)}`;
+            input.max = String(Math.max(1, maximum));
         } else {
-            preview.textContent = `보유 ${formatStockAmount(playerCoinBalance(), "코인")} / 수령 ${formatCashAmount(cashAmount)}`;
-            input.max = String(Math.max(1, playerCoinBalance()));
+            const maximum = playerSecuritiesCashBalance();
+            preview.textContent = `출금 가능 ${formatCashAmount(maximum)} / 출금 ${formatCashAmount(amount)}`;
+            input.max = String(Math.max(1, maximum));
         }
     });
 }
@@ -382,7 +381,7 @@ function setupStockEstimateInputs() {
             updateStockTradeEstimates();
         });
     });
-    document.querySelectorAll("[data-stock-exchange-form] input[name='coinAmount']").forEach((input) => {
+    document.querySelectorAll("[data-stock-exchange-form] input[name='amount']").forEach((input) => {
         input.addEventListener("input", () => {
             saveStockExchangeQuantity(input.closest("[data-stock-exchange-form]"), input.value);
             updateStockExchangeEstimates();
@@ -410,7 +409,7 @@ document.addEventListener("click", (event) => {
     const price = Number(detail.dataset.stockPrice || 0);
     const ownedQuantity = Number(detail.dataset.ownedQuantity || 0);
     const maxQuantity = form.hasAttribute("data-stock-buy-form")
-        ? maxAffordableStockQuantity(playerCoinBalance(), price)
+        ? maxAffordableStockQuantity(playerSecuritiesCashBalance(), price)
         : ownedQuantity;
     const currentQuantity = Math.max(0, Number(input.value || 0));
     let nextQuantity = currentQuantity;
@@ -433,22 +432,22 @@ document.addEventListener("click", (event) => {
         return;
     }
     const form = button.closest("[data-stock-exchange-form]");
-    const input = form?.querySelector("input[name='coinAmount']");
+    const input = form?.querySelector("input[name='amount']");
     if (!form || !input) {
         return;
     }
     event.preventDefault();
     event.stopPropagation();
-    const maxCoin = form.dataset.exchangeType === "cash-to-coin"
-        ? Math.floor(playerCashBalance() / CASH_PER_COIN)
-        : playerCoinBalance();
+    const maximum = form.dataset.exchangeType === "deposit"
+        ? playerCashBalance()
+        : playerSecuritiesCashBalance();
     let nextAmount = Number(input.value || 0);
     if (button.dataset.exchangeAction === "max") {
-        nextAmount = maxCoin;
+        nextAmount = maximum;
     } else if (button.dataset.exchangeAction === "set") {
         nextAmount = Number(button.dataset.exchangeValue || 0);
     }
-    input.value = String(Math.max(1, Math.min(Math.max(1, maxCoin), Math.trunc(nextAmount) || 1)));
+    input.value = String(Math.max(1, Math.min(Math.max(1, maximum), Math.trunc(nextAmount) || 1)));
     saveStockExchangeQuantity(form, input.value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
     updateStockExchangeEstimates();
@@ -496,7 +495,7 @@ function setupStockTradeHistoryFilters() {
 setupStockTradeHistoryFilters();
 
 function setupStockExchangeForms() {
-    // 현금/코인 교환은 fetch로 처리해 페이지 전체를 새로고침하지 않고 상단 잔액과 미리보기만 갱신한다.
+    // 증권계좌 입출금은 fetch로 처리해 페이지 전체를 새로고침하지 않고 잔액과 미리보기만 갱신한다.
     document.querySelectorAll("[data-stock-exchange-form]").forEach((form) => {
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -518,14 +517,14 @@ function setupStockExchangeForms() {
                 if (cashValue && result.cash) {
                     cashValue.textContent = result.cash;
                 }
-                if (coinValue && result.coin) {
-                    coinValue.textContent = result.coin;
+                if (securitiesCashValue && result.securitiesCash) {
+                    securitiesCashValue.textContent = result.securitiesCash;
                 }
                 if (result.cashRaw && stockPanelRoot()) {
                     stockPanelRoot().dataset.playerCash = result.cashRaw;
                 }
-                if (result.coinRaw && stockPanelRoot()) {
-                    stockPanelRoot().dataset.playerCoin = result.coinRaw;
+                if (result.securitiesCashRaw && stockPanelRoot()) {
+                    stockPanelRoot().dataset.securitiesCash = result.securitiesCashRaw;
                 }
                 updateStockTradeEstimates();
                 updateStockExchangeEstimates();

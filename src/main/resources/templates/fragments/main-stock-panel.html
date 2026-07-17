@@ -2,11 +2,11 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
 <section th:fragment="stockPanel" class="panel city-panel stock-panel"
-         th:attr="data-player-cash=${player.cash},data-player-coin=${player.coin}">
+         th:attr="data-player-cash=${player.cash},data-securities-cash=${player.securitiesCash}">
     <!--
     주식 화면 fragment다.
     서버가 stockQuotes, stockMarketStatus, stockTradeHistories를 미리 계산해 넘기고,
-    app.js는 선택 탭, 수량 버튼, 교환 미리보기 같은 상호작용만 담당한다.
+    app.js는 선택 탭, 수량 버튼, 계좌 입출금 미리보기 같은 상호작용만 담당한다.
     -->
     <div class="section-head">
         <div>
@@ -144,35 +144,35 @@
     </div>
     <div class="stock-bottom-grid">
         <article class="stock-exchange-panel">
-            <h3>현금 · 코인 교환</h3>
-            <p>1코인 = 현금 100원</p>
-            <form data-stock-exchange-form data-exchange-type="cash-to-coin" method="post" action="/stocks/exchange/cash-to-coin">
+            <h3>증권계좌</h3>
+            <p>개인 현금과 예수금은 같은 원 단위입니다.</p>
+            <form data-stock-exchange-form data-exchange-type="deposit" method="post" action="/stocks/account/deposit">
                 <label>
-                    구매 코인
-                    <input type="number" name="coinAmount" min="1" value="10000">
+                    입금액
+                    <input type="number" name="amount" min="1" value="10000000">
                 </label>
-                <div class="stock-exchange-quick-buttons" aria-label="구매 코인 빠른 선택">
+                <div class="stock-exchange-quick-buttons" aria-label="입금액 빠른 선택">
                     <button class="secondary" type="button" data-exchange-action="max">전액</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="100000">10만</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="1000000">100만</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="10000000">1000만</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="10000000">1천만</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="100000000">1억</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="1000000000">10억</button>
                 </div>
-                <div class="stock-order-preview" data-exchange-preview>예상 교환액 계산중</div>
-                <button type="submit">현금 → 코인</button>
+                <div class="stock-order-preview" data-exchange-preview>입금액 계산중</div>
+                <button type="submit">입금</button>
             </form>
-            <form data-stock-exchange-form data-exchange-type="coin-to-cash" method="post" action="/stocks/exchange/coin-to-cash">
+            <form data-stock-exchange-form data-exchange-type="withdraw" method="post" action="/stocks/account/withdraw">
                 <label>
-                    환전 코인
-                    <input type="number" name="coinAmount" min="1" value="10000">
+                    출금액
+                    <input type="number" name="amount" min="1" value="10000000">
                 </label>
-                <div class="stock-exchange-quick-buttons" aria-label="환전 코인 빠른 선택">
+                <div class="stock-exchange-quick-buttons" aria-label="출금액 빠른 선택">
                     <button class="secondary" type="button" data-exchange-action="max">전액</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="100000">10만</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="1000000">100만</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="10000000">1000만</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="10000000">1천만</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="100000000">1억</button>
+                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="1000000000">10억</button>
                 </div>
-                <div class="stock-order-preview" data-exchange-preview>예상 교환액 계산중</div>
-                <button class="secondary" type="submit">코인 → 현금</button>
+                <div class="stock-order-preview" data-exchange-preview>출금액 계산중</div>
+                <button class="secondary" type="submit">출금</button>
             </form>
         </article>
         <article class="stock-history-panel" data-stock-history-panel>
@@ -196,7 +196,7 @@
                     th:attr="data-trade-type=${trade.tradeType},data-trade-stock-key=${trade.stockKey}">
                     <b th:text="${trade.month} + '월 ' + ${trade.day} + '일'">날짜</b>
                     <span th:text="${trade.tradeType} + ' · ' + ${trade.stockName} + ' ' + ${trade.quantity} + '주'">거래</span>
-                    <small th:text="'단가 ' + ${@gameService.stockCoinText(trade.price)} + ' · 수수료 ' + ${@gameService.stockCoinText(trade.fee)} + ' · ' + ${@gameService.stockCoinText(trade.netAmount)}">금액</small>
+                    <small th:text="'단가 ' + ${@gameService.stockMoneyText(trade.price)} + ' · 수수료 ' + ${@gameService.stockMoneyText(trade.fee)} + ' · ' + ${@gameService.stockMoneyText(trade.netAmount)}">금액</small>
                 </li>
             </ul>
             <p class="stock-trade-empty-message" hidden>조건에 맞는 거래내역 없음</p>

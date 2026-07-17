@@ -51,6 +51,7 @@ public class BuildingTradeService {
     private final ReputationCatalog reputationCatalog;
     private final SecretaryTenantEventService secretaryTenantEventService;
     private final LoanService loanService;
+    private final CityMarketIndexService cityMarketIndexService;
 
     public BuildingTradeService(
             PlayerRepository playerRepository,
@@ -63,7 +64,8 @@ public class BuildingTradeService {
             BuildingCatalog buildingCatalog,
             ReputationCatalog reputationCatalog,
             SecretaryTenantEventService secretaryTenantEventService,
-            LoanService loanService
+            LoanService loanService,
+            CityMarketIndexService cityMarketIndexService
     ) {
         this.playerRepository = playerRepository;
         this.offerRepository = offerRepository;
@@ -76,6 +78,7 @@ public class BuildingTradeService {
         this.reputationCatalog = reputationCatalog;
         this.secretaryTenantEventService = secretaryTenantEventService;
         this.loanService = loanService;
+        this.cityMarketIndexService = cityMarketIndexService;
     }
 
     @Transactional(readOnly = true)
@@ -151,7 +154,8 @@ public class BuildingTradeService {
             return "판매 쿨타임 D-" + daysUntilSellable(player, building);
         }
         ValuationStatus valuationStatus = randomValuation();
-        long sellPrice = building.getMarketPrice() * valuationStatus.rate() / 100;
+        long currentMarketValue = cityMarketIndexService.marketValue(player, building);
+        long sellPrice = currentMarketValue * valuationStatus.rate() / 100;
         long sellFee = EconomyBalanceRules.sellFee(sellPrice);
         long payoutBeforeDebt = sellPrice - sellFee;
         Optional<Loan> securedLoan = loanRepository.findByBuilding(building);
@@ -211,7 +215,7 @@ public class BuildingTradeService {
                         spec.slot(),
                         spec.typeName(),
                         spec.name(),
-                        spec.marketPrice(),
+                        cityMarketIndexService.marketValue(player, spec.city(), spec.slot(), spec.marketPrice()),
                         spec.monthlyRent(),
                         spec.tradeCooldownDays(),
                         randomOfferValuation(player, city)

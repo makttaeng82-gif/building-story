@@ -33,7 +33,7 @@ public class MonthlyRecord {
     private int elapsedDays;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "record_type")
+    @Column(name = "record_type", columnDefinition = "varchar(32)")
     private RecordType type;
 
     private String title;

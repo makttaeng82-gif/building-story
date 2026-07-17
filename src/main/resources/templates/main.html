@@ -44,8 +44,8 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
                 <strong id="totalMonthlyRentValue" class="money" th:text="${@moneyText.format(totalMonthlyRent)}">0원</strong>
             </div>
             <div class="status-card">
-                <span>코인</span>
-                <strong id="coinValue" class="money" th:text="${@gameService.stockCoinText(player.coin)}">0코인</strong>
+                <span>증권 예수금</span>
+                <strong id="securitiesCashValue" class="money" th:text="${@gameService.stockMoneyText(player.securitiesCash)}">0원</strong>
             </div>
             <div class="status-card" th:if="${player.employed}">
                 <span>직장</span>
@@ -114,15 +114,15 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
                         </div>
                         <div>
                             <dt>매입원금</dt>
-                            <dd th:text="${stockHoldingSummary.totalCostText()}">0코인</dd>
+                            <dd th:text="${stockHoldingSummary.totalCostText()}">0원</dd>
                         </div>
                         <div>
                             <dt>평가금액</dt>
-                            <dd th:text="${stockHoldingSummary.totalValuationText()}">0코인</dd>
+                            <dd th:text="${stockHoldingSummary.totalValuationText()}">0원</dd>
                         </div>
                         <div>
                             <dt>평가손익</dt>
-                            <dd th:class="${stockHoldingSummary.profitDirection()}" th:text="${stockHoldingSummary.totalProfitText()}">0코인</dd>
+                            <dd th:class="${stockHoldingSummary.profitDirection()}" th:text="${stockHoldingSummary.totalProfitText()}">0원</dd>
                         </div>
                     </dl>
                 </section>

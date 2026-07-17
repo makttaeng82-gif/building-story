@@ -7,6 +7,7 @@ import com.game.buildingstory.domain.MonthlyRecord;
 import com.game.buildingstory.domain.OwnedBuilding;
 import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.RecordType;
+import com.game.buildingstory.domain.EconomyBalanceRules;
 import com.game.buildingstory.repo.GameEventRepository;
 import com.game.buildingstory.repo.MonthlyRecordRepository;
 import com.game.buildingstory.repo.OwnedBuildingRepository;
@@ -80,10 +81,12 @@ public class SettlementService {
                             return;
                         }
                         long rent = effectiveMonthlyRent(player, building);
-                        player.addMonthlyRentIncome(rent);
-                        int reputationChange = random.nextInt(5) + 1;
+                        long operatingCost = EconomyBalanceRules.rentOperatingCost(rent);
+                        long netRent = rent - operatingCost;
+                        player.addMonthlyRentIncome(netRent);
+                        int reputationChange = random.nextInt(3) + 1;
                         player.addReputation(reputationChange);
-                        saveRecord(player, RecordType.RENT_INCOME, "월세", rent, reputationChange, building.getName(), null);
+                        saveRecord(player, RecordType.RENT_INCOME, "월세", netRent, reputationChange, building.getName(), "운영비 " + operatingCost + "원 차감");
                     });
             String secretaryReputationNotice = secretaryOperationsService.processMonthlyReputation(player);
             notice = appendNotice(notice, secretaryReputationNotice);

@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 
 @Entity
 public class Loan {
@@ -22,20 +23,31 @@ public class Loan {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     private Player player;
 
+    @OneToOne(fetch = FetchType.LAZY)
+    private OwnedBuilding building;
+
     private long principal;
+    private Long originalPrincipal;
     private long totalRepayment;
     private int remainingMonths;
     private long monthlyPayment;
+    private Integer delinquentMonths = 0;
 
     protected Loan() {
     }
 
     public Loan(Player player, long principal) {
+        this(player, null, principal);
+    }
+
+    public Loan(Player player, OwnedBuilding building, long principal) {
         this.player = player;
+        this.building = building;
         this.principal = principal;
-        this.totalRepayment = principal * 120 / 100;
-        this.remainingMonths = 6;
-        this.monthlyPayment = totalRepayment / 6;
+        this.originalPrincipal = principal;
+        this.totalRepayment = principal;
+        this.remainingMonths = 24;
+        this.monthlyPayment = monthlyInterest(principal);
     }
 
     public long getPrincipal() {
@@ -44,6 +56,14 @@ public class Loan {
 
     public Player getPlayer() {
         return player;
+    }
+
+    public OwnedBuilding getBuilding() {
+        return building;
+    }
+
+    public long getOriginalPrincipal() {
+        return originalPrincipal == null ? principal : originalPrincipal;
     }
 
     public Long getId() {
@@ -63,7 +83,7 @@ public class Loan {
     }
 
     public long remainingRepayment() {
-        return monthlyPayment * remainingMonths;
+        return principal;
     }
 
     public void advanceMonth() {
@@ -76,7 +96,24 @@ public class Loan {
         return remainingMonths <= 0;
     }
 
-    public void extendGracePeriod() {
-        this.remainingMonths = 6;
+    public void refinance() {
+        this.remainingMonths = 24;
+    }
+
+    public int getDelinquentMonths() {
+        return delinquentMonths == null ? 0 : delinquentMonths;
+    }
+
+    public void recordPayment() {
+        delinquentMonths = 0;
+    }
+
+    public void recordDelinquency() {
+        delinquentMonths = getDelinquentMonths() + 1;
+    }
+
+    private long monthlyInterest(long amount) {
+        long quotient = amount / 250;
+        return amount % 250 == 0 ? quotient : quotient + 1;
     }
 }

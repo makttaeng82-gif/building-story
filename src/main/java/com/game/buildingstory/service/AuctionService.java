@@ -2,6 +2,7 @@ package com.game.buildingstory.service;
 
 import com.game.buildingstory.domain.AuctionEvent;
 import com.game.buildingstory.domain.AuctionStatus;
+import com.game.buildingstory.domain.EconomyBalanceRules;
 import com.game.buildingstory.domain.MonthlyRecord;
 import com.game.buildingstory.domain.OwnedBuilding;
 import com.game.buildingstory.domain.Player;
@@ -37,6 +38,7 @@ public class AuctionService {
     private final MonthlyRecordRepository monthlyRecordRepository;
     private final BuildingCatalog buildingCatalog;
     private final SecretaryTenantEventService secretaryTenantEventService;
+    private final ReputationCatalog reputationCatalog;
 
     public AuctionService(
             PlayerRepository playerRepository,
@@ -44,7 +46,8 @@ public class AuctionService {
             OwnedBuildingRepository ownedBuildingRepository,
             MonthlyRecordRepository monthlyRecordRepository,
             BuildingCatalog buildingCatalog,
-            SecretaryTenantEventService secretaryTenantEventService
+            SecretaryTenantEventService secretaryTenantEventService,
+            ReputationCatalog reputationCatalog
     ) {
         this.playerRepository = playerRepository;
         this.auctionEventRepository = auctionEventRepository;
@@ -52,6 +55,7 @@ public class AuctionService {
         this.monthlyRecordRepository = monthlyRecordRepository;
         this.buildingCatalog = buildingCatalog;
         this.secretaryTenantEventService = secretaryTenantEventService;
+        this.reputationCatalog = reputationCatalog;
     }
 
     public Optional<AuctionEvent> activeAuction(Player player) {
@@ -110,7 +114,9 @@ public class AuctionService {
             throw new IllegalArgumentException("잘못된 입찰가");
         }
         long price = auction.bidPrice(rate);
-        if (!player.spendCash(price)) {
+        long purchaseFee = EconomyBalanceRules.purchaseFee(price);
+        long totalPurchasePrice = price + purchaseFee;
+        if (!player.spendCash(totalPurchasePrice)) {
             return "현금 부족";
         }
         boolean successful = random.nextInt(100) < successChance;
@@ -129,12 +135,14 @@ public class AuctionService {
                     auction.getMonthlyRent(),
                     auction.getTradeCooldownDays()
             ));
+            awardBuildingMilestone(player, purchasedBuilding);
             secretaryTenantEventService.tryActivateIntro(player, purchasedBuilding);
-            saveRecord(player, RecordType.BUILDING_BUY, "경매 낙찰", -price, 0, auction.getName(), "시장가 " + rate + "% 입찰");
+            saveRecord(player, RecordType.BUILDING_BUY, "경매 낙찰", -totalPurchasePrice, 0, auction.getName(), "시장가 " + rate + "% 입찰 · 부대비용 " + purchaseFee + "원");
             auction.resolve(rate, successChance, true, "경매 낙찰 성공");
         } else {
-            player.addCash(price);
-            saveRecord(player, RecordType.BUILDING_BUY, "경매 패찰", null, 0, auction.getName(), "시장가 " + rate + "% 입찰 실패");
+            long deposit = EconomyBalanceRules.auctionDeposit(price);
+            player.addCash(totalPurchasePrice - deposit);
+            saveRecord(player, RecordType.BUILDING_BUY, "경매 패찰", -deposit, 0, auction.getName(), "시장가 " + rate + "% 입찰 실패 · 보증비 " + deposit + "원");
             auction.resolve(rate, successChance, false, "경매 낙찰 실패");
         }
         return auction.getResultMessage();
@@ -166,9 +174,9 @@ public class AuctionService {
 
     private int successChance(int rate) {
         return switch (rate) {
-            case 90 -> 80;
-            case 70 -> 60;
-            case 50 -> 40;
+            case 95 -> 75;
+            case 88 -> 40;
+            case 80 -> 15;
             default -> 0;
         };
     }
@@ -184,6 +192,17 @@ public class AuctionService {
 
     private boolean rollPercent(double percent) {
         return random.nextInt(100) < percent;
+    }
+
+    private void awardBuildingMilestone(Player player, OwnedBuilding building) {
+        int slot = building.getBuildingSlot() == null ? 1 : building.getBuildingSlot();
+        int reputationReward = EconomyBalanceRules.buildingMilestoneReputation(building.getCity(), slot);
+        if (reputationReward <= 0 || !player.claimBuildingMilestone(building.getCity(), slot)) {
+            return;
+        }
+        player.addReputation(reputationReward);
+        player.updateTitle(reputationCatalog.currentTier(player.getReputation(), !player.isEmployed()).title());
+        saveRecord(player, RecordType.BUILDING_BUY, "최초 건물 단계 달성", null, reputationReward, building.getName(), null);
     }
 
     private void saveRecord(Player player, RecordType type, String title, Long amount, int reputationChange, String buildingName, String memo) {

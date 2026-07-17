@@ -32,6 +32,7 @@ public class OwnedSecretary {
     private Integer proficiencyExperience = 0;
     private Integer affinity = 1;
     private Integer affinityExperience = 0;
+    private Integer unpaidSalaryMonths = 0;
     private Integer nextAutoRepairDay = 1;
     private Integer autoRepairsUsedInCooldown = 0;
 
@@ -86,6 +87,19 @@ public class OwnedSecretary {
 
     public int getAffinityExperience() {
         return affinityExperience == null ? 0 : affinityExperience;
+    }
+
+    public int getUnpaidSalaryMonths() {
+        return unpaidSalaryMonths == null ? 0 : unpaidSalaryMonths;
+    }
+
+    public void recordSalaryPaid() {
+        unpaidSalaryMonths = 0;
+    }
+
+    public void recordUnpaidSalary() {
+        unpaidSalaryMonths = getUnpaidSalaryMonths() + 1;
+        assignedCity = null;
     }
 
     public int getRequiredAffinityExperience() {

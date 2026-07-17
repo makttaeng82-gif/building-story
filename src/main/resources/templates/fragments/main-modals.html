@@ -146,27 +146,27 @@
                 <p>시장가 대비 얼마로 경매 하시겠습니까?</p>
                 <div class="auction-bid-grid">
                     <form method="post" th:action="@{/auctions/{id}/bid(id=${activeAuction.id})}">
-                        <input type="hidden" name="rate" value="90">
-                        <button type="submit" th:disabled="${player.cash < activeAuction.bidPrice(90)}">
-                            <span>시장가 90%</span>
-                            <strong th:text="${@moneyText.format(activeAuction.bidPrice(90))}">금액</strong>
-                            <small>성공 80%</small>
+                        <input type="hidden" name="rate" value="95">
+                        <button type="submit" th:disabled="${player.cash < activeAuction.totalPurchasePrice(95)}">
+                            <span>시장가 95%</span>
+                            <strong th:text="${@moneyText.format(activeAuction.totalPurchasePrice(95))}">금액</strong>
+                            <small>성공 75% · 부대비용 포함</small>
                         </button>
                     </form>
                     <form method="post" th:action="@{/auctions/{id}/bid(id=${activeAuction.id})}">
-                        <input type="hidden" name="rate" value="70">
-                        <button type="submit" th:disabled="${player.cash < activeAuction.bidPrice(70)}">
-                            <span>시장가 70%</span>
-                            <strong th:text="${@moneyText.format(activeAuction.bidPrice(70))}">금액</strong>
-                            <small>성공 60%</small>
+                        <input type="hidden" name="rate" value="88">
+                        <button type="submit" th:disabled="${player.cash < activeAuction.totalPurchasePrice(88)}">
+                            <span>시장가 88%</span>
+                            <strong th:text="${@moneyText.format(activeAuction.totalPurchasePrice(88))}">금액</strong>
+                            <small>성공 40% · 부대비용 포함</small>
                         </button>
                     </form>
                     <form method="post" th:action="@{/auctions/{id}/bid(id=${activeAuction.id})}">
-                        <input type="hidden" name="rate" value="50">
-                        <button type="submit" th:disabled="${player.cash < activeAuction.bidPrice(50)}">
-                            <span>시장가 50%</span>
-                            <strong th:text="${@moneyText.format(activeAuction.bidPrice(50))}">금액</strong>
-                            <small>성공 40%</small>
+                        <input type="hidden" name="rate" value="80">
+                        <button type="submit" th:disabled="${player.cash < activeAuction.totalPurchasePrice(80)}">
+                            <span>시장가 80%</span>
+                            <strong th:text="${@moneyText.format(activeAuction.totalPurchasePrice(80))}">금액</strong>
+                            <small>성공 15% · 부대비용 포함</small>
                         </button>
                     </form>
                 </div>

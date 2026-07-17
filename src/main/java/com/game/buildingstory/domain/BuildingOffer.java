@@ -97,10 +97,22 @@ public class BuildingOffer {
     }
 
     public long loanAmount() {
-        return offerPrice * 60 / 100;
+        long loanToValueLimit = Math.min(offerPrice, marketPrice) * 60 / 100;
+        long expectedNetRent = monthlyRent * 75 / 100 * 90 / 100;
+        long maximumInterestForDscr = expectedNetRent * 100 / 120;
+        long cashFlowLimit = maximumInterestForDscr * 250;
+        return Math.min(loanToValueLimit, cashFlowLimit);
     }
 
     public long cashForLoanPurchase() {
-        return offerPrice - loanAmount();
+        return offerPrice - loanAmount() + purchaseFee();
+    }
+
+    public long cashForPurchase() {
+        return offerPrice + purchaseFee();
+    }
+
+    public long purchaseFee() {
+        return EconomyBalanceRules.purchaseFee(offerPrice);
     }
 }

@@ -18,6 +18,8 @@ import java.util.Optional;
 public interface SecretaryTenantEventRepository extends JpaRepository<SecretaryTenantEvent, Long> {
     Optional<SecretaryTenantEvent> findByPlayerAndSecretaryKey(Player player, String secretaryKey);
 
+    boolean existsByBuilding(OwnedBuilding building);
+
     Optional<SecretaryTenantEvent> findByBuildingAndStatusNot(OwnedBuilding building, SecretaryTenantEventStatus status);
 
     @EntityGraph(attributePaths = "building")

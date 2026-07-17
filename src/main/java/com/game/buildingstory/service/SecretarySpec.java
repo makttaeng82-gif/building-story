@@ -28,36 +28,13 @@ public record SecretarySpec(
     }
 
     public long monthlySalaryForProficiency(int proficiency) {
-        long salary = monthlySalary;
         int clamped = Math.max(1, Math.min(30, proficiency));
-        for (int level = 2; level <= clamped; level++) {
-            salary = roundDownToThousands((long) (salary * (1.0 + salaryRaiseRate(level))));
-        }
-        return salary;
-    }
-
-    private double salaryRaiseRate(int level) {
-        if (level <= 10) {
-            return 0.08;
-        }
-        if (level <= 15) {
-            return 0.12;
-        }
-        if (level <= 20) {
-            return 0.16;
-        }
-        if (level <= 25) {
-            return 0.20;
-        }
-        return 0.25;
-    }
-
-    private long roundDownToThousands(long amount) {
-        return amount / 1000 * 1000;
+        int salaryPercent = 100 + (clamped - 1) * 5;
+        return monthlySalary * salaryPercent / 100;
     }
 
     public String salaryDetail() {
-        return "숙련도별 월급 인상률: 1~10 구간 레벨당 8%, 11~15 구간 12%, 16~20 구간 16%, 21~25 구간 20%, 26~30 구간 25%. 레벨마다 계산 후 천원단위 버림.";
+        return "기본 월급에서 숙련도 1단계마다 5%씩 선형 인상. 숙련도 30은 기본 월급의 245%.";
     }
 
     public String specialEffectSummary() {

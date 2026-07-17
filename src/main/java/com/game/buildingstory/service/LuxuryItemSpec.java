@@ -9,9 +9,7 @@ public record LuxuryItemSpec(
         String key,
         String name,
         long price,
+        int reputationReward,
         String imagePath
 ) {
-    public int reputationReward() {
-        return Math.toIntExact(price * 3 / 100_000);
-    }
 }

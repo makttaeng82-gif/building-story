@@ -120,6 +120,9 @@ public class GameService {
         if (player.isPaused()) {
             return pausedActionMessage();
         }
+        if (!player.canDoSideJobToday()) {
+            return "부업은 하루에 한 번만 가능";
+        }
         player.addSideIncome(SIDE_JOB_REWARD);
         return "부업 수익 10,000원 획득";
     }

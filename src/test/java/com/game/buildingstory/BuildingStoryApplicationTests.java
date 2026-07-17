@@ -4,6 +4,7 @@ import com.game.buildingstory.domain.AuctionEvent;
 import com.game.buildingstory.domain.AuctionStatus;
 import com.game.buildingstory.domain.BuildingOffer;
 import com.game.buildingstory.domain.GameEvent;
+import com.game.buildingstory.domain.Loan;
 import com.game.buildingstory.domain.OwnedSecretary;
 import com.game.buildingstory.domain.OwnedBuilding;
 import com.game.buildingstory.domain.Player;
@@ -14,6 +15,7 @@ import com.game.buildingstory.domain.ValuationStatus;
 import com.game.buildingstory.repo.AuctionEventRepository;
 import com.game.buildingstory.repo.BuildingOfferRepository;
 import com.game.buildingstory.repo.GameEventRepository;
+import com.game.buildingstory.repo.LoanRepository;
 import com.game.buildingstory.repo.OwnedBuildingRepository;
 import com.game.buildingstory.repo.OwnedSecretaryRepository;
 import com.game.buildingstory.repo.PlayerRepository;
@@ -22,6 +24,7 @@ import com.game.buildingstory.repo.OwnedGiftItemRepository;
 import com.game.buildingstory.repo.SecretaryTenantEventRepository;
 import com.game.buildingstory.repo.StockPriceHistoryRepository;
 import com.game.buildingstory.service.GameService;
+import com.game.buildingstory.service.LoanService;
 import com.game.buildingstory.service.BuildingTradeService;
 import com.game.buildingstory.service.QaService;
 import com.game.buildingstory.service.SecretaryCatalog;
@@ -67,6 +70,9 @@ class BuildingStoryApplicationTests {
 	private StockService stockService;
 
 	@Autowired
+	private LoanService loanService;
+
+	@Autowired
 	private PlayerRepository playerRepository;
 
 	@Autowired
@@ -97,6 +103,9 @@ class BuildingStoryApplicationTests {
 	private BuildingOfferRepository buildingOfferRepository;
 
 	@Autowired
+	private LoanRepository loanRepository;
+
+	@Autowired
 	private SecretaryTenantEventRepository secretaryTenantEventRepository;
 
 	@Autowired
@@ -116,6 +125,7 @@ class BuildingStoryApplicationTests {
 		secretaryTenantEventRepository.deleteAll();
 		ownedGiftItemRepository.deleteAll();
 		ownedLuxuryItemRepository.deleteAll();
+		loanRepository.deleteAll();
 		ownedBuildingRepository.deleteAll();
 		ownedSecretaryRepository.deleteAll();
 		playerRepository.deleteAll();
@@ -277,14 +287,14 @@ class BuildingStoryApplicationTests {
 	}
 
 	@Test
-	void secretarySalaryIncreasesByProficiencyTier() {
+	void secretarySalaryIncreasesLinearlyByProficiency() {
 		var secretary = secretaryCatalog.find("secretary-1").orElseThrow();
 
 		assertThat(secretary.monthlySalaryForProficiency(1)).isEqualTo(2_000_000L);
-		assertThat(secretary.monthlySalaryForProficiency(2)).isEqualTo(2_160_000L);
-		assertThat(secretary.monthlySalaryForProficiency(11)).isEqualTo(4_469_000L);
-		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(1)).isEqualTo(2_000_000L);
-		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(25)).isEqualTo(36_729_000L);
+		assertThat(secretary.monthlySalaryForProficiency(2)).isEqualTo(2_100_000L);
+		assertThat(secretary.monthlySalaryForProficiency(11)).isEqualTo(3_000_000L);
+		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(1)).isEqualTo(40_000_000L);
+		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(25)).isEqualTo(88_000_000L);
 	}
 
 	@Test
@@ -292,15 +302,15 @@ class BuildingStoryApplicationTests {
 		Player player = new Player("default-chance-test", "hash");
 
 		assertThat(player.getMoveInChancePercent()).isEqualTo(35);
-		assertThat(player.getMoveOutChancePercent()).isEqualTo(25);
-		assertThat(player.getRepairRequestChancePercent()).isEqualTo(35);
+		assertThat(player.getMoveOutChancePercent()).isEqualTo(18);
+		assertThat(player.getRepairRequestChancePercent()).isEqualTo(10);
 		player.updateTestChances(40, 20, 30);
 		assertThat(player.getMoveInChancePercent()).isEqualTo(35);
-		assertThat(player.getMoveOutChancePercent()).isEqualTo(25);
-		assertThat(player.getRepairRequestChancePercent()).isEqualTo(35);
+		assertThat(player.getMoveOutChancePercent()).isEqualTo(18);
+		assertThat(player.getRepairRequestChancePercent()).isEqualTo(10);
 		assertThat(gameService.baseMoveInChancePercent(player)).isEqualTo(35);
-		assertThat(gameService.baseMoveOutChancePercent(player)).isEqualTo(25);
-		assertThat(gameService.baseRepairRequestChancePercent(player)).isEqualTo(35);
+		assertThat(gameService.baseMoveOutChancePercent(player)).isEqualTo(18);
+		assertThat(gameService.baseRepairRequestChancePercent(player)).isEqualTo(10);
 		assertThat(secretaryCatalog.find("secretary-2").orElseThrow().specialEffectSummary()).isEqualTo("퇴거확률 감소 0.3%");
 	}
 
@@ -324,26 +334,27 @@ class BuildingStoryApplicationTests {
 
 	@Test
 	@Transactional
-	void donationAddsOneReputationPerFiftyThousandWon() {
+	void donationAwardsReputationOnlyWhenCumulativeMilestoneIsCrossed() {
 		Player player = playerRepository.save(new Player("donation-test", "hash"));
 		player.addCash(5_000_000L);
 
-		assertThat(gameService.donate(player.getId(), 100)).isEqualTo("기부 완료 · 평판 +100");
+		assertThat(gameService.donate(player.getId(), 100)).isEqualTo("기부 완료 · 누적 이정표 평판 +20");
 		Player updatedPlayer = playerRepository.findById(player.getId()).orElseThrow();
 		assertThat(updatedPlayer.getCash()).isZero();
-		assertThat(updatedPlayer.getReputation()).isEqualTo(100);
+		assertThat(updatedPlayer.getReputation()).isEqualTo(20);
+		assertThat(updatedPlayer.getCumulativeDonation()).isEqualTo(5_000_000L);
 	}
 
 	@Test
 	@Transactional
-	void luxuryItemCanBeBoughtOnceAndHasDonationEfficiencyBonus() {
+	void luxuryItemCanBeBoughtOnceAndHasFixedReputationReward() {
 		Player player = playerRepository.save(new Player("luxury-test", "hash"));
 		player.addCash(1_000_000L);
 
-		assertThat(gameService.buyLuxuryItem(player.getId(), "bicycle")).isEqualTo("자전거 구매 완료 · 평판 +9");
+		assertThat(gameService.buyLuxuryItem(player.getId(), "bicycle")).isEqualTo("자전거 구매 완료 · 평판 +10");
 		Player updatedPlayer = playerRepository.findById(player.getId()).orElseThrow();
 		assertThat(updatedPlayer.getCash()).isEqualTo(700_000L);
-		assertThat(updatedPlayer.getReputation()).isEqualTo(9);
+		assertThat(updatedPlayer.getReputation()).isEqualTo(10);
 		assertThat(gameService.buyLuxuryItem(player.getId(), "bicycle")).isEqualTo("이미 구매한 아이템");
 	}
 
@@ -385,12 +396,12 @@ class BuildingStoryApplicationTests {
 				.filter(gift -> "jewelry".equals(gift.key()))
 				.findFirst()
 				.orElseThrow()
-				.price()).isEqualTo(80_000_000L);
+				.price()).isEqualTo(10_000_000L);
 		assertThat(gameService.giftItems().stream()
 				.filter(gift -> "incentive".equals(gift.key()))
 				.findFirst()
 				.orElseThrow()
-				.price()).isEqualTo(500_000_000L);
+				.price()).isEqualTo(50_000_000L);
 	}
 
 	@Test
@@ -455,14 +466,14 @@ class BuildingStoryApplicationTests {
 		));
 
 		assertThat(offer.loanAmount()).isEqualTo(18_000_000L);
-		assertThat(offer.cashForLoanPurchase()).isEqualTo(12_000_000L);
+		assertThat(offer.cashForLoanPurchase()).isEqualTo(12_450_000L);
 		assertThat(gameService.buyOffer(player.getId(), offer.getId(), true)).isEqualTo("대출구매 완료");
-		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(8_000_000L);
+		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(7_550_000L);
 	}
 
 	@Test
 	@Transactional
-	void loanPurchaseRejectsLoanLimitOverflow() {
+	void loanPurchaseUsesPropertyCashFlowInsteadOfReputationLimit() {
 		Player player = playerRepository.save(new Player("loan-limit-test", "hash"));
 		player.addCash(20_000_000L);
 		BuildingOffer offer = buildingOfferRepository.save(new BuildingOffer(
@@ -477,8 +488,8 @@ class BuildingStoryApplicationTests {
 				ValuationStatus.FAIR
 		));
 
-		assertThat(gameService.buyOffer(player.getId(), offer.getId(), true)).isEqualTo("대출 한도 초과");
-		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(20_000_000L);
+		assertThat(gameService.buyOffer(player.getId(), offer.getId(), true)).isEqualTo("대출구매 완료");
+		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(7_550_000L);
 	}
 
 	@Test
@@ -765,9 +776,9 @@ class BuildingStoryApplicationTests {
 				.findFirst()
 				.orElseThrow();
 
-		assertThat(cheongjuRoom.monthlyRent()).isEqualTo(300_000L);
+		assertThat(cheongjuRoom.monthlyRent()).isEqualTo(250_000L);
 		assertThat(cheongjuRoom.tradeCooldownDays()).isEqualTo(5);
-		assertThat(seoulFinal.monthlyRent()).isEqualTo(27_000_000_000L);
+		assertThat(seoulFinal.monthlyRent()).isEqualTo(1_537_500_000L);
 		assertThat(seoulFinal.tradeCooldownDays()).isEqualTo(264);
 	}
 
@@ -795,8 +806,8 @@ class BuildingStoryApplicationTests {
 
 		assertThat(gameService.effectiveMoveInChancePercentText(player, "test-city")).isEqualTo("35.5%");
 		assertThat(gameService.effectiveMoveInChancePercentText(player, "other-city")).isEqualTo("35%");
-		assertThat(gameService.effectiveMoveOutChancePercentText(player, "test-city")).isEqualTo("25%");
-		assertThat(gameService.effectiveRepairRequestChancePercentText(player, "test-city")).isEqualTo("35%");
+		assertThat(gameService.effectiveMoveOutChancePercentText(player, "test-city")).isEqualTo("18%");
+		assertThat(gameService.effectiveRepairRequestChancePercentText(player, "test-city")).isEqualTo("10%");
 	}
 
 	@Test
@@ -905,8 +916,8 @@ class BuildingStoryApplicationTests {
 				101
 		));
 
-		assertThat(gameService.auctionDisplayTypeName(auction)).isEqualTo("\uC13C\uD2B8\uB7F4\uD30C\uD06C");
-		assertThat(gameService.auctionDisplayName(auction)).isEqualTo("\uC1A1\uB3C4 \uC13C\uD2B8\uB7F4\uD30C\uD06C");
+		assertThat(gameService.auctionDisplayTypeName(auction)).isEqualTo("물류센터");
+		assertThat(gameService.auctionDisplayName(auction)).isEqualTo("송도 물류센터");
 	}
 
 	@Test
@@ -980,7 +991,7 @@ class BuildingStoryApplicationTests {
 				4
 		));
 
-		assertThat(gameService.bidAuction(player.getId(), auction.getId(), 90)).isEqualTo("현금 부족");
+		assertThat(gameService.bidAuction(player.getId(), auction.getId(), 95)).isEqualTo("현금 부족");
 		assertThat(auctionEventRepository.findById(auction.getId()).orElseThrow().getStatus()).isEqualTo(AuctionStatus.ACTIVE);
 	}
 
@@ -1000,6 +1011,75 @@ class BuildingStoryApplicationTests {
 
 		assertThat(gameService.cancelAuction(player.getId(), auction.getId())).isEqualTo("경매 취소");
 		assertThat(auctionEventRepository.findById(auction.getId()).orElseThrow().getStatus()).isEqualTo(AuctionStatus.COMPLETED);
+	}
+
+	@Test
+	@Transactional
+	void secretarySalaryCannotMakeCashNegativeAndTwoMissedMonthsEndContract() {
+		Player player = playerRepository.save(new Player("secretary-arrears-test", "hash"));
+		OwnedSecretary secretary = ownedSecretaryRepository.save(new OwnedSecretary(player, "secretary-1", 1));
+		secretary.assignTo("청주");
+
+		secretaryOperationsService.processSalaries(player);
+
+		assertThat(player.getCash()).isZero();
+		assertThat(ownedSecretaryRepository.findById(secretary.getId()).orElseThrow().getUnpaidSalaryMonths()).isEqualTo(1);
+		assertThat(ownedSecretaryRepository.findById(secretary.getId()).orElseThrow().getAssignedCity()).isNull();
+
+		secretaryOperationsService.processSalaries(player);
+
+		assertThat(player.getCash()).isZero();
+		assertThat(ownedSecretaryRepository.findById(secretary.getId())).isEmpty();
+	}
+
+	@Test
+	@Transactional
+	void securedLoanChargesMonthlyInterestAndResetsDelinquency() {
+		Player player = playerRepository.save(new Player("loan-interest-test", "hash"));
+		player.addCash(100_000L);
+		OwnedBuilding building = ownedBuildingRepository.save(new OwnedBuilding(
+				player, "청주", 1, "원룸", "담보 원룸", 30_000_000L, 30_000_000L, 250_000L, 5));
+		Loan loan = loanRepository.save(new Loan(player, building, 18_000_000L));
+
+		loanService.processMaturity(player);
+
+		assertThat(player.getCash()).isEqualTo(28_000L);
+		assertThat(loanRepository.findById(loan.getId()).orElseThrow().getRemainingMonths()).isEqualTo(23);
+		assertThat(loanRepository.findById(loan.getId()).orElseThrow().getDelinquentMonths()).isZero();
+	}
+
+	@Test
+	@Transactional
+	void securedLoanForeclosesAfterTwoMissedInterestPayments() {
+		Player player = playerRepository.save(new Player("loan-foreclosure-test", "hash"));
+		OwnedBuilding building = ownedBuildingRepository.save(new OwnedBuilding(
+				player, "청주", 1, "원룸", "연체 원룸", 30_000_000L, 30_000_000L, 250_000L, 5));
+		loanRepository.save(new Loan(player, building, 18_000_000L));
+
+		loanService.processMaturity(player);
+		loanService.processMaturity(player);
+
+		assertThat(loanRepository.findByPlayer(player)).isEmpty();
+		assertThat(ownedBuildingRepository.findById(building.getId())).isEmpty();
+		assertThat(player.getCash()).isEqualTo(9_000_000L);
+	}
+
+	@Test
+	@Transactional
+	void securedLoanDefersForeclosureWhenSecretaryEventReferencesBuilding() {
+		Player player = playerRepository.save(new Player("loan-event-reference-test", "hash"));
+		OwnedBuilding building = ownedBuildingRepository.save(new OwnedBuilding(
+				player, "청주", 1, "원룸", "이벤트 원룸", 30_000_000L, 30_000_000L, 250_000L, 5));
+		Loan loan = loanRepository.save(new Loan(player, building, 18_000_000L));
+		secretaryTenantEventRepository.save(new SecretaryTenantEvent(
+				player, building, "secretary-1", "청주", player.getElapsedDays()));
+
+		loanService.processMaturity(player);
+		String notice = loanService.processMaturity(player);
+
+		assertThat(notice).contains("담보 처분 보류");
+		assertThat(loanRepository.findById(loan.getId())).isPresent();
+		assertThat(ownedBuildingRepository.findById(building.getId())).isPresent();
 	}
 
 }

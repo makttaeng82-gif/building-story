@@ -47,6 +47,7 @@ public class SecretaryTenantEventService {
     private final BuildingCatalog buildingCatalog;
     private final SecretaryCatalog secretaryCatalog;
     private final LuxuryItemCatalog luxuryItemCatalog;
+    private final ReputationCatalog reputationCatalog;
 
     public SecretaryTenantEventService(
             OwnedBuildingRepository ownedBuildingRepository,
@@ -58,7 +59,8 @@ public class SecretaryTenantEventService {
             GameEventRepository gameEventRepository,
             BuildingCatalog buildingCatalog,
             SecretaryCatalog secretaryCatalog,
-            LuxuryItemCatalog luxuryItemCatalog
+            LuxuryItemCatalog luxuryItemCatalog,
+            ReputationCatalog reputationCatalog
     ) {
         this.ownedBuildingRepository = ownedBuildingRepository;
         this.ownedSecretaryRepository = ownedSecretaryRepository;
@@ -70,6 +72,7 @@ public class SecretaryTenantEventService {
         this.buildingCatalog = buildingCatalog;
         this.secretaryCatalog = secretaryCatalog;
         this.luxuryItemCatalog = luxuryItemCatalog;
+        this.reputationCatalog = reputationCatalog;
     }
 
     public void evaluate(Player player, boolean hasActiveAuction) {
@@ -158,7 +161,10 @@ public class SecretaryTenantEventService {
             event.getBuilding().moveOut();
         }
         event.complete();
-        saveRecord(player, RecordType.BUILDING_BUY, "비서 고용", null, 0, event.getBuilding().getName(), spec.name());
+        int reputationReward = hireReputationReward(secretaryKey);
+        player.addReputation(reputationReward);
+        player.updateTitle(reputationCatalog.currentTier(player.getReputation(), !player.isEmployed()).title());
+        saveRecord(player, RecordType.BUILDING_BUY, "비서 고용", null, reputationReward, event.getBuilding().getName(), spec.name());
     }
 
     public void createTenantEvent(Player player, OwnedBuilding building, SecretaryTenantScenario scenario) {
@@ -302,6 +308,18 @@ public class SecretaryTenantEventService {
     private boolean hasAllLuxuryItems(Player player) {
         return luxuryItemCatalog.all().stream()
                 .allMatch(item -> ownedLuxuryItemRepository.findByPlayerAndItemKey(player, item.key()).isPresent());
+    }
+
+    private int hireReputationReward(String secretaryKey) {
+        return switch (secretaryKey) {
+            case "secretary-1" -> 100;
+            case "secretary-2" -> 300;
+            case "secretary-3" -> 600;
+            case "secretary-4" -> 1_000;
+            case "secretary-5" -> 1_500;
+            case "secretary-6" -> 2_000;
+            default -> 0;
+        };
     }
 
     private long remainingLoanPrincipal(Player player) {

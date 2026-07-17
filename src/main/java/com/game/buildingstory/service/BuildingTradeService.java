@@ -2,6 +2,7 @@ package com.game.buildingstory.service;
 
 import com.game.buildingstory.domain.AuctionEvent;
 import com.game.buildingstory.domain.BuildingOffer;
+import com.game.buildingstory.domain.EconomyBalanceRules;
 import com.game.buildingstory.domain.Loan;
 import com.game.buildingstory.domain.MonthlyRecord;
 import com.game.buildingstory.domain.OwnedBuilding;
@@ -35,7 +36,7 @@ public class BuildingTradeService {
      * 대출 구매라면 Loan도 함께 생성된다.
      */
     private static final int CITY_BUILDING_LIMIT = 8;
-    private static final int REPAIR_REPUTATION_REWARD = 3;
+    private static final int REPAIR_REPUTATION_REWARD = 5;
     private static final int RECORD_RETENTION_DAYS = 62;
 
     private final Random random = new Random();
@@ -109,17 +110,15 @@ public class BuildingTradeService {
             return "구매 쿨타임 D-" + purchaseCooldownDaysLeft;
         }
 
-        long cashCost = loanPurchase ? offer.cashForLoanPurchase() : offer.getOfferPrice();
-        if (loanPurchase && loanService.remainingPrincipal(player) + offer.loanAmount() > loanService.loanLimit(player)) {
-            return "대출 한도 초과";
-        }
+        long cashCost = loanPurchase ? offer.cashForLoanPurchase() : offer.cashForPurchase();
         if (!player.spendCash(cashCost)) {
             return "현금 부족";
         }
         OwnedBuilding purchasedBuilding = ownedBuildingRepository.save(new OwnedBuilding(player, offer));
         if (loanPurchase) {
-            loanRepository.save(new Loan(player, offer.loanAmount()));
+            loanRepository.save(new Loan(player, purchasedBuilding, offer.loanAmount()));
         }
+        awardBuildingMilestone(player, purchasedBuilding);
         saveRecord(
                 player,
                 RecordType.BUILDING_BUY,
@@ -127,7 +126,7 @@ public class BuildingTradeService {
                 -cashCost,
                 0,
                 offer.getName(),
-                null
+                "매수 부대비용 " + offer.purchaseFee() + "원"
         );
         startPurchaseCooldown(player, offer);
         secretaryTenantEventService.tryActivateIntro(player, purchasedBuilding);
@@ -153,10 +152,19 @@ public class BuildingTradeService {
         }
         ValuationStatus valuationStatus = randomValuation();
         long sellPrice = building.getMarketPrice() * valuationStatus.rate() / 100;
-        player.addCash(sellPrice);
-        saveRecord(player, RecordType.BUILDING_SELL, "건물 판매", sellPrice, 0, building.getName(), valuationStatus.label());
+        long sellFee = EconomyBalanceRules.sellFee(sellPrice);
+        long payoutBeforeDebt = sellPrice - sellFee;
+        Optional<Loan> securedLoan = loanRepository.findByBuilding(building);
+        long debt = securedLoan.map(Loan::getPrincipal).orElse(0L);
+        if (payoutBeforeDebt < debt) {
+            return "매각대금으로 담보대출을 상환할 수 없음";
+        }
+        long payout = payoutBeforeDebt - debt;
+        securedLoan.ifPresent(loanRepository::delete);
+        player.addCash(payout);
+        saveRecord(player, RecordType.BUILDING_SELL, "건물 판매", payout, 0, building.getName(), valuationStatus.label() + " · 매도비용 " + sellFee + "원 · 대출상환 " + debt + "원");
         ownedBuildingRepository.delete(building);
-        return "건물 판매 완료 · " + valuationStatus.label() + " " + sellPrice + "원";
+        return "건물 판매 완료 · " + valuationStatus.label() + " " + payout + "원";
     }
 
     public String repairBuilding(long playerId, long buildingId) {
@@ -290,6 +298,16 @@ public class BuildingTradeService {
                 .findByPlayerAndCityAndBuildingSlot(player, offer.getCity(), offer.getBuildingSlot())
                 .orElseGet(() -> purchaseCooldownRepository.save(new PurchaseCooldown(player, offer.getCity(), offer.getBuildingSlot(), availableDayCount)));
         cooldown.reset(availableDayCount);
+    }
+
+    private void awardBuildingMilestone(Player player, OwnedBuilding building) {
+        int reputationReward = EconomyBalanceRules.buildingMilestoneReputation(building.getCity(), building.getBuildingSlot());
+        if (reputationReward <= 0 || !player.claimBuildingMilestone(building.getCity(), building.getBuildingSlot())) {
+            return;
+        }
+        player.addReputation(reputationReward);
+        refreshTitle(player);
+        saveRecord(player, RecordType.BUILDING_BUY, "최초 건물 단계 달성", null, reputationReward, building.getName(), null);
     }
 
     private ValuationStatus randomValuation() {

@@ -139,6 +139,11 @@ public class AuctionEvent {
         return marketPrice * rate / 100;
     }
 
+    public long totalPurchasePrice(int rate) {
+        long price = bidPrice(rate);
+        return price + EconomyBalanceRules.purchaseFee(price);
+    }
+
     public long remainingSeconds() {
         if (createdAt == null) {
             return 0;

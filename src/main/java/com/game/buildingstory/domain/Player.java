@@ -36,7 +36,10 @@ public class Player {
     private String currentCity = "청주";
     // 평판은 도시 해금, 칭호, 일부 기능 접근 조건에 쓰이는 성장 자원이다.
     private int reputation = 0;
-    private String title = "회사의 최하급노예";
+    private String title = "첫 건물주";
+    private Long cumulativeDonation = 0L;
+    private String rewardedBuildingMilestones = "";
+    private Integer economyVersion = 2;
     // 퇴사 전에는 월급을 받지만, 일부 평판 조건에는 고용 상태가 반대로 작동한다.
     private Boolean employed = true;
     private Boolean firstSecretaryHired = false;
@@ -52,6 +55,7 @@ public class Player {
     // 아래 monthly* 값들은 이번 달 누적 기록이다. 월이 바뀌면 SettlementService가 월간 기록으로 남기고 초기화한다.
     private long monthlyRentIncome;
     private long monthlySideIncome;
+    private Integer lastSideJobElapsedDay;
     private Long monthlySalaryIncome = 0L;
     private long monthlyAdCost;
     private long monthlySecretarySalary;
@@ -66,8 +70,8 @@ public class Player {
     private Integer repairEventDay;
     private Integer repairEventDayTwo;
     private Integer moveInChancePercent = 35;
-    private Integer moveOutChancePercent = 25;
-    private Integer repairRequestChancePercent = 35;
+    private Integer moveOutChancePercent = 18;
+    private Integer repairRequestChancePercent = 10;
     private String dismissedSecretaryOfferKeys = "";
     // 부동산 뉴스 이벤트 예약/활성 상태다. 예약은 "이번 달 며칠에 뉴스가 날지", active는 "현재 가격 효과가 남았는지"를 뜻한다.
     private Integer marketNewsScheduleMonth;
@@ -159,8 +163,10 @@ public class Player {
         // 스토리 완료는 새 게임의 경제 시작점이다. 여기서 초기 자금과 칭호를 한 번에 확정한다.
         this.storySeen = true;
         this.cash = 2_000_000L;
-        this.title = "회사의 최하급노예";
+        this.title = "첫 건물주";
         this.reputation = 0;
+        this.cumulativeDonation = 0L;
+        this.rewardedBuildingMilestones = "";
     }
 
     public void advanceDay() {
@@ -294,6 +300,11 @@ public class Player {
     public void addSideIncome(long amount) {
         monthlySideIncome += amount;
         cash += amount;
+        lastSideJobElapsedDay = getElapsedDays();
+    }
+
+    public boolean canDoSideJobToday() {
+        return lastSideJobElapsedDay == null || lastSideJobElapsedDay != getElapsedDays();
     }
 
     public long getMonthlySalaryIncome() {
@@ -309,13 +320,41 @@ public class Player {
         reputation = Math.max(0, reputation + amount);
     }
 
+    public long getCumulativeDonation() {
+        return cumulativeDonation == null ? 0L : cumulativeDonation;
+    }
+
+    public int getEconomyVersion() {
+        return economyVersion == null ? 1 : economyVersion;
+    }
+
+    public void addDonation(long amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("기부액은 음수일 수 없습니다");
+        }
+        cumulativeDonation = Math.addExact(getCumulativeDonation(), amount);
+    }
+
+    public boolean claimBuildingMilestone(String city, int slot) {
+        String milestone = "|" + city + ":" + slot + "|";
+        String claimed = rewardedBuildingMilestones == null ? "" : rewardedBuildingMilestones;
+        if (claimed.contains(milestone)) {
+            return false;
+        }
+        rewardedBuildingMilestones = claimed + milestone;
+        return true;
+    }
+
     public void setReputationForTest(int reputation) {
         this.reputation = Math.max(0, reputation);
     }
 
-    public void addSecretarySalaryCost(long amount) {
-        monthlySecretarySalary += amount;
-        cash -= amount;
+    public boolean paySecretarySalary(long amount) {
+        if (!spendCash(amount)) {
+            return false;
+        }
+        monthlySecretarySalary = Math.addExact(monthlySecretarySalary, amount);
+        return true;
     }
 
     public long getMonthlyAdCost() {
@@ -328,6 +367,14 @@ public class Player {
 
     public long getMonthlyLoanPayment() {
         return monthlyLoanPayment;
+    }
+
+    public boolean payLoanInterest(long amount) {
+        if (!spendCash(amount)) {
+            return false;
+        }
+        monthlyLoanPayment = Math.addExact(monthlyLoanPayment, amount);
+        return true;
     }
 
     public long monthlyNetIncome() {
@@ -343,16 +390,16 @@ public class Player {
 
     public int getMoveOutChancePercent() {
         if (hasLegacyDefaultChances()) {
-            return 25;
+            return 18;
         }
-        return moveOutChancePercent == null ? 25 : moveOutChancePercent;
+        return moveOutChancePercent == null ? 18 : moveOutChancePercent;
     }
 
     public int getRepairRequestChancePercent() {
         if (hasLegacyDefaultChances()) {
-            return 35;
+            return 10;
         }
-        return repairRequestChancePercent == null ? 35 : repairRequestChancePercent;
+        return repairRequestChancePercent == null ? 10 : repairRequestChancePercent;
     }
 
     public void updateTestChances(int moveInChancePercent, int moveOutChancePercent, int repairRequestChancePercent) {

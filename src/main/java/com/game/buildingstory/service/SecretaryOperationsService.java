@@ -243,8 +243,17 @@ public class SecretaryOperationsService {
                 continue;
             }
             long salary = spec.monthlySalaryForProficiency(secretary.getProficiency());
-            player.addSecretarySalaryCost(salary);
-            saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급", -salary, 0, null, spec.name() + " · 숙련도 " + secretary.getProficiency());
+            if (player.paySecretarySalary(salary)) {
+                secretary.recordSalaryPaid();
+                saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급", -salary, 0, null, spec.name() + " · 숙련도 " + secretary.getProficiency());
+                continue;
+            }
+            secretary.recordUnpaidSalary();
+            saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급 미지급", null, 0, null, spec.name() + " · 효과 정지 · 미지급 " + secretary.getUnpaidSalaryMonths() + "개월");
+            if (secretary.getUnpaidSalaryMonths() >= 2) {
+                ownedSecretaryRepository.delete(secretary);
+                saveRecord(player, RecordType.SECRETARY_SALARY, "비서 계약 종료", null, 0, null, spec.name() + " · 월급 2개월 미지급");
+            }
         }
     }
 

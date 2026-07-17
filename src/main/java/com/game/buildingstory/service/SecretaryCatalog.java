@@ -17,7 +17,7 @@ public class SecretaryCatalog {
     private static final String PROFICIENCY_DETAIL = "숙련도 1 기준 30일, 숙련도 30 기준 7일. 공식: 30 - floor((숙련도 - 1) * 23 / 29)";
 
     private final List<SecretarySpec> specs = List.of(
-            new SecretarySpec("secretary-1", "설아름", "회사 후배", "/assets/secretaries/secretary-1.png", 250, 2_000_000L, 1, COMMON_EFFECT, PROFICIENCY_BONUS, PROFICIENCY_DETAIL, "자동수리 수리비 감소", "1%", "호감도 1 기준 자동수리 수리비 1% 감소. 호감도 30 기준 30% 감소.", "1월 3일 이벤트 후 입주 상태에서 영입 가능"),
+            new SecretarySpec("secretary-1", "설아름", "회사 후배", "/assets/secretaries/secretary-1.png", 250, 500_000L, 1, COMMON_EFFECT, PROFICIENCY_BONUS, PROFICIENCY_DETAIL, "자동수리 수리비 감소", "1%", "호감도 1 기준 자동수리 수리비 1% 감소. 호감도 30 기준 30% 감소.", "1월 3일 이벤트 후 입주 상태에서 영입 가능"),
             new SecretarySpec("secretary-2", "설하은", "연구원", "/assets/secretaries/secretary-2.png", 1_750, 3_000_000L, 5, COMMON_EFFECT, PROFICIENCY_BONUS, PROFICIENCY_DETAIL, "퇴거확률 감소", "0.3%", "호감도 1 기준 퇴거확률 0.3% 감소. 호감도 30 기준 9% 감소.", "세종 임차인 이벤트에서 영입 가능"),
             new SecretarySpec("secretary-3", "이다은", "공인중개사", "/assets/secretaries/secretary-3.png", 4_900, 5_000_000L, 10, COMMON_EFFECT, PROFICIENCY_BONUS, PROFICIENCY_DETAIL, "입주확률 증가", "0.5%", "호감도 1 기준 입주확률 0.5% 증가. 호감도 30 기준 15% 증가.", "대전 임차인 이벤트에서 영입 가능"),
             new SecretarySpec("secretary-4", "한아리", "세무사", "/assets/secretaries/secretary-4.png", 11_100, 10_000_000L, 15, COMMON_EFFECT, PROFICIENCY_BONUS, PROFICIENCY_DETAIL, "월세 증가", "0.5%", "호감도 1 기준 월세 0.5% 증가. 호감도 30 기준 15% 증가.", "부산 임차인 이벤트에서 영입 가능"),

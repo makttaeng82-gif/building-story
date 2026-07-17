@@ -30,3 +30,15 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+tasks.register('economySimulation', JavaExec) {
+	group = 'verification'
+	description = 'Runs the fixed-seed economy balance simulation and prints a Markdown report.'
+	dependsOn testClasses
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.game.buildingstory.simulation.EconomyBalanceSimulationRunner'
+	jvmArgs '-Dfile.encoding=UTF-8'
+	if (project.hasProperty('iterations')) {
+		args project.property('iterations')
+	}
+}

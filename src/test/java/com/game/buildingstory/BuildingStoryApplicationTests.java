@@ -315,9 +315,9 @@ class BuildingStoryApplicationTests {
 	void secretarySalaryIncreasesLinearlyByProficiency() {
 		var secretary = secretaryCatalog.find("secretary-1").orElseThrow();
 
-		assertThat(secretary.monthlySalaryForProficiency(1)).isEqualTo(2_000_000L);
-		assertThat(secretary.monthlySalaryForProficiency(2)).isEqualTo(2_100_000L);
-		assertThat(secretary.monthlySalaryForProficiency(11)).isEqualTo(3_000_000L);
+		assertThat(secretary.monthlySalaryForProficiency(1)).isEqualTo(500_000L);
+		assertThat(secretary.monthlySalaryForProficiency(2)).isEqualTo(525_000L);
+		assertThat(secretary.monthlySalaryForProficiency(11)).isEqualTo(750_000L);
 		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(1)).isEqualTo(40_000_000L);
 		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(25)).isEqualTo(88_000_000L);
 	}

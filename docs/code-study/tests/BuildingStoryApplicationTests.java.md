@@ -386,13 +386,13 @@ class BuildingStoryApplicationTests {
 	void secretarySalaryIncreasesByProficiencyTier() {
 		var secretary = secretaryCatalog.find("secretary-1").orElseThrow();
 
-		assertThat(secretary.monthlySalaryForProficiency(1)).isEqualTo(2_000_000L);
+		assertThat(secretary.monthlySalaryForProficiency(1)).isEqualTo(500_000L);
 		// 해설: 테스트 검증문이다. 실제 결과가 기대값과 다르면 테스트가 실패한다.
 		assertThat(secretary.monthlySalaryForProficiency(2)).isEqualTo(2_160_000L);
 		// 해설: 테스트 검증문이다. 실제 결과가 기대값과 다르면 테스트가 실패한다.
 		assertThat(secretary.monthlySalaryForProficiency(11)).isEqualTo(4_469_000L);
 		// 해설: 테스트 검증문이다. 실제 결과가 기대값과 다르면 테스트가 실패한다.
-		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(1)).isEqualTo(2_000_000L);
+		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(1)).isEqualTo(40_000_000L);
 		// 해설: 테스트 검증문이다. 실제 결과가 기대값과 다르면 테스트가 실패한다.
 		assertThat(secretaryCatalog.find("secretary-6").orElseThrow().monthlySalaryForProficiency(25)).isEqualTo(36_729_000L);
 		// 해설: 테스트 검증문이다. 실제 결과가 기대값과 다르면 테스트가 실패한다.

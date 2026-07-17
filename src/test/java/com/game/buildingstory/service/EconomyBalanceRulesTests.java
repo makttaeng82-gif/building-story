@@ -75,7 +75,7 @@ class EconomyBalanceRulesTests {
                 .mapToLong(secretary -> secretary.monthlySalaryForProficiency(30))
                 .sum();
 
-        assertThat(maximumPayroll).isEqualTo(196_000_000L);
+        assertThat(maximumPayroll).isEqualTo(192_325_000L);
     }
 
     @Test

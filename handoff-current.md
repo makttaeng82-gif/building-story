@@ -113,7 +113,17 @@
   - stock-view deferred city events
   - stock industry news activation and 2-update duration
   - real-estate news 2-refresh duration
-- Last full test run passed 63 tests.
+- Last full test run passed 65 tests.
+
+## Economy Simulation
+
+- Run with `./gradlew economySimulation`.
+- Uses fixed seed `20260718` and 10,000 runs per strategy.
+- Generated report: `build/reports/economy-simulation.md`.
+- Reviewed report: `docs/content-design/ECONOMY_SIMULATION_REPORT.md`.
+- Current result: all strategies progress slower than the target ranges and do not unlock stocks within 240 months.
+- Secretary 1 base salary was reduced from 2,000,000 won to 500,000 won after cash-flow comparison.
+- Secretary 2 maximum salary remains an observation item; secretaries 3-6 remain unchanged.
 
 ## Known Tooling Notes
 
@@ -123,7 +133,7 @@
 
 ## Suggested Next Work
 
-- Decide whether stock industry boom/recession should be visible as an active badge/status on the stock screen.
-- Add QA button for stock industry event activation if manual testing is needed.
-- Consider splitting stock UI JS from `app.js` if stock UI grows further.
-- Consider adding portfolio detail per held stock if holding summary becomes too compact.
+- Adjust Cheongju and Sejong capital formation so the loan-growth strategy reaches Sejong in 12-30 months.
+- Rebalance repeat rental-management reputation and first-purchase milestone reputation.
+- Reduce the active trading strategy's trading-income share from 56.2% to at most 50%.
+- Re-run the same simulation seed before changing stock or company unlock conditions.

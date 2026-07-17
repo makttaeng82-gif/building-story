@@ -745,6 +745,38 @@ class BuildingStoryApplicationTests {
 	}
 
 	@Test
+	@Transactional
+	void sharedTickAdvancesDateOnceAndUpdatesDueStockPrices() {
+		Player player = playerRepository.save(new Player("shared-stock-tick-test", "hash"));
+		player.unlockStockContent();
+		player.scheduleNoMonthlyStockNews();
+		stockService.ensureMarketInitialized(player);
+		for (int i = 0; i < 4; i++) {
+			player.advanceDay();
+		}
+		int elapsedDaysBeforeTick = player.getElapsedDays();
+		long historyCountBeforeTick = stockPriceHistoryRepository.countByPlayer(player);
+
+		gameService.tick(player.getId(), true);
+
+		assertThat(player.getElapsedDays()).isEqualTo(elapsedDaysBeforeTick + 1);
+		assertThat(stockPriceHistoryRepository.countByPlayer(player))
+				.isEqualTo(historyCountBeforeTick + stockService.stocks().size());
+	}
+
+	@Test
+	@Transactional
+	void activeAuctionStopsTickBeforeDateAdvances() {
+		Player player = playerRepository.save(new Player("auction-tick-gate-test", "hash"));
+		AuctionEvent auction = auctionEventRepository.save(new AuctionEvent(
+				player, "청주", 1, "원룸", "경매 원룸", 100_000_000L, 300_000L, 10));
+		int elapsedDaysBeforeTick = player.getElapsedDays();
+
+		assertThat(gameService.tick(player.getId(), false)).isEqualTo("AUCTION:" + auction.getId());
+		assertThat(player.getElapsedDays()).isEqualTo(elapsedDaysBeforeTick);
+	}
+
+	@Test
 	void naturalKeyUniqueConstraintsAreCreated() {
 		Integer constraintCount = jdbcTemplate.queryForObject("""
 				SELECT COUNT(*)

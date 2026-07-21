@@ -42,7 +42,7 @@ const dayProgressText = document.querySelector("#dayProgressText");
 const auctionTimer = document.querySelector(".auction-timer[data-auction-seconds]");
 // 해설: DOM에서 특정 HTML 요소를 찾는다. 이후 텍스트, 클래스, 속성 등을 조작한다.
 const TICK_DURATION_MS = 5000;
-const STOCK_FEE_RATE = 0.005;
+const STOCK_FEE_RATE = 0.0025;
 const CASH_PER_COIN = 100;
 const SCROLL_RESTORE_KEY = "buildingStory.scrollY";
 const SELECTED_BUILDING_KEY = "buildingStory.selectedBuildingId";

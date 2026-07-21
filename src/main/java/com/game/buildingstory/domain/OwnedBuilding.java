@@ -9,6 +9,8 @@ import jakarta.persistence.ManyToOne;
 
 @Entity
 public class OwnedBuilding {
+    private static final int GOVERNMENT_SUPPORT_HOLDING_DAYS = 365;
+
     /*
      * 플레이어가 실제로 소유한 건물이다.
      *
@@ -29,6 +31,7 @@ public class OwnedBuilding {
     private Integer buildingSlot;
     private long marketPrice;
     private long purchasePrice;
+    private Long governmentSupportAmount;
     private long monthlyRent;
     private Integer purchaseDayCount;
     private Integer tradeCooldownDays;
@@ -49,7 +52,8 @@ public class OwnedBuilding {
         this.name = offer.getName();
         this.buildingSlot = offer.getBuildingSlot();
         this.marketPrice = offer.getMarketPrice();
-        this.purchasePrice = offer.getOfferPrice();
+        this.purchasePrice = offer.effectivePurchasePrice();
+        this.governmentSupportAmount = offer.governmentSupportAmount();
         this.monthlyRent = offer.getMonthlyRent();
         this.purchaseDayCount = player.getElapsedDays();
         this.tradeCooldownDays = offer.getTradeCooldownDays();
@@ -60,10 +64,14 @@ public class OwnedBuilding {
     }
 
     public OwnedBuilding(Player player, String city, String typeName, String name, long marketPrice, long purchasePrice, long monthlyRent, int tradeCooldownDays) {
-        this(player, city, null, typeName, name, marketPrice, purchasePrice, monthlyRent, tradeCooldownDays);
+        this(player, city, null, typeName, name, marketPrice, purchasePrice, monthlyRent, tradeCooldownDays, 0L);
     }
 
     public OwnedBuilding(Player player, String city, Integer buildingSlot, String typeName, String name, long marketPrice, long purchasePrice, long monthlyRent, int tradeCooldownDays) {
+        this(player, city, buildingSlot, typeName, name, marketPrice, purchasePrice, monthlyRent, tradeCooldownDays, 0L);
+    }
+
+    public OwnedBuilding(Player player, String city, Integer buildingSlot, String typeName, String name, long marketPrice, long purchasePrice, long monthlyRent, int tradeCooldownDays, long governmentSupportAmount) {
         this.player = player;
         this.city = city;
         this.buildingSlot = buildingSlot;
@@ -71,6 +79,7 @@ public class OwnedBuilding {
         this.name = name;
         this.marketPrice = marketPrice;
         this.purchasePrice = purchasePrice;
+        this.governmentSupportAmount = governmentSupportAmount;
         this.monthlyRent = monthlyRent;
         this.purchaseDayCount = player.getElapsedDays();
         this.tradeCooldownDays = tradeCooldownDays;
@@ -110,6 +119,22 @@ public class OwnedBuilding {
 
     public long getPurchasePrice() {
         return purchasePrice;
+    }
+
+    public long getGovernmentSupportAmount() {
+        return governmentSupportAmount == null ? 0L : governmentSupportAmount;
+    }
+
+    public int governmentSupportClawbackDaysLeft(int currentDayCount) {
+        if (getGovernmentSupportAmount() == 0L) {
+            return 0;
+        }
+        int purchaseDay = getPurchaseDayCountForCalculation(currentDayCount);
+        return Math.max(0, purchaseDay + GOVERNMENT_SUPPORT_HOLDING_DAYS - currentDayCount);
+    }
+
+    public long governmentSupportClawback(int currentDayCount) {
+        return governmentSupportClawbackDaysLeft(currentDayCount) > 0 ? getGovernmentSupportAmount() : 0L;
     }
 
     public long getMonthlyRent() {

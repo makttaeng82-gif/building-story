@@ -42,3 +42,15 @@ tasks.register('economySimulation', JavaExec) {
 		args project.property('iterations')
 	}
 }
+
+tasks.register('stockPriceSimulation', JavaExec) {
+	group = 'verification'
+	description = 'Runs the fixed-seed long-term stock price simulation and writes a Markdown report.'
+	dependsOn testClasses
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.game.buildingstory.simulation.StockPriceLongTermSimulationRunner'
+	jvmArgs '-Dfile.encoding=UTF-8'
+	if (project.hasProperty('seeds') || project.hasProperty('years')) {
+		args project.findProperty('seeds') ?: '500', project.findProperty('years') ?: '10'
+	}
+}

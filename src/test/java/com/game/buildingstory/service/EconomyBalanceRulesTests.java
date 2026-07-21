@@ -18,14 +18,14 @@ class EconomyBalanceRulesTests {
 
         assertThat(buildings).hasSize(24);
         assertThat(buildings.getFirst().marketPrice()).isEqualTo(30_000_000L);
-        assertThat(buildings.getLast().marketPrice()).isEqualTo(450_000_000_000L);
+        assertThat(buildings.getLast().marketPrice()).isEqualTo(220_000_000_000L);
 
         long previousPrice = 0L;
         double previousYield = Double.MAX_VALUE;
         for (BuildingSpec building : buildings) {
             double grossYieldPercent = building.monthlyRent() * 12.0 * 100.0 / building.marketPrice();
             assertThat(building.marketPrice()).isGreaterThan(previousPrice);
-            assertThat(grossYieldPercent).isBetween(6.49, 10.01);
+            assertThat(grossYieldPercent).isBetween(9.99, 15.01);
             assertThat(grossYieldPercent).isLessThanOrEqualTo(previousYield + 0.01);
             previousPrice = building.marketPrice();
             previousYield = grossYieldPercent;
@@ -49,7 +49,7 @@ class EconomyBalanceRulesTests {
     }
 
     @Test
-    void transactionCostsKeepBestValuationRoundTripBelowElevenPercent() {
+    void transactionCostsKeepBestValuationRoundTripBelowTwentyPercent() {
         long marketPrice = 100_000_000L;
         long buyPrice = marketPrice * ValuationStatus.UNDER.rate() / 100;
         long buyTotal = buyPrice + EconomyBalanceRules.purchaseFee(buyPrice);
@@ -57,7 +57,7 @@ class EconomyBalanceRulesTests {
         long sellPayout = sellPrice - EconomyBalanceRules.sellFee(sellPrice);
         double profitRate = (sellPayout - buyTotal) * 100.0 / buyTotal;
 
-        assertThat(profitRate).isPositive().isLessThan(11.0);
+        assertThat(profitRate).isPositive().isLessThan(20.0);
     }
 
     @Test
@@ -69,13 +69,15 @@ class EconomyBalanceRulesTests {
     }
 
     @Test
-    void maximumSecretaryPayrollStaysBelowTwoHundredMillionWon() {
+    void everySecretaryHasSameMaximumSalary() {
         SecretaryCatalog catalog = new SecretaryCatalog();
         long maximumPayroll = catalog.all().stream()
                 .mapToLong(secretary -> secretary.monthlySalaryForProficiency(30))
                 .sum();
 
-        assertThat(maximumPayroll).isEqualTo(192_325_000L);
+        assertThat(maximumPayroll).isEqualTo(105_000_000L);
+        assertThat(catalog.all()).allSatisfy(secretary ->
+                assertThat(secretary.monthlySalaryForProficiency(30)).isEqualTo(17_500_000L));
     }
 
     @Test

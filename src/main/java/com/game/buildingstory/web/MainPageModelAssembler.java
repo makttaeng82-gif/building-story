@@ -6,6 +6,8 @@ import com.game.buildingstory.service.GameService;
 import org.springframework.stereotype.Component;
 import org.springframework.ui.Model;
 
+import java.util.List;
+
 @Component
 public class MainPageModelAssembler {
     /*
@@ -19,7 +21,13 @@ public class MainPageModelAssembler {
         this.gameService = gameService;
     }
 
-    public void addMainPageAttributes(long playerId, Player player, Model model) {
+    public void addMainPageAttributes(
+            long playerId,
+            Player player,
+            Model model,
+            String viewMode,
+            String requestedStockKey
+    ) {
         // 화면 렌더링 전에 필요한 상태를 먼저 준비한다. 예: 매물이 없으면 생성, 주식 unlock 예약, 비서 이벤트 평가.
         gameService.ensureOffers(player);
         gameService.ensureStockUnlockSchedule(player);
@@ -42,17 +50,31 @@ public class MainPageModelAssembler {
         model.addAttribute("stockSpecs", gameService.stockSpecs());
         model.addAttribute("stockContentUnlocked", gameService.stockContentUnlocked(player));
         model.addAttribute("stockContentStatus", gameService.stockContentStatusText(player));
-        // 주식 화면이 아니어도 모델은 준비한다. 내비게이션과 우측 요약이 같은 모델을 참조하기 때문이다.
-        gameService.ensureStockMarketInitialized(player);
-        model.addAttribute("stockQuotes", gameService.stockQuotes(player));
-        model.addAttribute("stockMarketStatus", gameService.stockMarketStatus(player));
-        model.addAttribute("stockTradeHistories", gameService.stockTradeHistories(player));
-        model.addAttribute("stockHoldingSummary", gameService.stockHoldingSummary(player));
+        if ("stocks".equals(viewMode)) {
+            gameService.ensureStockMarketInitialized(player);
+            var stockQuotes = gameService.stockListQuotes(player);
+            String selectedStockKey = stockQuotes.stream()
+                    .map(quote -> quote.stock().key())
+                    .filter(key -> key.equals(requestedStockKey))
+                    .findFirst()
+                    .orElseGet(() -> stockQuotes.get(0).stock().key());
+            model.addAttribute("stockQuotes", stockQuotes);
+            model.addAttribute("selectedStockKey", selectedStockKey);
+            model.addAttribute("selectedStockQuote", gameService.selectedStockQuote(player, selectedStockKey));
+            model.addAttribute("stockRisingCount", stockQuotes.stream().filter(quote -> quote.changePercent() > 0).count());
+            model.addAttribute("stockFallingCount", stockQuotes.stream().filter(quote -> quote.changePercent() < 0).count());
+            model.addAttribute("stockFlatCount", stockQuotes.stream().filter(quote -> quote.changePercent() == 0).count());
+            model.addAttribute("stockMarketStatus", gameService.stockMarketStatus(player));
+            model.addAttribute("stockNewsArticles", gameService.stockNewsArticles(player));
+            model.addAttribute("stockTradeHistories", gameService.stockTradeHistories(player));
+            model.addAttribute("stockHoldingSummary", gameService.stockHoldingSummary(player, stockQuotes));
+        } else {
+            model.addAttribute("stockQuotes", List.of());
+        }
         model.addAttribute("cities", gameService.cities());
         model.addAttribute("cityUnlocks", gameService.cityUnlocks(player));
         model.addAttribute("repairCountsByCity", gameService.repairRequestCountsByCity(player));
         model.addAttribute("loanPrincipal", loans.stream().mapToLong(Loan::getPrincipal).sum());
-        model.addAttribute("loanRepaymentTotal", loans.stream().mapToLong(Loan::remainingRepayment).sum());
         model.addAttribute("loanMonthlyPayment", loans.stream().mapToLong(Loan::getMonthlyPayment).sum());
         model.addAttribute("loanRemainingRepayment", gameService.remainingLoanRepayment(player));
         model.addAttribute("loanLimit", gameService.loanLimit(player));

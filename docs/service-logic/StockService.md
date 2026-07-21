@@ -12,7 +12,7 @@
 - 주식 개방 이벤트 생성
 - 종목 초기 가격 생성
 - 5일마다 가격 갱신
-- 현금/코인 교환
+- 개인 현금/증권계좌 예수금 입출금
 - 매수/매도
 - 보유요약 계산
 - 거래내역 조회
@@ -28,32 +28,33 @@ private static final int UPDATE_INTERVAL_DAYS = 5;
 주가 갱신 주기다. `elapsedDays` 기준으로 5일마다 갱신된다.
 
 ```java
-private static final int CASH_PER_COIN = 100;
+private static final long STOCK_UNLOCK_NET_WORTH = 3_000_000_000L;
+private static final int STOCK_UNLOCK_REPUTATION = 8_250;
 ```
 
-현금 100원 = 1코인.
+주식 기본 기능은 순자산 30억원과 평판 8,250을 함께 충족해야 개방 예약된다. 평판 8,250은 부산 4단계 해금값이다.
 
 ```java
-private static final double TRADE_FEE_RATE = 0.005;
+private static final double TRADE_FEE_RATE = 0.0025;
 ```
 
-거래 수수료 0.5%.
+거래 수수료 0.25%.
 
 ## 주요 메서드
 
 ### `ensureUnlockSchedule(Player player)`
 
-서울 해금 조건을 만족하면 주식 개방일을 예약한다.
+부산 후반부의 평판과 순자산 조건을 만족하면 주식 개방일을 예약한다.
 
 ```java
-if (reputationCatalog.isCityUnlocked("서울", player.getReputation(), !player.isEmployed())) {
+if (player.getReputation() >= STOCK_UNLOCK_REPUTATION && netWorth(player) >= STOCK_UNLOCK_NET_WORTH) {
     player.scheduleStockUnlock(player.getElapsedDays() + 2);
 }
 ```
 
 원리:
 
-- 서울이 열리면 바로 주식이 열리지 않는다.
+- 두 조건을 충족해도 바로 주식이 열리지는 않는다.
 - 현재 elapsedDays + 2일에 개방되도록 예약한다.
 
 ### `activateUnlockNoticeIfDue(Player player)`
@@ -234,4 +235,3 @@ int openY = (int) Math.round(priceY(row.getOpenPrice(), scale));
 - `OwnedStock`은 보유 수량/평균단가만 저장한다.
 - 현재가는 `StockPriceHistory`에서 가져온다.
 - 거래내역은 `StockTradeHistory`에 별도로 저장한다.
-

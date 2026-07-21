@@ -34,11 +34,41 @@ public class StockPriceHistory {
     private long lowPrice;
     private long closePrice;
     private long volume;
+    private Integer marketImpactBasisPoints;
+    private Integer industryImpactBasisPoints;
+    private Integer companyImpactBasisPoints;
+    private Integer earningsImpactBasisPoints;
+    private Integer valuationImpactBasisPoints;
+    private Integer trendImpactBasisPoints;
+    private Integer idiosyncraticImpactBasisPoints;
+    private Integer noiseImpactBasisPoints;
+    private Integer pathImpactBasisPoints;
 
     protected StockPriceHistory() {
     }
 
     public StockPriceHistory(Player player, String stockKey, long openPrice, long highPrice, long lowPrice, long closePrice, long volume) {
+        this(player, stockKey, openPrice, highPrice, lowPrice, closePrice, volume, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    public StockPriceHistory(
+            Player player,
+            String stockKey,
+            long openPrice,
+            long highPrice,
+            long lowPrice,
+            long closePrice,
+            long volume,
+            int marketImpactBasisPoints,
+            int industryImpactBasisPoints,
+            int companyImpactBasisPoints,
+            int earningsImpactBasisPoints,
+            int valuationImpactBasisPoints,
+            int trendImpactBasisPoints,
+            int idiosyncraticImpactBasisPoints,
+            int noiseImpactBasisPoints,
+            int pathImpactBasisPoints
+    ) {
         this.player = player;
         this.stockKey = stockKey;
         this.month = player.getMonth();
@@ -49,6 +79,47 @@ public class StockPriceHistory {
         this.lowPrice = lowPrice;
         this.closePrice = closePrice;
         this.volume = volume;
+        this.marketImpactBasisPoints = marketImpactBasisPoints;
+        this.industryImpactBasisPoints = industryImpactBasisPoints;
+        this.companyImpactBasisPoints = companyImpactBasisPoints;
+        this.earningsImpactBasisPoints = earningsImpactBasisPoints;
+        this.valuationImpactBasisPoints = valuationImpactBasisPoints;
+        this.trendImpactBasisPoints = trendImpactBasisPoints;
+        this.idiosyncraticImpactBasisPoints = idiosyncraticImpactBasisPoints;
+        this.noiseImpactBasisPoints = noiseImpactBasisPoints;
+        this.pathImpactBasisPoints = pathImpactBasisPoints;
+    }
+
+    /**
+     * 주식시장 개방 전에 존재했던 과거 캔들을 만든다.
+     * 플레이어의 현재 날짜를 바꾸지 않기 위해 기록 날짜와 경과일을 명시적으로 받는다.
+     */
+    public static StockPriceHistory historical(
+            Player player,
+            String stockKey,
+            int month,
+            int day,
+            int elapsedDays,
+            long openPrice,
+            long highPrice,
+            long lowPrice,
+            long closePrice,
+            long volume,
+            int marketImpactBasisPoints,
+            int industryImpactBasisPoints,
+            int idiosyncraticImpactBasisPoints,
+            int noiseImpactBasisPoints,
+            int pathImpactBasisPoints
+    ) {
+        StockPriceHistory history = new StockPriceHistory(
+                player, stockKey, openPrice, highPrice, lowPrice, closePrice, volume,
+                marketImpactBasisPoints, industryImpactBasisPoints, 0, 0, 0, 0,
+                idiosyncraticImpactBasisPoints, noiseImpactBasisPoints, pathImpactBasisPoints
+        );
+        history.month = month;
+        history.day = day;
+        history.elapsedDays = elapsedDays;
+        return history;
     }
 
     public Long getId() {
@@ -93,5 +164,37 @@ public class StockPriceHistory {
 
     public long getVolume() {
         return volume;
+    }
+
+    public int getMarketImpactBasisPoints() { return marketImpactBasisPoints == null ? 0 : marketImpactBasisPoints; }
+    public int getIndustryImpactBasisPoints() { return industryImpactBasisPoints == null ? 0 : industryImpactBasisPoints; }
+    public int getCompanyImpactBasisPoints() { return companyImpactBasisPoints == null ? 0 : companyImpactBasisPoints; }
+    public int getEarningsImpactBasisPoints() { return earningsImpactBasisPoints == null ? 0 : earningsImpactBasisPoints; }
+    public int getValuationImpactBasisPoints() { return valuationImpactBasisPoints == null ? 0 : valuationImpactBasisPoints; }
+    public int getTrendImpactBasisPoints() { return trendImpactBasisPoints == null ? 0 : trendImpactBasisPoints; }
+    public int getIdiosyncraticImpactBasisPoints() { return idiosyncraticImpactBasisPoints == null ? 0 : idiosyncraticImpactBasisPoints; }
+    public int getNoiseImpactBasisPoints() { return noiseImpactBasisPoints == null ? 0 : noiseImpactBasisPoints; }
+    public int getPathImpactBasisPoints() { return pathImpactBasisPoints == null ? 0 : pathImpactBasisPoints; }
+
+    /** 체결 직후 현재 캔들의 종가와 고가·저가를 함께 보정한다. 갱신일은 바꾸지 않는다. */
+    public void applyTradePrice(long tradedPrice) {
+        if (tradedPrice <= 0) {
+            throw new IllegalArgumentException("체결 가격은 1원 이상이어야 합니다.");
+        }
+        closePrice = tradedPrice;
+        highPrice = Math.max(highPrice, tradedPrice);
+        lowPrice = Math.min(lowPrice, tradedPrice);
+    }
+
+    /** 배당금만큼 기업가치가 빠지는 배당락을 현재 캔들 가격에 반영한다. */
+    public void applyDividendExDate(long dividendPerShare) {
+        if (dividendPerShare <= 0) {
+            return;
+        }
+        long adjusted = Math.max(1L, closePrice - dividendPerShare);
+        closePrice = adjusted;
+        openPrice = Math.max(1L, openPrice - dividendPerShare);
+        highPrice = Math.max(adjusted, highPrice - dividendPerShare);
+        lowPrice = Math.max(1L, lowPrice - dividendPerShare);
     }
 }

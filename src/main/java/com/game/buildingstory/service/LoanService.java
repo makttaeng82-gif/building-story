@@ -127,13 +127,14 @@ public class LoanService {
             return "담보 처분 보류";
         }
         long forcedSalePrice = cityMarketIndexService.marketValue(player, building) * 90 / 100;
-        long payout = Math.max(0L, forcedSalePrice - loan.getPrincipal());
+        long governmentSupportClawback = building.governmentSupportClawback(player.getElapsedDays());
+        long payout = Math.max(0L, forcedSalePrice - loan.getPrincipal() - governmentSupportClawback);
         if (payout > 0) {
             player.addCash(payout);
         }
         loanRepository.delete(loan);
         ownedBuildingRepository.delete(building);
-        saveRecord(player, RecordType.BUILDING_SELL, "담보 강제매각", payout, 0, building.getName(), "감정가 90% · 대출원금 우선상환");
+        saveRecord(player, RecordType.BUILDING_SELL, "담보 강제매각", payout, 0, building.getName(), "감정가 90% · 대출원금 우선상환 · 정부지원 환수 " + governmentSupportClawback + "원");
         return building.getName() + " 담보 강제매각";
     }
 

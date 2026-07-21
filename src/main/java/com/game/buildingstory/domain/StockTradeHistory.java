@@ -31,6 +31,9 @@ public class StockTradeHistory {
     private long grossAmount;
     private long fee;
     private long netAmount;
+    private Long costBasis;
+    private Long realizedProfit;
+    private Integer priceImpactBasisPoints;
     @Column(name = "record_month")
     private int month;
     @Column(name = "record_day")
@@ -40,7 +43,15 @@ public class StockTradeHistory {
     protected StockTradeHistory() {
     }
 
-    public StockTradeHistory(Player player, String stockKey, String stockName, String tradeType, long quantity, long price, long grossAmount, long fee, long netAmount) {
+    public StockTradeHistory(Player player, String stockKey, String stockName, String tradeType, long quantity, long price,
+                             long grossAmount, long fee, long netAmount, long costBasis, long realizedProfit) {
+        this(player, stockKey, stockName, tradeType, quantity, price, grossAmount, fee, netAmount,
+                costBasis, realizedProfit, 0);
+    }
+
+    public StockTradeHistory(Player player, String stockKey, String stockName, String tradeType, long quantity, long price,
+                             long grossAmount, long fee, long netAmount, long costBasis, long realizedProfit,
+                             int priceImpactBasisPoints) {
         this.player = player;
         this.stockKey = stockKey;
         this.stockName = stockName;
@@ -50,6 +61,9 @@ public class StockTradeHistory {
         this.grossAmount = grossAmount;
         this.fee = fee;
         this.netAmount = netAmount;
+        this.costBasis = costBasis;
+        this.realizedProfit = realizedProfit;
+        this.priceImpactBasisPoints = priceImpactBasisPoints;
         this.month = player.getMonth();
         this.day = player.getDay();
         this.elapsedDays = player.getElapsedDays();
@@ -71,6 +85,10 @@ public class StockTradeHistory {
         return quantity;
     }
 
+    public int getPriceImpactBasisPoints() {
+        return priceImpactBasisPoints == null ? 0 : priceImpactBasisPoints;
+    }
+
     public long getPrice() {
         return price;
     }
@@ -81,6 +99,14 @@ public class StockTradeHistory {
 
     public long getNetAmount() {
         return netAmount;
+    }
+
+    public long getCostBasis() {
+        return costBasis == null ? 0 : costBasis;
+    }
+
+    public long getRealizedProfit() {
+        return realizedProfit == null ? 0 : realizedProfit;
     }
 
     public int getMonth() {

@@ -99,6 +99,35 @@ public class AuctionEvent {
         return buildingSlot;
     }
 
+    public boolean isGovernmentSupportEligible() {
+        return isGovernmentSupportEligible(player);
+    }
+
+    public boolean isGovernmentSupportEligible(Player supportPlayer) {
+        return supportPlayer.canUseGovernmentPurchaseSupport(city);
+    }
+
+    public int governmentSupportPercent() {
+        return governmentSupportPercent(player);
+    }
+
+    public int governmentSupportPercent(Player supportPlayer) {
+        return isGovernmentSupportEligible(supportPlayer)
+                ? EconomyBalanceRules.governmentPurchaseSupportPercent(city)
+                : 0;
+    }
+
+    public long effectiveBidPrice(int rate) {
+        return effectiveBidPrice(rate, player);
+    }
+
+    public long effectiveBidPrice(int rate, Player supportPlayer) {
+        long price = bidPrice(rate);
+        return isGovernmentSupportEligible(supportPlayer)
+                ? EconomyBalanceRules.governmentSupportedPrice(price, city)
+                : price;
+    }
+
     public long getMarketPrice() {
         return marketPrice;
     }
@@ -140,7 +169,11 @@ public class AuctionEvent {
     }
 
     public long totalPurchasePrice(int rate) {
-        long price = bidPrice(rate);
+        return totalPurchasePrice(rate, player);
+    }
+
+    public long totalPurchasePrice(int rate, Player supportPlayer) {
+        long price = effectiveBidPrice(rate, supportPlayer);
         return price + EconomyBalanceRules.purchaseFee(price);
     }
 

@@ -9,6 +9,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
+import java.math.BigInteger;
+
 @Entity
 @Table(name = "owned_stock", uniqueConstraints =
         @UniqueConstraint(name = "uk_owned_stock_player_key", columnNames = {"player_id", "stock_key"}))
@@ -29,6 +31,7 @@ public class OwnedStock {
     private String stockKey;
     private long quantity;
     private long averagePrice;
+    private Long totalCostBasis;
 
     protected OwnedStock() {
     }
@@ -38,6 +41,7 @@ public class OwnedStock {
         this.stockKey = stockKey;
         this.quantity = 0;
         this.averagePrice = 0;
+        this.totalCostBasis = 0L;
     }
 
     public Long getId() {
@@ -60,27 +64,42 @@ public class OwnedStock {
         return averagePrice;
     }
 
-    public void buy(long buyQuantity, long price) {
-        // 새 평균단가는 기존 원가 총액과 신규 매수 원가를 합친 뒤 전체 수량으로 나눈 값이다.
+    public long getTotalCostBasis() {
+        // 기존 저장 데이터에는 이 컬럼이 없었으므로 평균단가로 원가를 복원한다.
+        if (totalCostBasis == null || (totalCostBasis == 0 && quantity > 0)) {
+            return Math.multiplyExact(averagePrice, quantity);
+        }
+        return totalCostBasis;
+    }
+
+    public void buy(long buyQuantity, long purchaseCost) {
+        // purchaseCost에는 매수금액과 수수료가 모두 포함된다.
         if (buyQuantity <= 0) {
             return;
         }
-        long previousCostBasis = Math.multiplyExact(averagePrice, quantity);
-        long newCostBasis = Math.multiplyExact(price, buyQuantity);
-        long totalCostBasis = Math.addExact(previousCostBasis, newCostBasis);
+        totalCostBasis = Math.addExact(getTotalCostBasis(), purchaseCost);
         quantity = Math.addExact(quantity, buyQuantity);
         averagePrice = totalCostBasis / quantity;
     }
 
-    public boolean sell(long sellQuantity) {
-        // 일부 매도는 평균단가를 유지한다. 전량 매도하면 다음 매수를 새 원가로 시작해야 하므로 평균단가를 0으로 초기화한다.
+    public long sell(long sellQuantity) {
+        // 일부 매도 원가는 현재 총취득원가에서 매도 수량 비율만큼 배분한다.
         if (sellQuantity <= 0 || quantity < sellQuantity) {
-            return false;
+            return -1;
         }
+        long currentCostBasis = getTotalCostBasis();
+        long soldCostBasis = BigInteger.valueOf(currentCostBasis)
+                .multiply(BigInteger.valueOf(sellQuantity))
+                .divide(BigInteger.valueOf(quantity))
+                .longValueExact();
         quantity -= sellQuantity;
         if (quantity == 0) {
             averagePrice = 0;
+            totalCostBasis = 0L;
+        } else {
+            totalCostBasis = currentCostBasis - soldCostBasis;
+            averagePrice = totalCostBasis / quantity;
         }
-        return true;
+        return soldCostBasis;
     }
 }

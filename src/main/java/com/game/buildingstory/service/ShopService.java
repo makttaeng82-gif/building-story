@@ -89,17 +89,18 @@ public class ShopService {
             case 10, 100, 1000 -> multiplier;
             default -> 1;
         };
-        long amount = 50_000L * safeMultiplier;
+        long amount = 300_000L * safeMultiplier;
         if (!player.spendCash(amount)) {
             return "기부금 부족 · 필요 금액 " + amount + "원";
         }
-        long previousDonation = player.getCumulativeDonation();
         player.addDonation(amount);
-        int reputationGain = donationMilestoneReward(previousDonation, player.getCumulativeDonation());
+        int reputationGain = Math.toIntExact(amount / 300_000L);
         player.addReputation(reputationGain);
         refreshTitle(player);
-        saveRecord(player, RecordType.DONATION, "기부", -amount, reputationGain, null, "누적 기부 " + player.getCumulativeDonation() + "원");
-        return reputationGain > 0 ? "기부 완료 · 누적 이정표 평판 +" + reputationGain : "기부 완료 · 다음 누적 이정표까지 반영";
+        // 최근 기록에는 이번 거래의 금액과 평판 변화만 남긴다.
+        // 계속 변하는 누적 기부액은 기부 패널에서 현재값을 직접 보여 준다.
+        saveRecord(player, RecordType.DONATION, "기부", -amount, reputationGain, null, null);
+        return "기부 완료 · 평판 +" + reputationGain;
     }
 
     public String buyLuxuryItem(long playerId, String itemKey) {
@@ -118,7 +119,7 @@ public class ShopService {
         player.addReputation(reputationGain);
         refreshTitle(player);
         ownedLuxuryItemRepository.save(new OwnedLuxuryItem(player, item.key()));
-        saveRecord(player, RecordType.BUILDING_BUY, "사치품 구매", -item.price(), reputationGain, item.name(), "고정 평판 보상 · 1회 구매");
+        saveRecord(player, RecordType.BUILDING_BUY, "사치품 구매", -item.price(), reputationGain, item.name(), "30만원당 평판 1.5 · 소수점 버림 · 1회 구매");
         return item.name() + " 구매 완료 · 평판 +" + reputationGain;
     }
 
@@ -195,18 +196,6 @@ public class ShopService {
 
     private int requiredAffinityExperience(int affinity) {
         return affinity >= 30 ? 0 : affinity + 2;
-    }
-
-    private int donationMilestoneReward(long previousDonation, long currentDonation) {
-        long[] thresholds = {1_000_000L, 10_000_000L, 100_000_000L, 1_000_000_000L, 10_000_000_000L};
-        int[] rewards = {20, 100, 500, 2_000, 6_000};
-        int reward = 0;
-        for (int i = 0; i < thresholds.length; i++) {
-            if (previousDonation < thresholds[i] && currentDonation >= thresholds[i]) {
-                reward += rewards[i];
-            }
-        }
-        return reward;
     }
 
     private String pausedActionMessage() {

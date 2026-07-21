@@ -27,9 +27,6 @@ public class DailyStockProcessor implements DailyGameProcessor {
             return activeEventSignal(context);
         }
         stockService.processPriceUpdates(context.player());
-        if (stockService.activateIndustryNewsIfDue(context.player())) {
-            return activeEventSignal(context);
-        }
         return DailyProcessResult.continueWithoutNotice();
     }
 

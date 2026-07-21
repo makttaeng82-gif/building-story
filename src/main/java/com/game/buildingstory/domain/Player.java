@@ -39,7 +39,9 @@ public class Player {
     private String title = "첫 건물주";
     private Long cumulativeDonation = 0L;
     private String rewardedBuildingMilestones = "";
-    private Integer economyVersion = 3;
+    // 정부지원 대상 도시에서 최초 유상 취득 지원을 이미 사용한 도시를 |도시| 형식으로 저장한다.
+    private String governmentSupportedCities = "";
+    private Integer economyVersion = 7;
     // 퇴사 전에는 월급을 받지만, 일부 평판 조건에는 고용 상태가 반대로 작동한다.
     private Boolean employed = true;
     private Boolean firstSecretaryHired = false;
@@ -82,7 +84,7 @@ public class Player {
     private String activeMarketNewsCity;
     private String activeMarketNewsTrend;
     private Integer activeMarketNewsRefreshesLeft = 0;
-    // 서울 진출 후 바로 주식이 열리지 않고, 지정된 elapsedDays에 주식 개방 이벤트가 뜬다.
+    // 부산 후반부의 평판·순자산 조건 달성 후, 지정된 elapsedDays에 주식 개방 이벤트가 뜬다.
     private Integer stockUnlockAvailableDay;
     private Boolean stockContentUnlocked = false;
     private Boolean stockUnlockNoticeShown = false;
@@ -167,6 +169,7 @@ public class Player {
         this.reputation = 0;
         this.cumulativeDonation = 0L;
         this.rewardedBuildingMilestones = "";
+        this.governmentSupportedCities = "";
     }
 
     public void advanceDay() {
@@ -342,6 +345,24 @@ public class Player {
             return false;
         }
         rewardedBuildingMilestones = claimed + milestone;
+        return true;
+    }
+
+    public boolean canUseGovernmentPurchaseSupport(String city) {
+        if (EconomyBalanceRules.governmentPurchaseSupportPercent(city) == 0) {
+            return false;
+        }
+        String supportKey = "|" + city + "|";
+        String usedCities = governmentSupportedCities == null ? "" : governmentSupportedCities;
+        return !usedCities.contains(supportKey);
+    }
+
+    public boolean claimGovernmentPurchaseSupport(String city) {
+        if (!canUseGovernmentPurchaseSupport(city)) {
+            return false;
+        }
+        governmentSupportedCities = (governmentSupportedCities == null ? "" : governmentSupportedCities)
+                + "|" + city + "|";
         return true;
     }
 

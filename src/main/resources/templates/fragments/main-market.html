@@ -28,13 +28,18 @@
     </div>
     <div class="market-list">
         <article class="market-card" th:each="offer : ${offers}"
-                 th:with="offerUnlocked=${@gameService.isOfferUnlocked(player, offer)}, purchaseCooldown=${@gameService.purchaseCooldownDaysLeft(player, offer)}, purchaseWaiting=${purchaseCooldown > 0}"
+                 th:with="offerUnlocked=${@gameService.isOfferUnlocked(player, offer)}, purchaseCooldown=${@gameService.purchaseCooldownDaysLeft(player, offer)}, purchaseWaiting=${purchaseCooldown > 0}, governmentSupported=${offer.isGovernmentSupportEligible(player)}"
                  th:classappend="${!offerUnlocked} ? ' locked-offer' : (${purchaseWaiting} ? ' waiting-offer' : (${offer.valuationStatus.name() == 'UNDER'} ? ' low' : (${offer.valuationStatus.name() == 'OVER'} ? ' high' : ' normal')))">
             <img class="market-image" th:src="${@gameService.buildingImagePath(offer)}" th:alt="${offer.name} + ' 이미지'">
             <span class="badge" th:classappend="${offer.valuationStatus.name() == 'UNDER'} ? ' good' : (${offer.valuationStatus.name() == 'OVER'} ? ' danger' : '')" th:text="${offer.valuationStatus.label()} + ' ' + ${offer.valuationStatus.rate()} + '%'">상태</span>
+            <span class="badge good" th:if="${governmentSupported}" th:text="'정부지원 ' + ${offer.governmentSupportPercent(player)} + '%'">정부지원</span>
             <h3 th:text="${offer.name}">매물명</h3>
             <p th:text="'시장가 ' + ${@moneyText.format(offer.marketPrice)}">시장가</p>
-            <strong class="money" th:text="${@moneyText.format(offer.offerPrice)}">가격</strong>
+            <div class="market-price-row">
+                <strong class="money" th:text="${@moneyText.format(offer.effectivePurchasePrice(player))}">가격</strong>
+                <small th:text="'(부대비용 ' + ${@moneyText.format(offer.purchaseFee(player))} + ')'">(부대비용)</small>
+            </div>
+            <small th:if="${governmentSupported}" th:text="'기존 매물가 ' + ${@moneyText.format(offer.offerPrice)} + ' · 정부지원 ' + ${@moneyText.format(offer.governmentSupportAmount(player))} + ' · 1년 내 매각 시 지원금 환수'">정부지원</small>
             <small th:text="'월세 ' + ${@moneyText.format(offer.monthlyRent)} + ' · 판매쿨타임 ' + ${offer.tradeCooldownDays} + '일'">월세</small>
             <small th:if="${!offerUnlocked}">해금 전 · 구매 불가</small>
             <small th:if="${purchaseCooldown > 0}" th:text="'구매쿨타임 ' + ${player.ddayText(purchaseCooldown)}">구매쿨타임</small>
@@ -50,14 +55,14 @@
             <div class="buy-actions">
                 <form method="post" th:action="@{/offers/{id}/buy(id=${offer.id})}">
                     <input type="hidden" name="mode" value="cash">
-                    <button type="submit" th:disabled="${player.paused || !offerUnlocked || purchaseWaiting || player.cash < offer.offerPrice}" th:text="${player.paused ? '일시정지' : (!offerUnlocked ? '해금 전' : (purchaseWaiting ? '쿨타임' : (player.cash < offer.offerPrice ? '현금부족' : '현금구매')))}">현금구매</button>
+                    <button type="submit" th:disabled="${player.paused || !offerUnlocked || purchaseWaiting || player.cash < offer.cashForPurchase(player)}" th:text="${player.paused ? '일시정지' : (!offerUnlocked ? '해금 전' : (purchaseWaiting ? '쿨타임' : (player.cash < offer.cashForPurchase(player) ? '현금부족' : '현금구매')))}">현금구매</button>
                 </form>
                 <form method="post" th:action="@{/offers/{id}/buy(id=${offer.id})}">
                     <input type="hidden" name="mode" value="loan">
-                    <button class="secondary" type="submit" th:disabled="${player.paused || !offerUnlocked || purchaseWaiting || player.cash < offer.cashForLoanPurchase() || availableLoanLimit < offer.loanAmount()}" th:text="${player.paused ? '일시정지' : (!offerUnlocked ? '해금 전' : (purchaseWaiting ? '쿨타임' : (player.cash < offer.cashForLoanPurchase() ? '현금부족' : (availableLoanLimit < offer.loanAmount() ? '한도초과' : '대출구매'))))}">대출구매</button>
+                    <button class="secondary" type="submit" th:disabled="${player.paused || !offerUnlocked || purchaseWaiting || player.cash < offer.cashForLoanPurchase(player) || availableLoanLimit < offer.loanAmount(player)}" th:text="${player.paused ? '일시정지' : (!offerUnlocked ? '해금 전' : (purchaseWaiting ? '쿨타임' : (player.cash < offer.cashForLoanPurchase(player) ? '현금부족' : (availableLoanLimit < offer.loanAmount(player) ? '한도초과' : '대출구매'))))}">대출구매</button>
                 </form>
             </div>
-            <small th:text="'대출구매: 대출 ' + ${@moneyText.format(offer.loanAmount())} + ' · 현금 ' + ${@moneyText.format(offer.cashForLoanPurchase())}">대출구매</small>
+            <small th:text="'대출구매: 대출 ' + ${@moneyText.format(offer.loanAmount(player))} + ' · 현금 ' + ${@moneyText.format(offer.cashForLoanPurchase(player))}">대출구매</small>
         </article>
     </div>
 </section>

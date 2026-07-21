@@ -3,6 +3,8 @@ package com.game.buildingstory.repo;
 import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.StockTradeHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -15,4 +17,13 @@ public interface StockTradeHistoryRepository extends JpaRepository<StockTradeHis
     List<StockTradeHistory> findTop12ByPlayerOrderByElapsedDaysDescIdDesc(Player player);
 
     List<StockTradeHistory> findByPlayerAndElapsedDaysGreaterThanEqualOrderByElapsedDaysDescIdDesc(Player player, int elapsedDays);
+
+    @Query("select coalesce(sum(history.realizedProfit), 0) from StockTradeHistory history where history.player = :player")
+    Long sumRealizedProfitByPlayer(@Param("player") Player player);
+
+    @Query("select coalesce(sum(history.fee), 0) from StockTradeHistory history where history.player = :player")
+    Long sumFeeByPlayer(@Param("player") Player player);
+
+    @Query("select coalesce(sum(history.netAmount), 0) from StockTradeHistory history where history.player = :player and history.tradeType = '배당'")
+    Long sumDividendIncomeByPlayer(@Param("player") Player player);
 }

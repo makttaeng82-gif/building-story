@@ -1,180 +1,264 @@
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
-<section th:fragment="stockPanel" class="panel city-panel stock-panel"
-         th:attr="data-player-cash=${player.cash},data-securities-cash=${player.securitiesCash}">
-    <!--
-    주식 화면 fragment다.
-    서버가 stockQuotes, stockMarketStatus, stockTradeHistories를 미리 계산해 넘기고,
-    app.js는 선택 탭, 수량 버튼, 계좌 입출금 미리보기 같은 상호작용만 담당한다.
-    -->
-    <div class="section-head">
-        <div>
-            <h2>주식</h2>
-            <p>회사 선택 후 주가 확인 · 주가는 5일마다 갱신</p>
-            <span th:if="${stockMarketStatus.hasActiveNews()}"
-                  class="stock-news-status"
-                  th:classappend="${stockMarketStatus.activeNewsDirection()}"
-                  th:text="${stockMarketStatus.activeNewsText()}">업종 이벤트 적용중</span>
-        </div>
-        <div class="refresh-progress-card" aria-label="다음 날 진행률">
-            <span>주가 갱신</span>
-            <strong th:text="${stockMarketStatus.nextUpdateDateText()} + ' · D-' + ${stockMarketStatus.daysUntilNextUpdate()}">다음 갱신</strong>
-            <div class="refresh-progress">
-                <span id="stockDayProgress" th:style="'width:' + ${stockMarketStatus.progressPercent()} + '%'"></span>
-            </div>
-            <small>5일마다 갱신</small>
-        </div>
-    </div>
-
-    <div class="stock-app">
-        <!-- 왼쪽 목록은 모든 종목 버튼을 렌더링하고, JS가 전체/내종목 필터에 따라 hidden을 토글한다. -->
+<section th:fragment="stockPanel" class="stock-panel"
+         th:attr="data-player-cash=${player.cash},data-securities-cash=${player.securitiesCash},data-selected-stock-key=${selectedStockKey}">
+    <div class="stock-workspace">
         <aside class="stock-sidebar">
-            <div class="stock-filter-tabs" role="tablist" aria-label="종목 필터">
-                <button type="button" class="active" data-stock-filter="all">전체종목</button>
-                <button type="button" data-stock-filter="owned">내종목</button>
+            <div class="stock-universe-head">
+                <h2>종목 탐색</h2>
+                <label class="stock-search">
+                    <span aria-hidden="true">⌕</span>
+                    <input type="search" data-stock-search placeholder="기업명 검색" autocomplete="off">
+                </label>
             </div>
-            <p class="stock-empty-message" hidden>보유중인 종목 없음</p>
+            <div class="stock-filter-tabs" role="tablist" aria-label="종목 필터">
+                <button type="button" class="active" data-stock-filter="all">전체</button>
+                <button type="button" data-stock-filter="owned">보유</button>
+                <button type="button" data-stock-filter="watched">관심</button>
+            </div>
+            <div class="stock-list-heading" aria-hidden="true">
+                <span>종목</span><span>시가총액</span><span>등락</span>
+            </div>
+            <p class="stock-empty-message" hidden>조건에 맞는 종목 없음</p>
             <div class="stock-company-list">
-            <button th:each="quote : ${stockQuotes}" th:with="stock=${quote.stock()}" type="button" class="stock-company-button"
-                    th:classappend="${quoteStat.index == 0} ? ' selected'"
-                    th:attr="data-stock-key=${stock.key()},data-owned-quantity=${quote.quantity()}">
-                <span th:text="${stock.industry()}">업계</span>
-                <em th:classappend="${quote.changeDirection()}"
-                    th:text="${quote.changePercentText()}">0%</em>
-                <strong th:text="${stock.name()}">회사</strong>
-                <small>현재 <b th:text="${quote.currentPriceText()}">0원</b></small>
-                <small>전일 <b th:text="${quote.previousPriceText()}">0원</b></small>
-            </button>
+                <div th:each="quote : ${stockQuotes}" th:with="stock=${quote.stock()}" class="stock-company-row"
+                     th:attr="data-stock-row=${stock.key()},data-stock-name=${stock.name()},data-owned-quantity=${quote.quantity()}">
+                    <button class="stock-watch-button" type="button" data-stock-watch
+                            th:attr="data-stock-watch-key=${stock.key()},aria-label=${stock.name()} + ' 관심종목 추가'">☆</button>
+                    <button type="button" class="stock-company-button"
+                            th:classappend="${stock.key() == selectedStockKey} ? ' selected'"
+                            th:attr="data-stock-key=${stock.key()}">
+                        <span class="stock-list-name">
+                            <strong th:text="${stock.name()}">회사</strong>
+                            <small th:text="${stock.industry()}">업종</small>
+                        </span>
+                        <b th:text="${quote.marketCapText()}">0원</b>
+                        <em th:classappend="${quote.changeDirection()}" th:text="${quote.changePercentText()}">0%</em>
+                    </button>
+                </div>
             </div>
         </aside>
+
         <section class="stock-detail-list">
-            <!-- 각 종목 상세는 모두 HTML에 존재한다. 선택된 종목 하나만 .active 클래스로 보이게 한다. -->
-            <article th:each="quote : ${stockQuotes}" th:with="stock=${quote.stock()}" class="stock-detail"
-                     th:classappend="${quoteStat.index == 0} ? ' active'"
-                     th:attr="data-stock-detail=${stock.key()},data-stock-price=${quote.currentPrice()},data-owned-quantity=${quote.quantity()}">
-                <div class="stock-detail-head">
-                    <div>
-                        <span class="badge" th:text="${stock.industry()}">업계</span>
-                        <h3 th:text="${stock.name()}">회사명</h3>
-                        <strong class="stock-price" th:text="${quote.currentPriceText()}">현재가</strong>
+            <article th:with="quote=${selectedStockQuote},stock=${quote.stock()}" class="stock-detail active"
+                     th:attr="data-stock-detail=${stock.key()}">
+                <header class="stock-detail-head">
+                    <div class="stock-company-identity">
+                        <span th:text="${stock.industry()} + ' · ' + ${stock.riskType().label()} + ' · β ' + ${stock.betaText()}">업종 · 위험도 · β 1.00</span>
+                        <h2 th:text="${stock.name()}">회사명</h2>
+                        <p th:text="${stock.description()}">회사 설명</p>
+                    </div>
+                    <div class="stock-quote-heading">
+                        <strong th:text="${quote.currentPriceText()}">현재가</strong>
+                        <span th:class="${quote.changeDirection()}"
+                              th:text="${quote.changePercentText()} + ' · ' + ${quote.changeAmountText()}">0%</span>
+                    </div>
+                </header>
+
+                <div class="stock-chart-toolbar">
+                    <div><strong>주가 흐름</strong><span data-chart-range-label>최근 73개 · 5일봉</span></div>
+                    <div class="stock-chart-controls">
+                        <div class="stock-chart-toggles" aria-label="차트 표시 항목">
+                            <button type="button" class="active" data-chart-toggle="events" aria-pressed="true">사건</button>
+                            <button type="button" data-chart-toggle="fair" aria-pressed="false">적정가치</button>
+                            <button type="button" data-chart-toggle="index" aria-pressed="false">시장 비교</button>
+                            <button type="button" data-chart-toggle="average" aria-pressed="false">이동평균</button>
+                        </div>
+                        <div class="stock-period-tabs" aria-label="차트 기간">
+                            <button type="button" data-chart-period="18">3개월</button>
+                            <button type="button" class="active" data-chart-period="73">1년</button>
+                            <button type="button" data-chart-period="219">3년</button>
+                            <button type="button" data-chart-period="all">전체</button>
+                        </div>
                     </div>
                 </div>
-                <div class="stock-chart-shell">
-                    <!-- 캔들 차트는 StockService가 계산한 SVG 좌표를 사용한다. 브라우저 차트 라이브러리가 필요 없다. -->
+                <div class="stock-chart-shell" data-stock-chart
+                     th:attr="data-fair-low=${quote.fairValueLower()},data-fair-high=${quote.fairValueUpper()}">
                     <svg class="stock-candle-chart" viewBox="0 0 860 300" preserveAspectRatio="none" aria-label="주가 차트">
-                        <line class="chart-grid-line" x1="20" y1="24" x2="700" y2="24"></line>
-                        <line class="chart-grid-line" x1="20" y1="91" x2="700" y2="91"></line>
-                        <line class="chart-grid-line" x1="20" y1="158" x2="700" y2="158"></line>
-                        <line class="chart-grid-line" x1="20" y1="226" x2="700" y2="226"></line>
-                        <g th:each="candle : ${quote.candles()}" th:classappend="${candle.rising()} ? ' candle-up' : ' candle-down'">
+                        <g class="chart-grid-layer"></g>
+                        <rect class="chart-fair-value-band" x="20" width="680" hidden></rect>
+                        <polyline class="chart-index-line" points="" hidden></polyline>
+                        <polyline class="chart-average-line chart-average-short" points="" hidden></polyline>
+                        <polyline class="chart-average-line chart-average-long" points="" hidden></polyline>
+                        <g th:each="candle : ${quote.candles()}" class="chart-candle"
+                           th:classappend="(${candle.rising()} ? ' candle-up' : ' candle-down') + (${candle.visible()} ? '' : ' chart-candle-hidden')"
+                           th:attr="data-elapsed-days=${candle.elapsedDays()},data-date=${candle.dateText()},data-open=${candle.openPrice()},data-high=${candle.highPrice()},data-low=${candle.lowPrice()},data-close=${candle.closePrice()},data-open-text=${candle.openPriceText()},data-high-text=${candle.highPriceText()},data-low-text=${candle.lowPriceText()},data-close-text=${candle.closePriceText()},data-change-text=${candle.changePercentText()},data-factor-text=${candle.factorText()},data-index=${candle.marketIndexBasisPoints()},data-news-id=${candle.newsArticleId()},data-news-title=${candle.newsTitle()},data-news-count=${candle.newsCount()},data-earnings=${candle.earningsEvent()},data-dividend=${candle.dividendEvent()}">
                             <line class="candle-wick"
                                   th:attr="x1=${candle.x()},x2=${candle.x()},y1=${candle.highY()},y2=${candle.lowY()}"></line>
                             <rect class="candle-body" width="7"
                                   th:attr="x=${candle.x() - 3},y=${candle.bodyY()},height=${candle.bodyHeight()}"></rect>
                         </g>
+                        <g class="chart-event-layer"></g>
                         <line class="current-price-line" x1="20" x2="700"
                               th:attr="y1=${quote.currentPriceY()},y2=${quote.currentPriceY()}"></line>
+                        <line class="chart-extreme-line chart-high-line" x1="20" x2="700"></line>
+                        <line class="chart-extreme-line chart-low-line" x1="20" x2="700"></line>
+                        <line class="chart-crosshair chart-crosshair-x" x1="20" x2="700" hidden></line>
+                        <line class="chart-crosshair chart-crosshair-y" y1="24" y2="244" hidden></line>
+                        <g class="chart-axis-layer"></g>
+                        <g class="chart-date-axis-layer"></g>
+                        <g class="chart-extreme-axis-label chart-high-axis-label">
+                            <rect x="704" width="146" height="16" rx="2"></rect>
+                            <text x="710"></text>
+                        </g>
+                        <g class="chart-extreme-axis-label chart-low-axis-label">
+                            <rect x="704" width="146" height="16" rx="2"></rect>
+                            <text x="710"></text>
+                        </g>
+                        <text class="chart-fair-indicator chart-fair-upper" x="28" y="38" hidden></text>
+                        <text class="chart-fair-indicator chart-fair-lower" x="28" y="238" hidden></text>
                         <text class="chart-price-label" x="710" th:attr="y=${quote.currentPriceY()}" th:text="${quote.currentChartPriceText()}">0원</text>
-                        <text class="chart-axis-label" x="710" y="28" th:text="${quote.maxPriceText()}">최고가</text>
-                        <text class="chart-axis-label" x="710" y="230" th:text="${quote.minPriceText()}">최저가</text>
+                        <rect class="chart-crosshair-price-bg" x="704" width="146" height="16" rx="2" hidden></rect>
+                        <text class="chart-crosshair-label chart-crosshair-price" x="710" hidden></text>
+                        <text class="chart-crosshair-label chart-crosshair-date" y="274" text-anchor="middle" hidden></text>
                     </svg>
+                    <div class="stock-chart-legend" data-chart-legend hidden>
+                        <span class="fair" data-chart-legend-fair hidden></span>
+                        <span class="index" data-chart-legend-index hidden></span>
+                        <span class="average-short" data-chart-legend-short hidden></span>
+                        <span class="average-long" data-chart-legend-long hidden></span>
+                    </div>
+                    <div class="stock-chart-inspector" data-chart-inspector>
+                        <div><strong data-chart-date>날짜</strong><span data-chart-change>0%</span></div>
+                        <dl>
+                            <div><dt>시가</dt><dd data-chart-open>0원</dd></div>
+                            <div><dt>고가</dt><dd data-chart-high>0원</dd></div>
+                            <div><dt>저가</dt><dd data-chart-low>0원</dd></div>
+                            <div><dt>종가</dt><dd data-chart-close>0원</dd></div>
+                        </dl>
+                        <p data-chart-factors>시장 0% · 업종 0% · 실적 0% · 가치 0% · 기타 0%</p>
+                        <button type="button" data-chart-news-open hidden>연결 뉴스 보기</button>
+                    </div>
                 </div>
-                <dl class="stock-summary-grid">
-                    <div>
-                        <dt>현재가</dt>
-                        <dd th:text="${quote.currentPriceText()}">가격</dd>
-                    </div>
-                    <div>
-                        <dt>직전가</dt>
-                        <dd th:text="${quote.previousPriceText()}">가격</dd>
-                    </div>
-                    <div>
-                        <dt>5일 변동</dt>
-                        <dd th:class="${quote.changeDirection()}" th:text="${quote.changePercentText()} + ' · ' + ${quote.changeAmountText()}">0%</dd>
-                    </div>
-                    <div>
-                        <dt>보유수량</dt>
-                        <dd th:text="${quote.quantity()} + '주'">0주</dd>
-                    </div>
-                    <div>
-                        <dt>평균단가</dt>
-                        <dd th:text="${quote.averagePriceText()}">0원</dd>
-                    </div>
-                    <div>
-                        <dt>평가손익</dt>
-                        <dd th:text="${quote.valuationProfitText()}">0원</dd>
-                    </div>
+
+                <dl class="stock-company-metrics">
+                    <div><dt>시가총액</dt><dd th:text="${quote.marketCapText()}">0원</dd></div>
+                    <div><dt>적정가</dt><dd><span th:text="${quote.fairValueRangeText()}">산정 전</span> <em th:class="${quote.valuationDirection()}" th:text="${quote.valuationStatusText()}">적정</em></dd></div>
+                    <div><dt>최근 변동</dt><dd th:class="${quote.changeDirection()}" th:text="${quote.changePercentText()}">0%</dd></div>
+                    <div><dt>내 지분</dt><dd th:text="${quote.ownershipPercentText()}">0%</dd></div>
+                    <div><dt>예상배당금</dt><dd th:text="${quote.expectedDividendText()}">0원</dd></div>
                 </dl>
-                <div class="stock-trade-panel">
-                    <!-- 매수/매도 form은 서버 POST가 최종 검증을 한다. JS 미리보기는 사용자 편의를 위한 보조 계산이다. -->
-                    <form class="stock-order-form" data-stock-buy-form method="post" th:action="@{/stocks/{key}/buy(key=${stock.key()})}">
-                        <label>
-                            매수 수량
-                            <input type="number" name="quantity" min="1" value="1">
-                        </label>
-                        <div class="stock-quick-buttons" aria-label="매수 수량 빠른 선택">
-                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="1">+1</button>
-                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="10">+10</button>
-                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="100">+100</button>
-                            <button class="secondary" type="button" data-quantity-action="half">50%</button>
-                            <button class="secondary" type="button" data-quantity-action="max">최대</button>
+
+                <section class="stock-company-news stock-financial-summary">
+                    <div class="stock-company-news-head">
+                        <h3 th:text="${quote.financialPeriodText()}">분기 실적</h3>
+                        <span th:text="${quote.nextEarningsText()}">실적 발표 D-90</span>
+                    </div>
+                    <dl class="stock-financial-metrics">
+                        <div><dt>분기 매출</dt><dd th:text="${quote.quarterlyRevenueText()}">0원</dd></div>
+                        <div><dt>영업이익</dt><dd th:text="${quote.operatingProfitText()}">공시 전</dd></div>
+                        <div><dt>순이익</dt><dd th:class="${quote.financialDirection()}" th:text="${quote.netIncomeText()}">0원</dd></div>
+                        <div><dt>예상 대비</dt><dd th:class="${quote.earningsSurpriseDirection()}" th:text="${quote.earningsSurpriseText()}">기준 전망</dd></div>
+                        <div><dt>주당배당</dt><dd th:text="${quote.dividendPerShareText()}">지급 전</dd></div>
+                    </dl>
+                </section>
+
+                <section class="stock-company-insight" aria-label="기업 상세 정보">
+                    <div class="stock-company-overview-block">
+                        <header><span>COMPANY</span><h3>기업 개요</h3></header>
+                        <dl class="stock-company-profile-grid">
+                            <div><dt>대표</dt><dd th:text="${quote.companyDetail().chiefExecutive()}">대표자</dd></div>
+                            <div><dt>설립</dt><dd th:text="${quote.companyDetail().foundedText()}">0년차</dd></div>
+                            <div><dt>본사</dt><dd th:text="${quote.companyDetail().headquarters()}">도시</dd></div>
+                            <div class="wide"><dt>주요 사업</dt><dd th:text="${quote.companyDetail().mainBusiness()}">주요 사업</dd></div>
+                        </dl>
+                        <dl class="stock-investment-core">
+                            <div><dt>주요 수익원</dt><dd th:text="${quote.companyDetail().mainRevenueSource()}">수익원</dd></div>
+                            <div><dt>경기 민감도</dt><dd th:text="${quote.companyDetail().cyclicality()}">중간</dd></div>
+                            <div><dt>핵심 위험</dt><dd th:text="${quote.companyDetail().keyRisk()}">위험 요인</dd></div>
+                        </dl>
+                    </div>
+
+                    <div class="stock-quarter-history-block">
+                        <header><span>EARNINGS</span><h3>최근 4분기</h3></header>
+                        <div class="stock-quarter-table" th:if="${!quote.companyDetail().recentQuarters().isEmpty()}">
+                            <div class="stock-quarter-row stock-quarter-header" aria-hidden="true">
+                                <span>분기</span><span>매출</span><span>영업이익</span><span>순이익</span><span>예상 대비</span>
+                            </div>
+                            <div class="stock-quarter-row" th:each="quarter : ${quote.companyDetail().recentQuarters()}">
+                                <strong th:text="${quarter.periodText()}">1년 1분기</strong>
+                                <span th:text="${quarter.revenueText()}">0원</span>
+                                <span th:text="${quarter.operatingProfitText()}">0원</span>
+                                <span th:text="${quarter.netIncomeText()}">0원</span>
+                                <span th:class="${quarter.surpriseDirection()}" th:text="${quarter.surpriseText()}">0%</span>
+                            </div>
                         </div>
-                        <div class="stock-order-preview" data-stock-buy-preview>예상 비용 계산중</div>
-                        <button type="submit">매수</button>
-                    </form>
-                    <form class="stock-order-form" data-stock-sell-form method="post" th:action="@{/stocks/{key}/sell(key=${stock.key()})}">
-                        <label>
-                            매도 수량
-                            <input type="number" name="quantity" min="1" value="1">
-                        </label>
-                        <div class="stock-quick-buttons" aria-label="매도 수량 빠른 선택">
-                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="1">+1</button>
-                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="10">+10</button>
-                            <button class="secondary" type="button" data-quantity-action="plus" data-quantity-value="100">+100</button>
-                            <button class="secondary" type="button" data-quantity-action="half">50%</button>
-                            <button class="secondary" type="button" data-quantity-action="max">최대</button>
-                        </div>
-                        <div class="stock-order-preview" data-stock-sell-preview>예상 수령 계산중</div>
-                        <button class="secondary" type="submit" th:disabled="${quote.quantity() <= 0}">매도</button>
-                    </form>
-                </div>
+                        <p class="stock-company-detail-empty" th:if="${quote.companyDetail().recentQuarters().isEmpty()}">확정된 분기 실적 없음</p>
+                    </div>
+
+                    <div class="stock-company-finance-block">
+                        <header>
+                            <div><span>FINANCIALS</span><h3>재무·가치평가</h3></div>
+                            <em th:class="${quote.companyDetail().financialHealthDirection()}"
+                                th:text="${quote.companyDetail().financialHealthText()}">안정</em>
+                        </header>
+                        <dl class="stock-company-finance-grid">
+                            <div><dt>현금</dt><dd th:text="${quote.companyDetail().cashText()}">0원</dd></div>
+                            <div><dt>부채</dt><dd th:text="${quote.companyDetail().debtText()}">0원</dd></div>
+                            <div><dt>순자산</dt><dd th:text="${quote.companyDetail().netAssetsText()}">0원</dd></div>
+                            <div><dt>부채비율</dt><dd th:text="${quote.companyDetail().debtRatioText()}">0%</dd></div>
+                            <div><dt>EPS</dt><dd th:text="${quote.companyDetail().earningsPerShareText()}">0원</dd></div>
+                            <div><dt>BPS</dt><dd th:text="${quote.companyDetail().bookValuePerShareText()}">0원</dd></div>
+                            <div><dt>PER</dt><dd th:text="${quote.companyDetail().priceEarningsRatioText()}">0배</dd></div>
+                            <div><dt>PBR</dt><dd th:text="${quote.companyDetail().priceBookRatioText()}">0배</dd></div>
+                            <div><dt>배당성향</dt><dd th:text="${quote.dividendPayoutRatioText()}">0%</dd></div>
+                            <div><dt>최근 주당배당</dt><dd th:text="${quote.dividendPerShareText()}">지급 전</dd></div>
+                            <div><dt>예상 주당배당</dt><dd th:text="${quote.expectedDividendPerShareText()}">무배당 예상</dd></div>
+                            <div><dt>내 예상배당금</dt><dd th:text="${quote.expectedDividendText()}">0원</dd></div>
+                        </dl>
+                    </div>
+                </section>
             </article>
         </section>
     </div>
+
     <div class="stock-bottom-grid">
-        <article class="stock-exchange-panel">
-            <h3>증권계좌</h3>
-            <p>개인 현금과 예수금은 같은 원 단위입니다.</p>
-            <form data-stock-exchange-form data-exchange-type="deposit" method="post" action="/stocks/account/deposit">
-                <label>
-                    입금액
-                    <input type="number" name="amount" min="1" value="10000000">
-                </label>
-                <div class="stock-exchange-quick-buttons" aria-label="입금액 빠른 선택">
-                    <button class="secondary" type="button" data-exchange-action="max">전액</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="10000000">1천만</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="100000000">1억</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="1000000000">10억</button>
+        <article class="stock-portfolio-panel">
+            <div class="stock-panel-heading"><h3>보유종목</h3><span th:text="${stockHoldingSummary.holdingCount()} + '개 종목'">0개 종목</span></div>
+            <div class="stock-holdings-table" th:if="${stockHoldingSummary.holdingCount() > 0}">
+                <div class="stock-holdings-row stock-holdings-header" aria-hidden="true">
+                    <span>종목</span><span>수량</span><span>평가손익</span><span>평가금액</span>
                 </div>
-                <div class="stock-order-preview" data-exchange-preview>입금액 계산중</div>
-                <button type="submit">입금</button>
-            </form>
-            <form data-stock-exchange-form data-exchange-type="withdraw" method="post" action="/stocks/account/withdraw">
-                <label>
-                    출금액
-                    <input type="number" name="amount" min="1" value="10000000">
-                </label>
-                <div class="stock-exchange-quick-buttons" aria-label="출금액 빠른 선택">
-                    <button class="secondary" type="button" data-exchange-action="max">전액</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="10000000">1천만</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="100000000">1억</button>
-                    <button class="secondary" type="button" data-exchange-action="set" data-exchange-value="1000000000">10억</button>
-                </div>
-                <div class="stock-order-preview" data-exchange-preview>출금액 계산중</div>
-                <button class="secondary" type="submit">출금</button>
-            </form>
+                <button th:each="quote : ${stockQuotes}" th:if="${quote.quantity() > 0}" type="button"
+                        class="stock-holdings-row" th:attr="data-stock-holding-key=${quote.stock().key()}">
+                    <strong th:text="${quote.stock().name()}">종목</strong>
+                    <span th:text="${quote.quantity()} + '주'">0주</span>
+                    <span th:class="${quote.valuationProfit() > 0 ? 'up' : (quote.valuationProfit() < 0 ? 'down' : 'flat')}"
+                          th:text="${quote.valuationProfitText()}">0원</span>
+                    <span th:text="${quote.valuationText()}">0원</span>
+                </button>
+            </div>
+            <p class="stock-section-empty" th:if="${stockHoldingSummary.holdingCount() == 0}">보유중인 종목 없음</p>
         </article>
+
+        <article class="stock-news-panel" data-stock-news-panel>
+            <div class="stock-news-panel-head">
+                <div><span>MARKET BRIEF</span><h3>시장 뉴스</h3></div>
+                <span th:text="${stockNewsArticles.size()} + '건'">0건</span>
+            </div>
+            <div class="stock-news-filter-tabs" role="tablist" aria-label="뉴스 유형 필터">
+                <button type="button" class="active" data-stock-news-filter="all">전체</button>
+                <button type="button" data-stock-news-filter="market">시장</button>
+                <button type="button" data-stock-news-filter="industry">업종</button>
+                <button type="button" data-stock-news-filter="company">기업</button>
+                <button type="button" data-stock-news-filter="ipo">IPO</button>
+            </div>
+            <div class="stock-market-news-list">
+                <button th:each="article : ${stockNewsArticles}" type="button" class="stock-market-news-item"
+                        th:classappend="${article.unread()} ? ' unread'"
+                        th:attr="data-stock-news-category=${article.category()},data-stock-news-open=${article.id()},data-stock-news-read-url=@{/stocks/news/{id}/read(id=${article.id()})}">
+                    <span th:class="'stock-news-kind ' + ${article.category()}" th:text="${article.categoryText()}">업종</span>
+                    <span class="stock-news-copy">
+                        <strong><span class="stock-news-new" th:if="${article.unread()}">NEW</span><span th:text="${article.title()}">뉴스 제목</span></strong>
+                        <small th:text="${article.source()} + ' · ' + ${article.scopeText()}">출처 · 범위</small>
+                    </span>
+                    <time th:text="${article.dateText()}">오늘</time>
+                </button>
+            </div>
+            <p class="stock-news-empty" th:hidden="${!stockNewsArticles.isEmpty()}">아직 발행된 시장 뉴스가 없습니다.</p>
+        </article>
+
         <article class="stock-history-panel" data-stock-history-panel>
             <div class="stock-history-head">
                 <h3>거래내역</h3>
@@ -182,27 +266,183 @@
                     <button type="button" class="active" data-trade-filter="all">전체</button>
                     <button type="button" data-trade-filter="매수">매수</button>
                     <button type="button" data-trade-filter="매도">매도</button>
+                    <button type="button" data-trade-filter="배당">배당</button>
                 </div>
-                <label>
-                    종목별
-                    <select data-trade-stock-filter>
-                        <option value="all">전체 종목</option>
-                        <option th:each="stock : ${stockSpecs}" th:value="${stock.key()}" th:text="${stock.name()}">종목</option>
-                    </select>
-                </label>
+                <label><span class="sr-only">종목별</span><select data-trade-stock-filter>
+                    <option value="all">전체 종목</option>
+                    <option th:each="stock : ${stockSpecs}" th:value="${stock.key()}" th:text="${stock.name()}">종목</option>
+                </select></label>
             </div>
+            <div class="stock-trade-history-head" aria-hidden="true"><span>일자</span><span>구분</span><span>종목</span><span>수량</span><span>거래금액</span></div>
             <ul class="stock-trade-history" th:if="${!stockTradeHistories.isEmpty()}">
                 <li th:each="trade : ${stockTradeHistories}"
                     th:attr="data-trade-type=${trade.tradeType},data-trade-stock-key=${trade.stockKey}">
                     <b th:text="${trade.month} + '월 ' + ${trade.day} + '일'">날짜</b>
-                    <span th:text="${trade.tradeType} + ' · ' + ${trade.stockName} + ' ' + ${trade.quantity} + '주'">거래</span>
-                    <small th:text="'단가 ' + ${@gameService.stockMoneyText(trade.price)} + ' · 수수료 ' + ${@gameService.stockMoneyText(trade.fee)} + ' · ' + ${@gameService.stockMoneyText(trade.netAmount)}">금액</small>
+                    <span th:class="${trade.tradeType == '매도' ? 'down' : 'up'}" th:text="${trade.tradeType}">구분</span>
+                    <strong th:text="${trade.stockName}">종목</strong>
+                    <span th:text="${trade.quantity} + '주'">수량</span>
+                    <span class="stock-trade-amount">
+                        <strong th:text="${@gameService.stockMoneyText(trade.netAmount)}">금액</strong>
+                        <small th:if="${trade.tradeType == '매수'}"
+                               th:text="'수수료 ' + ${@gameService.stockMoneyText(trade.fee)}">수수료</small>
+                        <small th:if="${trade.tradeType == '매도'}">
+                            <em th:class="${trade.realizedProfit > 0 ? 'up' : (trade.realizedProfit < 0 ? 'down' : 'flat')}"
+                                th:text="'실현 ' + ${@gameService.stockSignedMoneyText(trade.realizedProfit)}">실현손익</em>
+                            <i th:text="' · 수수료 ' + ${@gameService.stockMoneyText(trade.fee)}">수수료</i>
+                        </small>
+                        <small th:if="${trade.tradeType == '배당'}"
+                               th:text="'주당 ' + ${@gameService.stockMoneyText(trade.price)}">주당배당</small>
+                        <small th:if="${trade.tradeType != '배당' && trade.priceImpactBasisPoints != 0}"
+                               th:text="'가격 영향 ' + ${trade.priceImpactBasisPoints > 0 ? '+' : ''} + ${#numbers.formatDecimal(trade.priceImpactBasisPoints / 100.0, 1, 2)} + '%'">가격 영향</small>
+                    </span>
                 </li>
             </ul>
             <p class="stock-trade-empty-message" hidden>조건에 맞는 거래내역 없음</p>
-            <p th:if="${stockTradeHistories.isEmpty()}">거래내역 없음</p>
+            <p class="stock-section-empty" th:if="${stockTradeHistories.isEmpty()}">거래내역 없음</p>
         </article>
     </div>
+
+    <dialog class="stock-news-dialog" data-stock-news-dialog>
+        <div class="stock-news-dialog-head">
+            <div><span>MARKET NEWS</span><h2>뉴스 상세</h2></div>
+            <div class="stock-news-dialog-actions"><span>Ⅱ 일시정지</span><button class="stock-dialog-close" type="button" data-stock-news-close aria-label="닫기">×</button></div>
+        </div>
+        <article th:each="article : ${stockNewsArticles}" class="stock-news-detail"
+                 th:attr="data-stock-news-detail=${article.id()}" hidden>
+            <div class="stock-news-detail-meta">
+                <span th:class="'stock-news-kind ' + ${article.category()}" th:text="${article.categoryText()}">업종</span>
+                <span th:text="${article.dateText()}">오늘</span>
+                <span th:text="${article.source()}">출처</span>
+            </div>
+            <h3 th:text="${article.title()}">뉴스 제목</h3>
+            <p th:text="${article.firstParagraph()}">첫 번째 문단</p>
+            <p th:text="${article.secondParagraph()}">두 번째 문단</p>
+            <dl>
+                <div><dt>관련 범위</dt><dd th:text="${article.scopeText()}">범위</dd></div>
+                <div><dt>확인 상태</dt><dd th:text="${article.certaintyText()}">확정</dd></div>
+                <div><dt>시장 반영</dt><dd th:class="${article.directionClass()}" th:text="${article.effectText()}">반영 상태</dd></div>
+            </dl>
+        </article>
+        <div class="stock-news-dialog-footer"><button type="button" data-stock-news-close>닫기</button></div>
+    </dialog>
+
+    <dialog class="stock-account-dialog" data-stock-account-dialog>
+        <div class="stock-account-dialog-head">
+            <div><span>SECURITIES ACCOUNT</span><h2>증권계좌 입출금</h2></div>
+            <button class="stock-dialog-close" type="button" data-stock-account-close aria-label="닫기">×</button>
+        </div>
+        <div class="stock-account-pause-notice"><strong>Ⅱ</strong><span>입출금 창을 닫을 때까지 게임 시간이 정지됩니다.</span></div>
+        <div class="stock-account-balances">
+            <div><span>개인자금</span><strong id="stockDialogCash" th:text="${@moneyText.format(player.cash)}">0원</strong></div>
+            <div><span>증권 예수금</span><strong id="stockDialogSecuritiesCash" th:text="${@moneyText.format(player.securitiesCash)}">0원</strong></div>
+        </div>
+        <div class="stock-exchange-tabs" role="tablist" aria-label="입출금 유형">
+            <button type="button" class="active" data-stock-exchange-tab="deposit">입금</button>
+            <button type="button" data-stock-exchange-tab="withdraw">출금</button>
+        </div>
+        <div class="stock-exchange-panel">
+            <form class="active" data-stock-exchange-form data-exchange-type="deposit" method="post" action="/stocks/account/deposit">
+                <label>이체 금액<input type="number" name="amount" min="1" value="1000000000"></label>
+                <div class="stock-exchange-quick-buttons" aria-label="입금액 빠른 선택">
+                    <button type="button" data-exchange-action="set" data-exchange-value="10000000">1천만</button>
+                    <button type="button" data-exchange-action="set" data-exchange-value="100000000">1억</button>
+                    <button class="active" type="button" data-exchange-action="set" data-exchange-value="1000000000">10억</button>
+                    <button type="button" data-exchange-action="set" data-exchange-value="10000000000">100억</button>
+                    <button type="button" data-exchange-action="max">전액</button>
+                </div>
+                <div class="stock-order-preview" data-exchange-preview>입금액 계산중</div>
+                <button type="submit">입금</button>
+            </form>
+            <form data-stock-exchange-form data-exchange-type="withdraw" method="post" action="/stocks/account/withdraw">
+                <label>이체 금액<input type="number" name="amount" min="1" value="1000000000"></label>
+                <div class="stock-exchange-quick-buttons" aria-label="출금액 빠른 선택">
+                    <button type="button" data-exchange-action="set" data-exchange-value="10000000">1천만</button>
+                    <button type="button" data-exchange-action="set" data-exchange-value="100000000">1억</button>
+                    <button class="active" type="button" data-exchange-action="set" data-exchange-value="1000000000">10억</button>
+                    <button type="button" data-exchange-action="set" data-exchange-value="10000000000">100억</button>
+                    <button type="button" data-exchange-action="max">전액</button>
+                </div>
+                <div class="stock-order-preview" data-exchange-preview>출금액 계산중</div>
+                <button type="submit">출금</button>
+            </form>
+        </div>
+    </dialog>
 </section>
+
+<aside th:fragment="stockSidePanel" class="stock-record-panel">
+    <section class="stock-holding-summary">
+        <div class="stock-panel-heading">
+            <div><span>MY PORTFOLIO</span><h2>투자현황</h2></div>
+            <button class="stock-account-open" type="button" data-stock-account-open>입출금</button>
+        </div>
+        <dl class="stock-summary-primary">
+            <div><dt>예수금</dt><dd id="stockRailSecuritiesCash" th:text="${@moneyText.format(player.securitiesCash)}">0원</dd></div>
+            <div><dt>평가금액</dt><dd th:text="${stockHoldingSummary.totalValuationText()}">0원</dd></div>
+            <div><dt>평가손익</dt><dd th:class="${stockHoldingSummary.profitDirection()}" th:text="${stockHoldingSummary.totalProfitText()}">0원</dd></div>
+        </dl>
+        <details class="stock-summary-more">
+            <summary><span>더보기</span></summary>
+            <dl>
+                <div><dt>실현손익</dt><dd th:class="${stockHoldingSummary.realizedProfitDirection()}" th:text="${stockHoldingSummary.totalRealizedProfitText()}">0원</dd></div>
+                <div><dt>누적배당</dt><dd class="up" th:text="${stockHoldingSummary.totalDividendIncomeText()}">0원</dd></div>
+                <div><dt>누적수수료</dt><dd th:text="${stockHoldingSummary.totalFeesText()}">0원</dd></div>
+            </dl>
+        </details>
+    </section>
+
+    <section class="stock-side-order-list">
+        <article th:with="quote=${selectedStockQuote},stock=${quote.stock()}" class="stock-side-detail active"
+                 th:attr="data-stock-side-detail=${stock.key()},data-stock-order-context=${stock.key()},data-stock-price=${quote.currentPrice()},data-owned-quantity=${quote.quantity()},data-market-buy-limit=${quote.maxAffordableBuyQuantity()},data-market-sell-limit=${quote.availableSellQuantity()}">
+            <header class="stock-side-detail-head">
+                <div><span th:text="${stock.industry()}">업종</span><h3 th:text="${stock.name()}">회사</h3></div>
+                <strong th:text="${quote.currentPriceText()}">0원</strong>
+            </header>
+            <dl class="stock-position-summary">
+                <div><dt>보유수량</dt><dd th:text="${quote.quantity()} + '주'">0주</dd></div>
+                <div><dt>평균단가</dt><dd th:text="${quote.averagePriceText()}">0원</dd></div>
+                <div><dt>평가손익</dt><dd th:class="${quote.valuationProfit() > 0 ? 'up' : (quote.valuationProfit() < 0 ? 'down' : 'flat')}" th:text="${quote.valuationProfitText()}">0원</dd></div>
+            </dl>
+            <div class="stock-order-tabs" role="tablist" aria-label="주문 유형">
+                <button type="button" class="active" data-stock-order-tab="buy">매수</button>
+                <button type="button" data-stock-order-tab="sell">매도</button>
+            </div>
+            <form class="stock-order-form active" data-stock-order-form="buy" data-stock-buy-form method="post" th:action="@{/stocks/{key}/buy(key=${stock.key()})}">
+                <input type="hidden" name="quantity" value="1" data-stock-order-quantity>
+                <div class="stock-order-percent-head"><span>투자 비율</span><output data-stock-order-percent-output>50%</output></div>
+                <input class="stock-order-range" type="range" min="1" max="100" value="50" data-stock-order-percent aria-label="매수 비율">
+                <div class="stock-percent-presets">
+                    <button type="button" data-order-percent="10">10%</button><button type="button" data-order-percent="25">25%</button>
+                    <button class="active" type="button" data-order-percent="50">50%</button><button type="button" data-order-percent="75">75%</button>
+                    <button type="button" data-order-percent="100">100%</button>
+                </div>
+                <dl class="stock-order-breakdown">
+                    <div><dt>계산 수량</dt><dd data-stock-order-quantity-output>0주</dd></div>
+                    <div><dt>주문금액</dt><dd data-stock-order-gross-output>0원</dd></div>
+                    <div><dt>수수료</dt><dd data-stock-order-fee-output>0원</dd></div>
+                    <div><dt>총 결제금액</dt><dd data-stock-order-net-output>0원</dd></div>
+                </dl>
+                <button type="submit" data-stock-order-submit th:disabled="${screenPaused}">50% 매수</button>
+            </form>
+            <form class="stock-order-form" data-stock-order-form="sell" data-stock-sell-form method="post" th:action="@{/stocks/{key}/sell(key=${stock.key()})}">
+                <input type="hidden" name="quantity" value="1" data-stock-order-quantity>
+                <div class="stock-order-percent-head"><span>매도 비율</span><output data-stock-order-percent-output>50%</output></div>
+                <input class="stock-order-range" type="range" min="1" max="100" value="50" data-stock-order-percent aria-label="매도 비율">
+                <div class="stock-percent-presets">
+                    <button type="button" data-order-percent="10">10%</button><button type="button" data-order-percent="25">25%</button>
+                    <button class="active" type="button" data-order-percent="50">50%</button><button type="button" data-order-percent="75">75%</button>
+                    <button type="button" data-order-percent="100">100%</button>
+                </div>
+                <dl class="stock-order-breakdown">
+                    <div><dt>계산 수량</dt><dd data-stock-order-quantity-output>0주</dd></div>
+                    <div><dt>매도금액</dt><dd data-stock-order-gross-output>0원</dd></div>
+                    <div><dt>수수료</dt><dd data-stock-order-fee-output>0원</dd></div>
+                    <div><dt>예상 수령액</dt><dd data-stock-order-net-output>0원</dd></div>
+                </dl>
+                <button type="submit" data-stock-order-submit th:disabled="${screenPaused || quote.quantity() <= 0}">50% 매도</button>
+            </form>
+            <p class="stock-order-note" th:text="'즉시 매수 가능 ' + ${quote.liquidityText()} + ' · 대량 주문 가격 영향 · 수수료 0.25%'">유동성 안내</p>
+        </article>
+    </section>
+</aside>
 </body>
 </html>

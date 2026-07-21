@@ -44,7 +44,7 @@ public class StockService {
      * StockService는 주식 컨텐츠의 서버 규칙을 담당한다.
      *
      * 주요 책임:
-     * 1. 서울 진출 후 주식 기능 개방 예약/이벤트 표시
+     * 1. 순자산과 평판 조건 달성 후 주식 기능 개방 예약/이벤트 표시
      * 2. 종목별 가격 이력 생성과 5일 주기 가격 갱신
      * 3. 현금 <-> 코인 교환
      * 4. 현재가 기준 즉시 매수/매도
@@ -64,7 +64,7 @@ public class StockService {
     private static final double NORMAL_LIMIT_PERCENT = 12.0;
     private static final double SHOCK_LIMIT_PERCENT = 25.0;
     private static final int CASH_PER_COIN = 100;
-    private static final double TRADE_FEE_RATE = 0.005;
+    private static final double TRADE_FEE_RATE = 0.0025;
 
     private final Random random = new Random();
     private final StockCatalog stockCatalog;

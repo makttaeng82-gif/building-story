@@ -135,7 +135,7 @@ public class Player {
     // 해설: 엔티티 또는 객체의 상태 필드다. 서비스 로직은 주로 이 값을 읽거나 도메인 메서드로 변경한다.
     private Integer activeMarketNewsRefreshesLeft = 0;
     // 해설: 엔티티 또는 객체의 상태 필드다. 서비스 로직은 주로 이 값을 읽거나 도메인 메서드로 변경한다.
-    // 서울 진출 후 바로 주식이 열리지 않고, 지정된 elapsedDays에 주식 개방 이벤트가 뜬다.
+    // 부산 후반부의 평판·순자산 조건 달성 후, 지정된 elapsedDays에 주식 개방 이벤트가 뜬다.
     private Integer stockUnlockAvailableDay;
     // 해설: 엔티티 또는 객체의 상태 필드다. 서비스 로직은 주로 이 값을 읽거나 도메인 메서드로 변경한다.
     private Boolean stockContentUnlocked = false;

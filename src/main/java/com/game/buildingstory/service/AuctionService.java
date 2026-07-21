@@ -28,7 +28,7 @@ public class AuctionService {
      */
     private static final int CITY_BUILDING_LIMIT = 8;
     private static final int RECORD_RETENTION_DAYS = 62;
-    private static final int AUCTION_CHANCE_PERCENT = 3;
+    private static final int AUCTION_CHANCE_PERCENT = 2;
     private static final int AUCTION_DURATION_SECONDS = 20;
 
     private final Random random = new Random();
@@ -116,7 +116,9 @@ public class AuctionService {
         if (successChance == 0) {
             throw new IllegalArgumentException("잘못된 입찰가");
         }
-        long price = auction.bidPrice(rate);
+        long originalBidPrice = auction.bidPrice(rate);
+        boolean governmentSupported = auction.isGovernmentSupportEligible();
+        long price = auction.effectiveBidPrice(rate);
         long purchaseFee = EconomyBalanceRules.purchaseFee(price);
         long totalPurchasePrice = price + purchaseFee;
         if (!player.spendCash(totalPurchasePrice)) {
@@ -136,14 +138,18 @@ public class AuctionService {
                     auction.getMarketPrice(),
                     price,
                     auction.getMonthlyRent(),
-                    auction.getTradeCooldownDays()
+                    auction.getTradeCooldownDays(),
+                    governmentSupported ? originalBidPrice - price : 0L
             ));
+            if (governmentSupported) {
+                player.claimGovernmentPurchaseSupport(auction.getCity());
+            }
             awardBuildingMilestone(player, purchasedBuilding);
             secretaryTenantEventService.tryActivateIntro(player, purchasedBuilding);
-            saveRecord(player, RecordType.BUILDING_BUY, "경매 낙찰", -totalPurchasePrice, 0, auction.getName(), "시장가 " + rate + "% 입찰 · 부대비용 " + purchaseFee + "원");
+            saveRecord(player, RecordType.BUILDING_BUY, "경매 낙찰", -totalPurchasePrice, 0, auction.getName(), "시장가 " + rate + "% 입찰 · " + (governmentSupported ? "정부지원 " + (originalBidPrice - price) + "원 · " : "") + "부대비용 " + purchaseFee + "원");
             auction.resolve(rate, successChance, true, "경매 낙찰 성공");
         } else {
-            long deposit = EconomyBalanceRules.auctionDeposit(price);
+            long deposit = EconomyBalanceRules.auctionDeposit(originalBidPrice);
             player.addCash(totalPurchasePrice - deposit);
             saveRecord(player, RecordType.BUILDING_BUY, "경매 패찰", -deposit, 0, auction.getName(), "시장가 " + rate + "% 입찰 실패 · 보증비 " + deposit + "원");
             auction.resolve(rate, successChance, false, "경매 낙찰 실패");
@@ -177,9 +183,9 @@ public class AuctionService {
 
     private int successChance(int rate) {
         return switch (rate) {
-            case 95 -> 75;
-            case 88 -> 40;
-            case 80 -> 15;
+            case 95 -> 70;
+            case 88 -> 35;
+            case 80 -> 10;
             default -> 0;
         };
     }

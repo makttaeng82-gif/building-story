@@ -25,9 +25,9 @@ class EconomyBalanceSimulatorTests {
         var report = simulator.simulate(1, 1L);
 
         assertThat(report.secretarySalaries()).hasSize(6);
-        assertThat(report.secretarySalaries().get(0).hireSalary()).isEqualTo(500_000L);
-        assertThat(report.secretarySalaries().get(0).maximumSalary()).isEqualTo(1_225_000L);
-        assertThat(report.secretarySalaries().get(5).hireSalary()).isEqualTo(88_000_000L);
-        assertThat(report.secretarySalaries().get(5).maximumSalary()).isEqualTo(98_000_000L);
+		assertThat(report.secretarySalaries().get(0).hireSalary()).isEqualTo(1_500_000L);
+		assertThat(report.secretarySalaries().get(0).maximumSalary()).isEqualTo(17_500_000L);
+		assertThat(report.secretarySalaries().get(5).hireSalary()).isEqualTo(14_360_879L);
+		assertThat(report.secretarySalaries().get(5).maximumSalary()).isEqualTo(17_500_000L);
     }
 }

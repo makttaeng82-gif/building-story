@@ -28,13 +28,12 @@ public final class EconomyBalanceSimulator {
 
     private static final List<String> CITIES = List.of("청주", "세종", "대전", "부산", "인천", "서울");
     private static final Map<String, Integer> CITY_REPUTATION = Map.of(
-            "청주", 0, "세종", 500, "대전", 2_300, "부산", 6_000, "인천", 13_500, "서울", 26_000
+            "청주", 0, "세종", 375, "대전", 1_725, "부산", 4_500, "인천", 10_125, "서울", 19_500
     );
     private static final long[] DONATION_THRESHOLDS = {
             1_000_000L, 10_000_000L, 100_000_000L, 1_000_000_000L, 10_000_000_000L
     };
-    private static final int[] DONATION_REWARDS = {20, 100, 500, 2_000, 6_000};
-    private static final long[] SECRETARY_REQUEST_COSTS = {0L, 100_000_000L, 50_000_000L, 6_000_000_000L, 30_000_000_000L, 68_450_300_000L};
+    private static final long[] SECRETARY_REQUEST_COSTS = {0L, 100_000_000L, 50_000_000L, 3_000_000_000L, 12_000_000_000L, 35_450_300_000L};
     private static final int[] SECRETARY_REWARDS = {100, 300, 600, 1_000, 1_500, 2_000};
 
     private final List<BuildingSpec> buildings;
@@ -68,7 +67,7 @@ public final class EconomyBalanceSimulator {
                 .filter(spec -> spec.city().equals("청주") && spec.slot() == 1)
                 .findFirst()
                 .orElseThrow();
-        state.buildings.add(new SimBuilding(starter, 0L, 0L, true, true, 0));
+        state.buildings.add(new SimBuilding(starter, 0L, 0L, 0L, true, true, 0));
         state.claimedMilestones.put(key(starter), true);
         state.cityUnlockMonth.put("청주", 0);
 
@@ -146,7 +145,7 @@ public final class EconomyBalanceSimulator {
             long netRent = grossRent - EconomyBalanceRules.rentOperatingCost(grossRent);
             state.cash += netRent;
             state.rentIncome += netRent;
-            state.reputation += random.nextInt(3) + 1;
+            state.reputation += random.nextInt(3) + 2;
         }
     }
 
@@ -203,7 +202,8 @@ public final class EconomyBalanceSimulator {
                 continue;
             }
             long forcedSale = currentValue(state, loan.building) * 90 / 100;
-            state.cash += Math.max(0L, forcedSale - loan.principal);
+            long supportClawback = loan.building.ageMonths < 13 ? loan.building.governmentSupportAmount : 0L;
+            state.cash += Math.max(0L, forcedSale - loan.principal - supportClawback);
             state.buildings.remove(loan.building);
             state.loans.remove(index);
             state.foreclosures++;
@@ -234,12 +234,14 @@ public final class EconomyBalanceSimulator {
         long target = DONATION_THRESHOLDS[state.nextDonationMilestone];
         long additionalDonation = target - state.cumulativeDonation;
         long reserve = reserveCash(state, strategy);
-        if (state.cash - additionalDonation < reserve) {
+        // 누적 기부 이정표가 보이자마자 성장 자금을 전부 소진하는 행동은 일반적인 플레이가 아니다.
+        // 기부액이 순자산의 10% 이하일 때만 집행해 부동산 투자와 기부를 함께 하는 전략을 모델링한다.
+        if (netWorth(state) < target * 10 || state.cash - additionalDonation < reserve) {
             return;
         }
         state.cash -= additionalDonation;
         state.cumulativeDonation = target;
-        state.reputation += DONATION_REWARDS[state.nextDonationMilestone];
+        state.reputation += Math.toIntExact(additionalDonation / 300_000L);
         state.nextDonationMilestone++;
     }
 
@@ -252,19 +254,20 @@ public final class EconomyBalanceSimulator {
                 .toList();
         for (BuildingSpec spec : candidates) {
             int valuationRate = randomValuationRate(random);
-            long offerPrice = spec.marketPrice() * valuationRate / 100;
-            long loan = strategy == Strategy.STABLE_NO_LOAN ? 0L : loanAmount(spec, offerPrice);
-            long cashCost = offerPrice - loan + EconomyBalanceRules.purchaseFee(offerPrice);
+            long originalOfferPrice = spec.marketPrice() * valuationRate / 100;
+            long purchasePrice = effectivePurchasePrice(state, spec, originalOfferPrice);
+            long loan = strategy == Strategy.STABLE_NO_LOAN ? 0L : loanAmount(spec, purchasePrice);
+            long cashCost = purchasePrice - loan + EconomyBalanceRules.purchaseFee(purchasePrice);
             if (state.cash - cashCost < reserveCash(state, strategy)) {
                 continue;
             }
-            purchase(state, spec, offerPrice, loan, cashCost);
+            purchase(state, spec, originalOfferPrice, purchasePrice, loan, cashCost);
             return;
         }
     }
 
     private boolean tryAuctionPurchase(State state, Random random) {
-        if (random.nextDouble() >= 1.0 - Math.pow(0.97, 30)) {
+        if (random.nextDouble() >= 1.0 - Math.pow(0.98, 30)) {
             return false;
         }
         List<BuildingSpec> candidates = buildings.stream()
@@ -274,27 +277,32 @@ public final class EconomyBalanceSimulator {
                 .toList();
         for (BuildingSpec spec : candidates) {
             long bidPrice = spec.marketPrice() * 88 / 100;
-            long loan = loanAmount(spec, bidPrice);
-            long cashCost = bidPrice - loan + EconomyBalanceRules.purchaseFee(bidPrice);
+            long purchasePrice = effectivePurchasePrice(state, spec, bidPrice);
+            long loan = loanAmount(spec, purchasePrice);
+            long cashCost = purchasePrice - loan + EconomyBalanceRules.purchaseFee(purchasePrice);
             long deposit = EconomyBalanceRules.auctionDeposit(bidPrice);
             if (state.cash - Math.max(cashCost, deposit) < reserveCash(state, Strategy.ACTIVE_TRADING)) {
                 continue;
             }
-            if (random.nextInt(100) >= 40) {
+            if (random.nextInt(100) >= 35) {
                 state.cash -= deposit;
                 state.tradeProfit -= deposit;
                 return false;
             }
-            purchase(state, spec, bidPrice, loan, cashCost);
+            purchase(state, spec, bidPrice, purchasePrice, loan, cashCost);
             return true;
         }
         return false;
     }
 
-    private void purchase(State state, BuildingSpec spec, long purchasePrice, long loan, long cashCost) {
+    private void purchase(State state, BuildingSpec spec, long originalPrice, long purchasePrice, long loan, long cashCost) {
         state.cash -= cashCost;
-        SimBuilding building = new SimBuilding(spec, purchasePrice, cashCost, false, false, 0);
+        long governmentSupportAmount = originalPrice - purchasePrice;
+        SimBuilding building = new SimBuilding(spec, purchasePrice, cashCost, governmentSupportAmount, false, false, 0);
         state.buildings.add(building);
+        if (governmentSupportAvailable(state, spec)) {
+            state.governmentSupportedCities.put(spec.city(), true);
+        }
         if (loan > 0) {
             state.loans.add(new SimLoan(building, loan));
         }
@@ -303,6 +311,17 @@ public final class EconomyBalanceSimulator {
             state.claimedMilestones.put(key(spec), true);
             state.reputation += EconomyBalanceRules.buildingMilestoneReputation(spec.city(), spec.slot());
         }
+    }
+
+    private long effectivePurchasePrice(State state, BuildingSpec spec, long originalPrice) {
+        return governmentSupportAvailable(state, spec)
+                ? EconomyBalanceRules.governmentSupportedPrice(originalPrice, spec.city())
+                : originalPrice;
+    }
+
+    private boolean governmentSupportAvailable(State state, BuildingSpec spec) {
+        return EconomyBalanceRules.governmentPurchaseSupportPercent(spec.city()) > 0
+                && !state.governmentSupportedCities.containsKey(spec.city());
     }
 
     private void sellTradingBuilding(State state, Random random) {
@@ -319,11 +338,12 @@ public final class EconomyBalanceSimulator {
         long proceeds = sellPrice - EconomyBalanceRules.sellFee(sellPrice);
         SimLoan loan = loanFor(state, target);
         long debt = loan == null ? 0L : loan.principal;
-        if (proceeds < debt) {
+        long supportClawback = target.ageMonths < 13 ? target.governmentSupportAmount : 0L;
+        if (proceeds < debt + supportClawback) {
             return;
         }
-        state.cash += proceeds - debt;
-        state.tradeProfit += proceeds - debt - target.cashInvested;
+        state.cash += proceeds - debt - supportClawback;
+        state.tradeProfit += proceeds - debt - supportClawback - target.cashInvested;
         state.buildings.remove(target);
         if (loan != null) {
             state.loans.remove(loan);
@@ -350,11 +370,11 @@ public final class EconomyBalanceSimulator {
     private boolean secretaryConditionMet(State state, int index) {
         return switch (index) {
             case 0 -> state.cash >= 100_000_000L;
-            case 1 -> state.reputation >= 1_750 && state.cash >= 300_000_000L;
-            case 2 -> state.reputation >= 4_900;
-            case 3 -> state.reputation >= 11_100 && state.cash >= 15_000_000_000L;
-            case 4 -> state.reputation >= 16_100 && state.cash >= 80_000_000_000L && state.loans.isEmpty();
-            case 5 -> state.cash >= 150_000_000_000L && ownsBuilding(state, "서울", 4);
+            case 1 -> state.reputation >= 1_275 && state.cash >= 300_000_000L;
+            case 2 -> state.reputation >= 3_600;
+            case 3 -> state.reputation >= 8_250 && state.cash >= 8_000_000_000L;
+            case 4 -> state.reputation >= 12_000 && state.cash >= 30_000_000_000L && state.loans.isEmpty();
+            case 5 -> state.cash >= 90_000_000_000L && ownsBuilding(state, "서울", 4);
             default -> false;
         };
     }
@@ -396,13 +416,13 @@ public final class EconomyBalanceSimulator {
 
     private void recordFinancialUnlocks(State state) {
         long netWorth = netWorth(state);
-        if (state.stockUnlockMonth == 0 && state.reputation >= 22_500 && netWorth >= 100_000_000_000L) {
+        if (state.stockUnlockMonth == 0 && state.reputation >= 8_250 && netWorth >= 3_000_000_000L) {
             state.stockUnlockMonth = state.month;
         }
         if (state.companyMonth == 0
                 && state.stockUnlockMonth > 0
                 && state.month - state.stockUnlockMonth >= 12
-                && state.reputation >= 50_000
+                && state.reputation >= 37_500
                 && state.stockValue >= 50_000_000_000L
                 && state.cash >= 10_000_000_000L
                 && state.month - state.lastForeclosureMonth > 6) {
@@ -458,8 +478,8 @@ public final class EconomyBalanceSimulator {
 
     private int requiredReputation(String city, int slot) {
         int[][] required = {
-                {0, 50, 120, 250}, {500, 800, 1_200, 1_700}, {2_300, 3_000, 3_800, 4_800},
-                {6_000, 7_500, 9_000, 11_000}, {13_500, 16_000, 19_000, 22_500}, {26_000, 30_000, 35_000, 42_000}
+                {0, 40, 90, 190}, {375, 600, 900, 1_275}, {1_725, 2_250, 2_850, 3_600},
+                {4_500, 5_625, 6_750, 8_250}, {10_125, 12_000, 14_250, 16_875}, {19_500, 22_500, 26_250, 31_500}
         };
         return required[CITIES.indexOf(city)][slot - 1];
     }
@@ -478,7 +498,7 @@ public final class EconomyBalanceSimulator {
     }
 
     private long loanAmount(BuildingSpec spec, long offerPrice) {
-        long loanToValue = Math.min(offerPrice, spec.marketPrice()) * 60 / 100;
+        long loanToValue = Math.min(offerPrice, spec.marketPrice()) * 80 / 100;
         long expectedNetRent = spec.monthlyRent() * 75 / 100 * 90 / 100;
         long cashFlowLimit = expectedNetRent * 100 / 120 * 250;
         return Math.min(loanToValue, cashFlowLimit);
@@ -538,7 +558,7 @@ public final class EconomyBalanceSimulator {
 
     public enum Strategy {
         STABLE_NO_LOAN("무대출 안정형"),
-        LOAN_GROWTH("60% 대출 성장형"),
+        LOAN_GROWTH("담보대출 성장형"),
         ACTIVE_TRADING("매매·경매 적극형");
 
         private final String label;
@@ -566,11 +586,12 @@ public final class EconomyBalanceSimulator {
                     .append("- 최대 기간: ").append(MAX_MONTHS).append("게임월\n\n")
                     .append("## 모델 가정\n\n")
                     .append("- 가격·월세·쿨타임·거래비용·대출이자·비서 급여는 실제 카탈로그와 계산식을 사용한다.\n")
+                    .append("- 첫 유상 취득 정부지원은 청주·세종·대전 40%, 부산 30%, 인천 20%, 서울 10%이며 1년 내 매각 시 전액 환수한다.\n")
                     .append("- 플레이어는 매월 최대 한 번 부동산 투자 결정을 한다. 부업과 선물 구매는 제외한다.\n")
                     .append("- 입주·퇴거·수리는 실제 월 2회 판정 확률을 사용하고, 도시지수는 월 변동 범위를 적용한다.\n")
                     .append("- 주식 해금 후 여유 현금의 20~40%를 투자하며 월 수익률은 평균 0.3~0.5%, 표준편차 3.5%로 가정한다.\n")
                     .append("- 비서는 조건 충족 시 고용하고 고용 시 숙련도 월급을 낸다. 선물·숙련도 성장·특수효과는 제외해 최대 월급은 별도 표로 검토한다.\n")
-                    .append("- 기업 설립은 평판 50,000, 금융자산 500억원, 현금 100억원, 주식 해금 후 12개월 조건으로 판정한다.\n\n")
+                    .append("- 기업 설립은 평판 37,500, 금융자산 500억원, 현금 100억원, 주식 해금 후 12개월 조건으로 판정한다.\n\n")
                     .append("## 전략 결과\n\n")
                     .append("| 전략 | 기업 설립 중앙값 | 미도달 | 최종 평판 | 최종 금융자산 | 최종 순자산 | 현금부족 월 | 강제매각률 | 매매수익 비중 | 단일건물 최대비중 |\n")
                     .append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
@@ -751,6 +772,7 @@ public final class EconomyBalanceSimulator {
         private final List<SimSecretary> hiredSecretaries = new ArrayList<>();
         private final Map<String, Boolean> hiredSecretaryKeys = new HashMap<>();
         private final Map<String, Boolean> claimedMilestones = new HashMap<>();
+        private final Map<String, Boolean> governmentSupportedCities = new HashMap<>();
         private final Map<String, Integer> nextPurchaseMonth = new HashMap<>();
         private final Map<String, Double> cityIndex = new HashMap<>();
         private final Map<String, Integer> cityUnlockMonth = new LinkedHashMap<>();
@@ -784,16 +806,18 @@ public final class EconomyBalanceSimulator {
         private final BuildingSpec spec;
         private final long purchasePrice;
         private final long cashInvested;
+        private final long governmentSupportAmount;
         private boolean occupied;
         private final boolean protectedTenant;
         private int occupiedMonths;
         private int ageMonths;
 
-        private SimBuilding(BuildingSpec spec, long purchasePrice, long cashInvested,
+        private SimBuilding(BuildingSpec spec, long purchasePrice, long cashInvested, long governmentSupportAmount,
                             boolean occupied, boolean protectedTenant, int ageMonths) {
             this.spec = spec;
             this.purchasePrice = purchasePrice;
             this.cashInvested = cashInvested;
+            this.governmentSupportAmount = governmentSupportAmount;
             this.occupied = occupied;
             this.protectedTenant = protectedTenant;
             this.ageMonths = ageMonths;

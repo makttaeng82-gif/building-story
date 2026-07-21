@@ -12,11 +12,18 @@
             if (window.sessionStorage.getItem("buildingStory.scrollY") !== null) {
                 document.documentElement.classList.add("restore-scroll-pending");
             }
+            try {
+                const stockTheme = window.localStorage.getItem("buildingStory.stockTheme");
+                document.documentElement.dataset.stockTheme = stockTheme === "light" ? "light" : "dark";
+            } catch (error) {
+                document.documentElement.dataset.stockTheme = "dark";
+            }
         })();
     </script>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=stock-workspace-v14">
+    <link rel="stylesheet" th:if="${viewMode == 'stocks'}" href="/stock.css?v=stock-workspace-v19">
 </head>
-<body th:classappend="${screenPaused} ? ' game-paused'"
+<body th:class="${(screenPaused ? 'game-paused ' : '') + (viewMode == 'stocks' ? 'view-stocks' : '')}"
       th:attr="data-player-paused=${screenPaused},data-elapsed-days=${player.elapsedDays}">
 <!--
 main.html은 로그인 후 플레이어가 가장 오래 머무는 메인 화면이다.
@@ -85,6 +92,7 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
         <a class="info-tab" href="/info">정보</a>
         <form class="tab-pause-form" method="post" action="/pause/toggle">
             <input type="hidden" name="redirectView" th:value="${viewMode}">
+            <input type="hidden" name="selectedStockKey" th:if="${viewMode == 'stocks'}" th:value="${selectedStockKey}">
             <button class="tab-pause-button" type="submit" th:text="${player.paused ? '진행 재개' : '일시정지'}">일시정지</button>
         </form>
     </nav>
@@ -98,51 +106,43 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
         <section th:replace="~{fragments/main-info-grid :: infoGrid}"></section>
     </th:block>
     <th:block th:if="${viewMode == 'stocks'}">
+        <section class="stock-market-overview" data-stock-market-overview aria-label="시장 요약">
+            <header>
+                <span>MARKET SNAPSHOT</span>
+                <strong>시장 요약</strong>
+                <div class="stock-update-status">
+                    <small th:text="'주가 갱신 ' + ${stockMarketStatus.nextUpdateDateText()} + ' · D-' + ${stockMarketStatus.daysUntilNextUpdate()}">주가 갱신 D-5</small>
+                    <i aria-hidden="true"><b th:style="'width:' + ${stockMarketStatus.progressPercent()} + '%'" style="width: 0"></b></i>
+                </div>
+            </header>
+            <dl>
+                <div>
+                    <dt>종합지수</dt>
+                    <dd th:class="${stockMarketStatus.indexDirection()}"
+                        th:text="${stockMarketStatus.indexValueText()} + ' · ' + ${stockMarketStatus.indexChangeText()}">1,000.00 · +0.00%</dd>
+                </div>
+                <div>
+                    <dt>경기국면</dt>
+                    <dd th:text="${stockMarketStatus.regimeText()}">중립</dd>
+                </div>
+                <div>
+                    <dt>상승 / 하락 / 보합</dt>
+                    <dd class="stock-market-breadth"><span class="up" th:text="${stockRisingCount}">0</span> / <span class="down" th:text="${stockFallingCount}">0</span> / <span class="flat" th:text="${stockFlatCount}">0</span></dd>
+                </div>
+                <div>
+                    <dt>시장이슈</dt>
+                    <dd th:if="${stockMarketStatus.hasActiveNews()}" th:class="${stockMarketStatus.activeNewsDirection()}" th:text="${stockMarketStatus.activeNewsText()}">시장 호재 적용중</dd>
+                    <dd th:unless="${stockMarketStatus.hasActiveNews()}" class="flat">없음</dd>
+                </div>
+            </dl>
+            <div class="stock-theme-switch" role="group" aria-label="주식 화면 테마">
+                <button type="button" data-stock-theme-option="light">라이트</button>
+                <button type="button" data-stock-theme-option="dark">다크</button>
+            </div>
+        </section>
         <main class="stock-layout">
             <section th:replace="~{fragments/main-stock-panel :: stockPanel}"></section>
-            <aside class="panel stock-record-panel">
-                <section class="stock-holding-summary">
-                    <h2>보유종목요약</h2>
-                    <dl>
-                        <div>
-                            <dt>보유 종목</dt>
-                            <dd th:text="${stockHoldingSummary.holdingCount()} + '개'">0개</dd>
-                        </div>
-                        <div>
-                            <dt>보유 주식</dt>
-                            <dd th:text="${stockHoldingSummary.totalQuantity()} + '주'">0주</dd>
-                        </div>
-                        <div>
-                            <dt>매입원금</dt>
-                            <dd th:text="${stockHoldingSummary.totalCostText()}">0원</dd>
-                        </div>
-                        <div>
-                            <dt>평가금액</dt>
-                            <dd th:text="${stockHoldingSummary.totalValuationText()}">0원</dd>
-                        </div>
-                        <div>
-                            <dt>평가손익</dt>
-                            <dd th:class="${stockHoldingSummary.profitDirection()}" th:text="${stockHoldingSummary.totalProfitText()}">0원</dd>
-                        </div>
-                    </dl>
-                </section>
-                <section class="stock-side-records">
-                    <h2>최근 기록</h2>
-                    <ul class="event-list record-list" th:if="${!records.isEmpty()}">
-                        <li th:each="record : ${records}">
-                            <b th:text="${record.month} + '월 ' + ${record.day} + '일'">1월 1일</b>
-                            <span th:text="${record.title}">기록</span>
-                            <span th:if="${record.buildingName != null}" th:text="' · ' + ${record.buildingName}">건물</span>
-                            <span th:if="${record.amount != null}"
-                                  th:classappend="${record.amount > 0} ? ' money-in' : ' money-out'"
-                                  th:text="' · ' + ${record.amount > 0 ? '+' : '-'} + ${@moneyText.format(record.amount < 0 ? -record.amount : record.amount)}">금액</span>
-                            <span th:if="${record.reputationChange != 0}" th:text="' · 평판 ' + ${record.reputationChange > 0 ? '+' : ''} + ${@gameService.reputationText(record.reputationChange)}">평판</span>
-                            <small th:if="${record.memo != null}" th:text="${record.memo}">메모</small>
-                        </li>
-                    </ul>
-                    <p th:if="${records.isEmpty()}">최근 기록 없음</p>
-                </section>
-            </aside>
+            <aside th:replace="~{fragments/main-stock-panel :: stockSidePanel}"></aside>
         </main>
     </th:block>
 
@@ -155,6 +155,6 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
     <div th:replace="~{fragments/main-modals :: modals}"></div>
 </div>
 
-<script type="module" src="/app.js?v=stock-tools-1"></script>
+<script type="module" src="/app.js?v=stock-workspace-v19"></script>
 </body>
 </html>

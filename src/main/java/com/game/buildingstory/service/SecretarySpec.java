@@ -12,7 +12,7 @@ public record SecretarySpec(
         String origin,
         String imagePath,
         int requiredReputation,
-        long monthlySalary,
+        long maximumMonthlySalary,
         int baseProficiency,
         String effect,
         String growthBonus,
@@ -22,6 +22,7 @@ public record SecretarySpec(
         String specialEffectDetail,
         String unlockNote
 ) {
+    private static final long MINIMUM_MONTHLY_SALARY = 1_500_000L;
     public int autoCheckDays(int proficiency) {
         int clamped = Math.max(1, Math.min(30, proficiency));
         return 30 - Math.floorDiv((clamped - 1) * 23, 29);
@@ -29,12 +30,13 @@ public record SecretarySpec(
 
     public long monthlySalaryForProficiency(int proficiency) {
         int clamped = Math.max(1, Math.min(30, proficiency));
-        int salaryPercent = 100 + (clamped - 1) * 5;
-        return monthlySalary * salaryPercent / 100;
+        long progress = clamped - 1L;
+        long salaryRange = maximumMonthlySalary - MINIMUM_MONTHLY_SALARY;
+        return MINIMUM_MONTHLY_SALARY + salaryRange * progress * progress / (29L * 29L);
     }
 
     public String salaryDetail() {
-        return "기본 월급에서 숙련도 1단계마다 5%씩 선형 인상. 숙련도 30은 기본 월급의 245%.";
+        return "모든 비서는 숙련도 1에서 월 150만원으로 시작하며 숙련도가 높아질수록 인상 폭이 커집니다. 숙련도 30의 월급은 모두 1,750만원입니다.";
     }
 
     public String specialEffectSummary() {

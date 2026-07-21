@@ -15,6 +15,24 @@ public record StockCandleView(
         int bodyY,
         int bodyHeight,
         boolean rising,
-        String dateText
+        String dateText,
+        boolean visible,
+        int elapsedDays,
+        long openPrice,
+        long highPrice,
+        long lowPrice,
+        long closePrice,
+        String openPriceText,
+        String highPriceText,
+        String lowPriceText,
+        String closePriceText,
+        String changePercentText,
+        String factorText,
+        long marketIndexBasisPoints,
+        Long newsArticleId,
+        String newsTitle,
+        int newsCount,
+        boolean earningsEvent,
+        boolean dividendEvent
 ) {
 }

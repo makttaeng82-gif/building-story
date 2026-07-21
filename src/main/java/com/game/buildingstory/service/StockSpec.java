@@ -1,5 +1,7 @@
 package com.game.buildingstory.service;
 
+import java.util.Locale;
+
 /**
  * 주식 종목 원본 스펙이다.
  *
@@ -10,6 +12,19 @@ public record StockSpec(
         String industry,
         String name,
         StockRiskType riskType,
-        long basePrice
+        double beta,
+        double industryBeta,
+        double idiosyncraticVolatilityPercent,
+        long basePrice,
+        long issuedShares,
+        String description
 ) {
+    /** 시장 수익률에 대한 민감도를 화면에서 읽기 쉬운 두 자리 소수로 표시한다. */
+    public String betaText() {
+        return String.format(Locale.ROOT, "%.2f", beta);
+    }
+
+    public String industryBetaText() {
+        return String.format(Locale.ROOT, "%.2f", industryBeta);
+    }
 }

@@ -73,7 +73,12 @@ public class GameController {
     }
 
     @GetMapping("/main")
-    public String main(@RequestParam(defaultValue = "city") String view, HttpSession session, Model model) {
+    public String main(
+            @RequestParam(defaultValue = "city") String view,
+            @RequestParam(required = false) String stockKey,
+            HttpSession session,
+            Model model
+    ) {
         Long playerId = currentPlayerId(session);
         if (playerId == null) {
             return "redirect:/login";
@@ -84,17 +89,15 @@ public class GameController {
         }
         // view 파라미터는 사용자가 보고 싶은 화면이다. 주식이 아직 잠겨 있으면 강제로 도시 화면을 보여준다.
         String viewMode = "stocks".equals(view) && gameService.stockContentUnlocked(player) ? "stocks" : "city";
-        mainPageModelAssembler.addMainPageAttributes(playerId, player, model);
-        boolean hiddenCityModal = false;
+        mainPageModelAssembler.addMainPageAttributes(playerId, player, model, viewMode, stockKey);
         if ("stocks".equals(viewMode)) {
             // 주식 화면에서는 도시 이벤트/경매 모달을 즉시 띄우지 않는다. 시간은 흐르지만 표시만 도시 화면으로 미룬다.
-            hiddenCityModal = model.asMap().get("activeEvent") != null || model.asMap().get("activeAuction") != null;
             model.addAttribute("activeEvent", null);
             model.addAttribute("activeAuction", null);
         }
         model.addAttribute("viewMode", viewMode);
-        model.addAttribute("screenPaused", ("city".equals(viewMode) && (model.asMap().get("activeEvent") != null || model.asMap().get("activeAuction") != null))
-                || (player.isPaused() && !hiddenCityModal));
+        model.addAttribute("screenPaused", player.isPaused()
+                || ("city".equals(viewMode) && (model.asMap().get("activeEvent") != null || model.asMap().get("activeAuction") != null)));
         return "main";
     }
 
@@ -211,6 +214,7 @@ public class GameController {
     @PostMapping("/pause/toggle")
     public String togglePause(
             @RequestParam(defaultValue = "city") String redirectView,
+            @RequestParam(required = false) String selectedStockKey,
             HttpSession session,
             RedirectAttributes redirectAttributes
     ) {
@@ -220,7 +224,7 @@ public class GameController {
         }
         redirectAttributes.addFlashAttribute("notice", gameService.togglePause(playerId));
         if ("stocks".equals(redirectView)) {
-            return "redirect:/main?view=stocks";
+            return stockRedirect(selectedStockKey);
         }
         return "redirect:/main";
     }
@@ -268,7 +272,7 @@ public class GameController {
             return "redirect:/login";
         }
         redirectAttributes.addFlashAttribute("notice", gameService.buyStock(playerId, stockKey, quantity));
-        return "redirect:/main?view=stocks";
+        return stockRedirect(stockKey);
     }
 
     @PostMapping("/stocks/{stockKey}/buy-max")
@@ -278,7 +282,7 @@ public class GameController {
             return "redirect:/login";
         }
         redirectAttributes.addFlashAttribute("notice", gameService.buyMaxStock(playerId, stockKey));
-        return "redirect:/main?view=stocks";
+        return stockRedirect(stockKey);
     }
 
     @PostMapping("/stocks/{stockKey}/sell")
@@ -288,7 +292,7 @@ public class GameController {
             return "redirect:/login";
         }
         redirectAttributes.addFlashAttribute("notice", gameService.sellStock(playerId, stockKey, quantity));
-        return "redirect:/main?view=stocks";
+        return stockRedirect(stockKey);
     }
 
     @PostMapping("/stocks/{stockKey}/sell-all")
@@ -298,7 +302,14 @@ public class GameController {
             return "redirect:/login";
         }
         redirectAttributes.addFlashAttribute("notice", gameService.sellAllStock(playerId, stockKey));
-        return "redirect:/main?view=stocks";
+        return stockRedirect(stockKey);
+    }
+
+    @PostMapping("/stocks/news/{articleId}/read")
+    @ResponseBody
+    public Map<String, Boolean> readStockNews(@PathVariable long articleId, HttpSession session) {
+        Long playerId = currentPlayerId(session);
+        return Map.of("read", playerId != null && gameService.markStockNewsRead(playerId, articleId));
     }
 
     @PostMapping("/donations")
@@ -472,6 +483,13 @@ public class GameController {
         }
         gameService.cancelEvent(playerId, eventId);
         return "redirect:/main";
+    }
+
+    private String stockRedirect(String stockKey) {
+        if (stockKey == null || stockKey.isBlank()) {
+            return "redirect:/main?view=stocks";
+        }
+        return "redirect:/main?view=stocks&stockKey=" + stockKey;
     }
 
     private Long currentPlayerId(HttpSession session) {

@@ -507,6 +507,16 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
+    public List<StockListQuoteView> stockListQuotes(Player player) {
+        return stockService.stockListQuotes(player);
+    }
+
+    @Transactional(readOnly = true)
+    public StockQuoteView selectedStockQuote(Player player, String stockKey) {
+        return stockService.selectedStockQuote(player, stockKey);
+    }
+
+    @Transactional(readOnly = true)
     public StockMarketStatusView stockMarketStatus(Player player) {
         return stockService.marketStatus(player);
     }
@@ -517,8 +527,24 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
+    public List<StockNewsArticleView> stockNewsArticles(Player player) {
+        return stockService.newsArticles(player);
+    }
+
+    @Transactional
+    public boolean markStockNewsRead(long playerId, long articleId) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return stockService.markNewsRead(player, articleId);
+    }
+
+    @Transactional(readOnly = true)
     public StockHoldingSummaryView stockHoldingSummary(Player player) {
         return stockService.holdingSummary(player);
+    }
+
+    @Transactional(readOnly = true)
+    public StockHoldingSummaryView stockHoldingSummary(Player player, List<StockListQuoteView> stockQuotes) {
+        return stockService.holdingSummary(player, stockQuotes);
     }
 
     @Transactional
@@ -559,6 +585,10 @@ public class GameService {
 
     public String stockMoneyText(long amount) {
         return stockService.moneyText(amount);
+    }
+
+    public String stockSignedMoneyText(long amount) {
+        return stockService.signedMoneyText(amount);
     }
 
     @Transactional

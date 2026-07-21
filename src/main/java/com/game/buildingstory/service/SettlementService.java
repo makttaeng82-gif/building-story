@@ -88,7 +88,9 @@ public class SettlementService {
                         long operatingCost = EconomyBalanceRules.rentOperatingCost(rent);
                         long netRent = rent - operatingCost;
                         player.addMonthlyRentIncome(netRent);
-                        int reputationChange = random.nextInt(3) + 1;
+                        // 임차인이 있는 건물을 한 달간 정상 운영하면 2~4의 평판을 얻는다.
+                        // nextInt(3)은 0, 1, 2 중 하나를 반환하므로 2를 더해 실제 범위를 만든다.
+                        int reputationChange = random.nextInt(3) + 2;
                         player.addReputation(reputationChange);
                         saveRecord(player, RecordType.RENT_INCOME, "월세", netRent, reputationChange, building.getName(), "운영비 " + operatingCost + "원 차감");
                     });

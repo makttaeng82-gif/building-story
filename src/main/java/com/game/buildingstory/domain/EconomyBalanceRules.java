@@ -10,7 +10,7 @@ public final class EconomyBalanceRules {
     public static final int PURCHASE_FEE_BASIS_POINTS = 150;
     public static final int SELL_FEE_BASIS_POINTS = 100;
     public static final int RENT_OPERATING_COST_BASIS_POINTS = 1_000;
-    public static final int AUCTION_DEPOSIT_BASIS_POINTS = 20;
+    public static final int AUCTION_DEPOSIT_BASIS_POINTS = 100;
 
     private static final long BASIS_POINT_DENOMINATOR = 10_000L;
 
@@ -31,6 +31,24 @@ public final class EconomyBalanceRules {
 
     public static long auctionDeposit(long amount) {
         return basisPoints(amount, AUCTION_DEPOSIT_BASIS_POINTS);
+    }
+
+    public static int governmentPurchaseSupportPercent(String city) {
+        return switch (city) {
+            case "청주", "세종", "대전" -> 40;
+            case "부산" -> 30;
+            case "인천" -> 20;
+            case "서울" -> 10;
+            default -> 0;
+        };
+    }
+
+    public static long governmentSupportedPrice(long amount, String city) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("기준 금액은 음수일 수 없습니다");
+        }
+        int playerPaymentPercent = 100 - governmentPurchaseSupportPercent(city);
+        return Math.multiplyExact(amount, playerPaymentPercent) / 100;
     }
 
     public static int buildingMilestoneReputation(String city, int slot) {

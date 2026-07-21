@@ -238,7 +238,7 @@
             <div class="section-head">
                 <div>
                     <h2>주식 종목</h2>
-                    <p>서울 진출 후 개방 · 업계별 호황/불황 이벤트 추가 예정</p>
+                    <p>부산 후반부 개방 · 업계별 호황/불황 이벤트</p>
                 </div>
             </div>
             <div class="table-wrap">

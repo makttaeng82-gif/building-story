@@ -43,9 +43,15 @@ public class DatabaseMigration {
             addUniqueConstraint(jdbcTemplate, "purchase_cooldown", "uk_purchase_cooldown_player_slot", "player_id, city, building_slot");
             jdbcTemplate.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS economy_version INTEGER DEFAULT 1");
             jdbcTemplate.update("UPDATE players SET economy_version = 1 WHERE economy_version IS NULL");
+            jdbcTemplate.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS government_supported_cities VARCHAR(255) DEFAULT ''");
+            jdbcTemplate.update("UPDATE players SET government_supported_cities = '' WHERE government_supported_cities IS NULL");
             transactionTemplate.executeWithoutResult(status -> {
                 migrateEconomyVersionTwo(jdbcTemplate, buildingCatalog, reputationCatalog);
                 migrateEconomyVersionThree(jdbcTemplate, buildingCatalog);
+                migrateEconomyVersionFour(jdbcTemplate);
+                migrateEconomyVersionFive(jdbcTemplate);
+                migrateEconomyVersionSix(jdbcTemplate);
+                migrateEconomyVersionSeven(jdbcTemplate);
             });
         };
     }
@@ -199,6 +205,80 @@ public class DatabaseMigration {
                 WHERE player_id IN (SELECT id FROM players WHERE economy_version < 3)
                 """);
         jdbcTemplate.update("UPDATE players SET economy_version = 3 WHERE economy_version < 3");
+    }
+
+    private void migrateEconomyVersionFour(JdbcTemplate jdbcTemplate) {
+        Integer pendingPlayers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM players WHERE economy_version < 4", Integer.class);
+        if (pendingPlayers == null || pendingPlayers == 0) {
+            return;
+        }
+
+        // 기존 플레이어가 이미 돈을 주고 산 도시라면 신규 50% 지원을 다시 받을 수 없게 표시한다.
+        jdbcTemplate.query("""
+                SELECT DISTINCT b.player_id, b.city
+                FROM owned_building b
+                JOIN players p ON p.id = b.player_id
+                WHERE p.economy_version < 4
+                  AND b.purchase_price > 0
+                  AND b.city IN ('청주', '세종', '대전')
+                """, resultSet -> {
+            String cityKey = "|" + resultSet.getString("city") + "|";
+            jdbcTemplate.update("""
+                    UPDATE players
+                    SET government_supported_cities = CONCAT(COALESCE(government_supported_cities, ''), ?)
+                    WHERE id = ? AND POSITION(? IN COALESCE(government_supported_cities, '')) = 0
+                    """, cityKey, resultSet.getLong("player_id"), cityKey);
+        });
+        jdbcTemplate.update("UPDATE players SET economy_version = 4 WHERE economy_version < 4");
+    }
+
+    private void migrateEconomyVersionFive(JdbcTemplate jdbcTemplate) {
+        Integer pendingPlayers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM players WHERE economy_version < 5", Integer.class);
+        if (pendingPlayers == null || pendingPlayers == 0) {
+            return;
+        }
+
+        // 부산·인천 지원이 추가되기 전에 이미 유상 건물을 보유한 플레이어는 해당 도시의 지원을 사용한 것으로 이전한다.
+        jdbcTemplate.query("""
+                SELECT DISTINCT b.player_id, b.city
+                FROM owned_building b
+                JOIN players p ON p.id = b.player_id
+                WHERE p.economy_version < 5
+                  AND b.purchase_price > 0
+                  AND b.city IN ('부산', '인천')
+                """, resultSet -> {
+            String cityKey = "|" + resultSet.getString("city") + "|";
+            jdbcTemplate.update("""
+                    UPDATE players
+                    SET government_supported_cities = CONCAT(COALESCE(government_supported_cities, ''), ?)
+                    WHERE id = ? AND POSITION(? IN COALESCE(government_supported_cities, '')) = 0
+                    """, cityKey, resultSet.getLong("player_id"), cityKey);
+        });
+        jdbcTemplate.update("UPDATE players SET economy_version = 5 WHERE economy_version < 5");
+    }
+
+    private void migrateEconomyVersionSix(JdbcTemplate jdbcTemplate) {
+        Integer pendingPlayers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM players WHERE economy_version < 6", Integer.class);
+        if (pendingPlayers == null || pendingPlayers == 0) {
+            return;
+        }
+
+        // 상장기업에는 아직 실적 이력이 없으므로 기존 소유구조만 삭제한다.
+        // OwnedStock은 유지되어 새 발행량으로 기업을 다시 만들 때 개인 보유량이 그대로 반영된다.
+        jdbcTemplate.update("DELETE FROM listed_company WHERE player_id IN (SELECT id FROM players WHERE economy_version < 6)");
+        jdbcTemplate.update("UPDATE players SET economy_version = 6 WHERE economy_version < 6");
+    }
+
+    private void migrateEconomyVersionSeven(JdbcTemplate jdbcTemplate) {
+        Integer pendingPlayers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM players WHERE economy_version < 7", Integer.class);
+        if (pendingPlayers == null || pendingPlayers == 0) {
+            return;
+        }
+
+        // V1 가격 이력에는 설명 없는 희귀 충격과 임의 고가·저가가 섞여 있어 V2 차트와 함께 사용할 수 없다.
+        // 보유 주식과 거래 장부는 유지하고 캔들만 초기화한다.
+        jdbcTemplate.update("DELETE FROM stock_price_history WHERE player_id IN (SELECT id FROM players WHERE economy_version < 7)");
+        jdbcTemplate.update("UPDATE players SET economy_version = 7 WHERE economy_version < 7");
     }
 
     private void refreshOwnedBuildingBalance(JdbcTemplate jdbcTemplate, BuildingCatalog catalog) {

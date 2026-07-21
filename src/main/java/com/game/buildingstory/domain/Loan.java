@@ -13,8 +13,8 @@ public class Loan {
     /*
      * 건물 대출 한 건이다.
      *
-     * principal은 남은 원금이고, monthlyPayment는 매월 상환되는 금액이다.
-     * 월초 정산에서 상환 후 원금이 0이 되면 대출은 종료된다.
+     * principal은 전액 상환 전까지 줄지 않는 원금이고, monthlyPayment는 매월 내는 이자다.
+     * 월초 정산에서 이자를 내고 24개월이 지나면 기간만 다시 24개월로 갱신한다.
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

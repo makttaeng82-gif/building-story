@@ -11,9 +11,16 @@ public record StockHoldingSummaryView(
         long totalCost,
         long totalValuation,
         long totalProfit,
+        long totalRealizedProfit,
+        long totalDividendIncome,
+        long totalFees,
         String totalCostText,
         String totalValuationText,
         String totalProfitText,
-        String profitDirection
+        String profitDirection,
+        String totalRealizedProfitText,
+        String realizedProfitDirection,
+        String totalDividendIncomeText,
+        String totalFeesText
 ) {
 }

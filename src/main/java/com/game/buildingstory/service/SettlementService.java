@@ -41,8 +41,11 @@ public class SettlementService {
     private final ReputationCatalog reputationCatalog;
     private final SecretaryTenantEventService secretaryTenantEventService;
     private final SecretaryOperationsService secretaryOperationsService;
+    private final PropertyManagementService propertyManagementService;
     private final LoanService loanService;
     private final CityMarketIndexService cityMarketIndexService;
+    private final CompanyTutorialService companyTutorialService;
+    private final CompanySettlementService companySettlementService;
 
     public SettlementService(
             OwnedBuildingRepository ownedBuildingRepository,
@@ -51,8 +54,11 @@ public class SettlementService {
             ReputationCatalog reputationCatalog,
             SecretaryTenantEventService secretaryTenantEventService,
             SecretaryOperationsService secretaryOperationsService,
+            PropertyManagementService propertyManagementService,
             LoanService loanService,
-            CityMarketIndexService cityMarketIndexService
+            CityMarketIndexService cityMarketIndexService,
+            CompanyTutorialService companyTutorialService,
+            CompanySettlementService companySettlementService
     ) {
         this.ownedBuildingRepository = ownedBuildingRepository;
         this.monthlyRecordRepository = monthlyRecordRepository;
@@ -60,8 +66,11 @@ public class SettlementService {
         this.reputationCatalog = reputationCatalog;
         this.secretaryTenantEventService = secretaryTenantEventService;
         this.secretaryOperationsService = secretaryOperationsService;
+        this.propertyManagementService = propertyManagementService;
         this.loanService = loanService;
         this.cityMarketIndexService = cityMarketIndexService;
+        this.companyTutorialService = companyTutorialService;
+        this.companySettlementService = companySettlementService;
     }
 
     public String runDailySettlement(Player player) {
@@ -72,6 +81,8 @@ public class SettlementService {
             // 월초에는 지난 달 누적 상태를 기록하고, 이번 달 고정 수입/지출을 반영한다.
             cityMarketIndexService.updateMonthlyIndexes(player);
             notice = processRepairNeglect(player);
+            notice = appendNotice(notice, companyTutorialService.processMonthly(player));
+            notice = appendNotice(notice, companySettlementService.processMonthly(player));
             if (player.isEmployed()) {
                 player.addSalaryIncome(MONTHLY_JOB_SALARY);
                 saveRecord(player, RecordType.SALARY_INCOME, "직장 월급", MONTHLY_JOB_SALARY, 0, null, null);
@@ -102,6 +113,7 @@ public class SettlementService {
         }
         if (player.getDay() == 15) {
             secretaryOperationsService.processSalaries(player);
+            notice = appendNotice(notice, propertyManagementService.processSalaries(player));
         }
         if (player.getDay() == 20) {
             String loanNotice = loanService.processMaturity(player);
@@ -111,7 +123,10 @@ public class SettlementService {
         if (!eventNotice.isBlank()) {
             notice = notice.isBlank() ? eventNotice : notice + " · " + eventNotice;
         }
-        String secretaryNotice = secretaryOperationsService.processAutoRepairs(player);
+        String managerNotice = propertyManagementService.processAutoRepairs(player);
+        notice = appendNotice(notice, managerNotice);
+        String secretaryNotice = secretaryOperationsService.processAutoRepairs(
+                player, propertyManagementService.managedCities(player));
         notice = appendNotice(notice, secretaryNotice);
         return notice;
     }
@@ -296,8 +311,7 @@ public class SettlementService {
             building.requestRepair();
             saveRecord(player, RecordType.REPAIR_REQUEST, "수리요청 발생", null, 0, building.getName(), null);
         });
-        String secretaryNotice = secretaryOperationsService.processAutoRepairs(player);
-        return appendNotice(repairRequestedBuildings.size() + "채 수리요청 발생", secretaryNotice);
+        return repairRequestedBuildings.size() + "채 수리요청 발생";
     }
 
     private String processRepairNeglect(Player player) {

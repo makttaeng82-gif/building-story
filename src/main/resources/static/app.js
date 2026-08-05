@@ -13,7 +13,6 @@ const buildingSlots = document.querySelectorAll(".building-slot[data-building]")
 const buildingDetails = document.querySelectorAll(".building-detail[data-building-detail-id]");
 const toast = document.querySelector("#toast");
 const flashToast = document.querySelector("#flashToast");
-const sideJobButton = document.querySelector("#sideJobBtn");
 const cashValue = document.querySelector("#cashValue");
 const securitiesCashValue = document.querySelector("#securitiesCashValue");
 const totalMonthlyRentValue = document.querySelector("#totalMonthlyRentValue");
@@ -33,6 +32,8 @@ const STOCK_CHART_TOGGLES_KEY = "buildingStory.stockChartToggles";
 const STOCK_CHART_LATEST_CANDLE_KEY = "buildingStory.stockChartLatestCandle";
 const WATCHED_STOCKS_KEY = "buildingStory.watchedStocks";
 const STOCK_THEME_KEY = "buildingStory.stockTheme";
+const COMPANY_THEME_KEY = "buildingStory.companyTheme";
+const STOCK_SUMMARY_MORE_KEY = "buildingStory.stockSummaryMoreOpen";
 const RECORD_PANEL_DOCKED_KEY = "buildingStory.recordPanelDocked";
 const COLLAPSIBLE_PANEL_STATE_KEY = "buildingStory.collapsiblePanels";
 const GAME_TICK_PROGRESS_KEY = "buildingStory.gameTickProgress";
@@ -86,6 +87,46 @@ function setupStockTheme() {
 }
 
 setupStockTheme();
+
+function setupCompanyTheme() {
+    const buttons = document.querySelectorAll("[data-company-theme-option]");
+    if (buttons.length === 0) {
+        return;
+    }
+
+    function applyTheme(theme, persist) {
+        const selectedTheme = theme === "light" ? "light" : "dark";
+        document.documentElement.dataset.companyTheme = selectedTheme;
+        buttons.forEach((button) => {
+            const selected = button.dataset.companyThemeOption === selectedTheme;
+            button.classList.toggle("active", selected);
+            button.setAttribute("aria-pressed", String(selected));
+        });
+        if (persist) {
+            window.localStorage.setItem(COMPANY_THEME_KEY, selectedTheme);
+        }
+    }
+
+    applyTheme(document.documentElement.dataset.companyTheme, false);
+    buttons.forEach((button) => {
+        button.addEventListener("click", () => applyTheme(button.dataset.companyThemeOption, true));
+    });
+}
+
+setupCompanyTheme();
+
+function setupStockSummaryMore() {
+    const details = document.querySelector(".stock-summary-more");
+    if (!details) {
+        return;
+    }
+    details.open = window.sessionStorage.getItem(STOCK_SUMMARY_MORE_KEY) === "true";
+    details.addEventListener("toggle", () => {
+        window.sessionStorage.setItem(STOCK_SUMMARY_MORE_KEY, String(details.open));
+    });
+}
+
+setupStockSummaryMore();
 
 const pauseForm = document.querySelector(".tab-pause-form");
 if (pauseForm) {
@@ -974,6 +1015,70 @@ function setupStockNewsPanel() {
 
 setupStockNewsPanel();
 
+function setupCompanyInformationDialog(kind) {
+    const dialog = document.querySelector(`[data-company-${kind}-dialog]`);
+    const openButtons = document.querySelectorAll(`[data-company-${kind}-open]`);
+    if (!dialog || openButtons.length === 0) {
+        return;
+    }
+    const detailArticles = dialog.querySelectorAll(`[data-company-${kind}-detail]`);
+    const closeButtons = dialog.querySelectorAll("[data-company-dialog-close]");
+
+    openButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const detailKey = button.dataset[`company${kind[0].toUpperCase()}${kind.slice(1)}Open`];
+            let selected = null;
+            detailArticles.forEach((article) => {
+                const articleKey = article.dataset[`company${kind[0].toUpperCase()}${kind.slice(1)}Detail`];
+                article.hidden = articleKey !== detailKey;
+                if (!article.hidden) {
+                    selected = article;
+                }
+            });
+            if (!selected) {
+                return;
+            }
+            const completesCompanyTutorial = kind === "report"
+                && detailKey === "1"
+                && document.querySelector("[data-company-tutorial-notice]");
+            if ((button.classList.contains("unread") || completesCompanyTutorial) && button.dataset.companyReadUrl) {
+                fetch(button.dataset.companyReadUrl, { method: "POST" })
+                    .then((response) => response.json())
+                    .then((result) => {
+                        if (result.read) {
+                            button.classList.remove("unread");
+                            button.querySelector(".company-new-mark")?.remove();
+                            const unreadCount = document.querySelector(`[data-company-unread-count="${kind}"]`);
+                            if (unreadCount) {
+                                const currentCount = Number(unreadCount.textContent.replace(/[^0-9]/g, "")) || 0;
+                                const nextCount = Math.max(0, currentCount - 1);
+                                unreadCount.textContent = `미확인 ${nextCount}`;
+                                unreadCount.hidden = nextCount === 0;
+                            }
+                            if (kind === "report" && detailKey === "1") {
+                                document.querySelector("[data-company-tutorial-notice]")?.remove();
+                            }
+                        }
+                    })
+                    .catch(() => {});
+            }
+            dialog.showModal();
+            syncGamePauseState();
+            dialog.querySelector("[data-company-dialog-close]")?.focus();
+        });
+    });
+    closeButtons.forEach((button) => button.addEventListener("click", () => dialog.close()));
+    dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) {
+            dialog.close();
+        }
+    });
+    dialog.addEventListener("close", syncGamePauseState);
+}
+
+setupCompanyInformationDialog("news");
+setupCompanyInformationDialog("report");
+
 function setupStockExchangeTabs() {
     const dialog = document.querySelector("[data-stock-account-dialog]");
     if (!dialog) {
@@ -1386,7 +1491,10 @@ function shouldKeepGamePaused() {
         || !!document.querySelector(".ability-modal-backdrop:not([hidden])")
         || !!document.querySelector(".gift-select-popover:not([hidden])")
         || !!document.querySelector("[data-stock-account-dialog][open]")
-        || !!document.querySelector("[data-stock-news-dialog][open]");
+        || !!document.querySelector("[data-stock-news-dialog][open]")
+        || !!document.querySelector("[data-company-news-dialog][open]")
+        || !!document.querySelector("[data-company-report-dialog][open]")
+        || !!document.querySelector("[data-company-command-dialog][open]");
 }
 
 function syncGamePauseState() {
@@ -1432,31 +1540,486 @@ if (auctionTimer) {
     }
 }
 
-if (sideJobButton) {
-    sideJobButton.addEventListener("click", async () => {
-        sideJobButton.disabled = true;
-        try {
-            const response = await fetch("/side-job/quick", { method: "POST" });
-            const result = await response.json();
-            if (result.redirect) {
-                window.location.href = result.redirect;
-                return;
+function setupCompanyDashboard() {
+    /*
+     * 가운데 운영 항목을 선택하면 같은 key를 가진 좌측 상세 정보와 우측 비서 정보를 함께 연다.
+     * 서버가 렌더링한 데이터를 다시 계산하지 않고 표시 상태만 바꾸므로 페이지 이동이나 날짜 게이지 초기화가 없다.
+     */
+    const dashboard = document.querySelector("[data-company-dashboard]");
+    if (!dashboard) {
+        return;
+    }
+
+    const operationButtons = [...dashboard.querySelectorAll("[data-company-operation-key]")];
+    const executiveCommandButtons = [...dashboard.querySelectorAll("[data-company-executive-command-target]")];
+    const workQueueButtons = [...dashboard.querySelectorAll("[data-company-work-target]")];
+    const detailViews = [...dashboard.querySelectorAll("[data-company-detail-key]")];
+    const secretaryViews = [...dashboard.querySelectorAll("[data-company-secretary-key]")];
+    const secretaryDepartment = dashboard.querySelector("[data-company-secretary-department]");
+    const secretaryName = dashboard.querySelector("[data-company-secretary-name]");
+    const selectedStatus = dashboard.querySelector("[data-company-selected-status]");
+    const actionBar = dashboard.querySelector("[data-company-detail-actionbar]");
+    const actionLabel = dashboard.querySelector("[data-company-detail-action-label]");
+    const actionButton = dashboard.querySelector("[data-company-detail-action]");
+    const actionSelect = dashboard.querySelector("[data-company-detail-action-select]");
+    let selectedPrimaryActions = [];
+    const selectionStorageKey = "company-dashboard-selected-item";
+    const detailScrollStorageKey = "company-dashboard-detail-scroll";
+    const secretaryScrollStorageKey = "company-dashboard-secretary-scroll";
+    const detailSectionStorageKey = "company-dashboard-detail-section";
+    const availableKeys = new Set(operationButtons.map((button) => button.dataset.companyOperationKey));
+    const detailSectionControllers = new Map();
+
+    function scrollKey(prefix, key) {
+        return `${prefix}:${key}`;
+    }
+
+    function restorePanelScroll(view, prefix, key) {
+        if (!view) {
+            return;
+        }
+        const saved = Number(sessionStorage.getItem(scrollKey(prefix, key))) || 0;
+        window.requestAnimationFrame(() => {
+            view.scrollTop = saved;
+        });
+    }
+
+    function setupDetailSections(view) {
+        const sections = [...view.querySelectorAll(":scope > [data-company-detail-section]")];
+        if (sections.length < 2) {
+            return;
+        }
+        const navigation = document.createElement("nav");
+        navigation.className = "company-detail-section-tabs";
+        navigation.setAttribute("aria-label", "선택 상세 구역");
+        const buttons = sections.map((section, index) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = section.dataset.companyDetailSection;
+            button.addEventListener("click", () => selectDetailSection(view, index, true));
+            navigation.append(button);
+            return button;
+        });
+        const highlight = view.querySelector(":scope > .company-detail-highlight");
+        highlight?.insertAdjacentElement("afterend", navigation);
+        detailSectionControllers.set(view, { sections, buttons });
+        const savedIndex = Number(sessionStorage.getItem(scrollKey(
+            detailSectionStorageKey,
+            view.dataset.companyDetailKey
+        )));
+        selectDetailSection(view, Number.isInteger(savedIndex) ? savedIndex : 0, false);
+    }
+
+    function selectDetailSection(view, requestedIndex, focusNavigation) {
+        const controller = detailSectionControllers.get(view);
+        if (!controller) {
+            return;
+        }
+        const index = Math.min(Math.max(requestedIndex, 0), controller.sections.length - 1);
+        controller.sections.forEach((section, sectionIndex) => {
+            section.hidden = sectionIndex !== index;
+        });
+        controller.buttons.forEach((button, buttonIndex) => {
+            const selected = buttonIndex === index;
+            button.classList.toggle("active", selected);
+            button.setAttribute("aria-pressed", String(selected));
+        });
+        sessionStorage.setItem(scrollKey(detailSectionStorageKey, view.dataset.companyDetailKey), String(index));
+        if (focusNavigation) {
+            controller.buttons[index].focus({ preventScroll: true });
+        }
+    }
+
+    function revealActionSection(action) {
+        const view = action.closest("[data-company-detail-key]");
+        const section = action.closest("[data-company-detail-section]");
+        const controller = detailSectionControllers.get(view);
+        if (!section || !controller) {
+            return;
+        }
+        selectDetailSection(view, controller.sections.indexOf(section), false);
+    }
+
+    detailViews.forEach(setupDetailSections);
+
+    function selectCompanyItem(key) {
+        if (!availableKeys.has(key)) {
+            return;
+        }
+        operationButtons.forEach((button) => {
+            const selected = button.dataset.companyOperationKey === key;
+            button.classList.toggle("active", selected);
+            button.setAttribute("aria-pressed", String(selected));
+        });
+        detailViews.forEach((view) => view.classList.toggle("active", view.dataset.companyDetailKey === key));
+        secretaryViews.forEach((view) => view.classList.toggle("active", view.dataset.companySecretaryKey === key));
+        const selectedSecretary = secretaryViews.find((view) => view.dataset.companySecretaryKey === key);
+        const selectedDetail = detailViews.find((view) => view.dataset.companyDetailKey === key);
+        const selectedOperation = operationButtons.find((button) => button.dataset.companyOperationKey === key);
+        if (selectedStatus && selectedOperation) {
+            selectedStatus.textContent = selectedOperation.dataset.companyOperationStatus || "상태 확인";
+            selectedStatus.classList.remove("good", "warn", "danger", "muted");
+            if (selectedOperation.dataset.companyOperationTone) {
+                selectedStatus.classList.add(selectedOperation.dataset.companyOperationTone);
             }
-            if (cashValue) {
-                cashValue.textContent = result.cash;
+        }
+        if (selectedSecretary && secretaryDepartment && secretaryName) {
+            secretaryDepartment.textContent = selectedSecretary.dataset.companySecretaryDepartment;
+            secretaryName.textContent = selectedSecretary.dataset.companySecretaryName;
+        }
+        dashboard.dataset.selectedCompanyKey = key;
+        sessionStorage.setItem(selectionStorageKey, key);
+        restorePanelScroll(selectedDetail, detailScrollStorageKey, key);
+        restorePanelScroll(selectedSecretary, secretaryScrollStorageKey, key);
+        if (actionBar && actionLabel && actionButton) {
+            selectedPrimaryActions = selectedDetail
+                ? [...selectedDetail.querySelectorAll('form button[type="submit"]:not(:disabled)')]
+                    .filter((button) => !button.classList.contains("secondary"))
+                    .filter((button) => !["거절", "계약 종료"].includes(button.textContent.trim()))
+                : [];
+            actionBar.hidden = selectedPrimaryActions.length === 0;
+            dashboard.querySelector(".company-detail-panel")
+                ?.classList.toggle("has-actionbar", selectedPrimaryActions.length > 0);
+            if (selectedPrimaryActions.length === 1) {
+                const label = selectedPrimaryActions[0].textContent.trim();
+                actionLabel.textContent = label;
+                actionButton.textContent = label;
+                if (actionSelect) {
+                    actionSelect.hidden = true;
+                    actionSelect.replaceChildren();
+                }
+            } else if (selectedPrimaryActions.length > 1) {
+                actionLabel.textContent = `사용 가능한 명령 ${selectedPrimaryActions.length}개 중 선택`;
+                actionButton.textContent = "명령으로 이동";
+                if (actionSelect) {
+                    actionSelect.replaceChildren();
+                    selectedPrimaryActions.forEach((button, index) => {
+                        const option = document.createElement("option");
+                        const sectionLabel = button.closest("[data-company-detail-section]")
+                            ?.dataset.companyDetailSection;
+                        const itemLabel = button.closest("article")
+                            ?.querySelector(":scope > div strong")
+                            ?.textContent.trim();
+                        option.value = String(index);
+                        option.textContent = [sectionLabel, itemLabel, button.textContent.trim()]
+                            .filter(Boolean)
+                            .join(" · ");
+                        actionSelect.append(option);
+                    });
+                    actionSelect.hidden = false;
+                }
             }
-            if (totalMonthlyRentValue) {
-                totalMonthlyRentValue.textContent = result.totalMonthlyRent;
-            }
-            showToast(result.notice);
-        } catch (error) {
-            console.warn("side job failed", error);
-            showToast("부업 처리 실패");
-        } finally {
-            sideJobButton.disabled = false;
+        }
+    }
+
+    detailViews.forEach((view) => {
+        view.addEventListener("scroll", () => {
+            sessionStorage.setItem(scrollKey(detailScrollStorageKey, view.dataset.companyDetailKey), String(view.scrollTop));
+        });
+    });
+    secretaryViews.forEach((view) => {
+        view.addEventListener("scroll", () => {
+            sessionStorage.setItem(scrollKey(secretaryScrollStorageKey, view.dataset.companySecretaryKey), String(view.scrollTop));
+        });
+    });
+    operationButtons.forEach((button) => {
+        button.addEventListener("click", () => selectCompanyItem(button.dataset.companyOperationKey));
+    });
+    workQueueButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const targetKey = button.dataset.companyWorkTarget;
+            selectCompanyItem(targetKey);
+            dashboard.querySelector(`[data-company-operation-key="${targetKey}"]`)
+                ?.scrollIntoView({ block: "center", behavior: "smooth" });
+        });
+    });
+    executiveCommandButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const targetKey = button.dataset.companyExecutiveCommandTarget;
+            selectCompanyItem(targetKey);
+            window.requestAnimationFrame(() => {
+                const targetDetail = detailViews.find((view) => view.dataset.companyDetailKey === targetKey);
+                const firstCommand = targetDetail?.querySelector('form button[type="submit"]:not(:disabled)');
+                if (firstCommand) {
+                    firstCommand.scrollIntoView({ block: "center", behavior: "smooth" });
+                    firstCommand.focus({ preventScroll: true });
+                    return;
+                }
+                targetDetail?.scrollTo({ top: 0, behavior: "smooth" });
+                targetDetail?.focus({ preventScroll: true });
+            });
+        });
+    });
+    actionButton?.addEventListener("click", () => {
+        if (selectedPrimaryActions.length === 1) {
+            selectedPrimaryActions[0].click();
+            return;
+        }
+        const selectedAction = selectedPrimaryActions[Number(actionSelect?.value) || 0];
+        if (selectedAction) {
+            revealActionSection(selectedAction);
+            window.requestAnimationFrame(() => {
+                selectedAction.scrollIntoView({ block: "center", behavior: "smooth" });
+                selectedAction.focus({ preventScroll: true });
+            });
         }
     });
+    const tutorialReportButton = dashboard.querySelector("[data-company-open-first-report]");
+    tutorialReportButton?.addEventListener("click", () => {
+        dashboard.querySelector('[data-company-report-open="1"]')?.click();
+    });
+
+    const budgetPolicy = dashboard.querySelector("[data-company-budget-policy]");
+    if (budgetPolicy) {
+        const developmentSelect = budgetPolicy.querySelector('select[name="developmentPolicy"]');
+        const marketingSelect = budgetPolicy.querySelector('select[name="marketingPolicy"]');
+        const developmentOutput = budgetPolicy.querySelector("[data-company-development-cost-preview]");
+        const marketingOutput = budgetPolicy.querySelector("[data-company-marketing-cost-preview]");
+        const standardDevelopmentCost = Number(budgetPolicy.dataset.standardDevelopmentCost) || 0;
+        const standardMarketingCost = Number(budgetPolicy.dataset.standardMarketingCost) || 0;
+
+        function formatCompanyBudgetMoney(value) {
+            let remaining = Math.max(0, Math.trunc(value));
+            const jo = Math.floor(remaining / 1_000_000_000_000);
+            remaining %= 1_000_000_000_000;
+            const eok = Math.floor(remaining / 100_000_000);
+            remaining %= 100_000_000;
+            const man = Math.floor(remaining / 10_000);
+            const parts = [];
+            if (jo > 0) parts.push(`${jo}조`);
+            if (eok > 0) parts.push(`${eok}억`);
+            if (man > 0 && jo === 0) parts.push(`${man}만`);
+            if (parts.length === 0) parts.push(String(remaining));
+            return `${parts.join("")}원`;
+        }
+
+        function selectedSpendingPercent(select) {
+            return Number(select?.selectedOptions[0]?.dataset.spendingPercent) || 0;
+        }
+
+        function updateBudgetPreview() {
+            if (developmentOutput) {
+                developmentOutput.textContent = formatCompanyBudgetMoney(
+                    Math.trunc(standardDevelopmentCost * selectedSpendingPercent(developmentSelect) / 100)
+                );
+            }
+            if (marketingOutput) {
+                marketingOutput.textContent = formatCompanyBudgetMoney(
+                    Math.trunc(standardMarketingCost * selectedSpendingPercent(marketingSelect) / 100)
+                );
+            }
+        }
+
+        developmentSelect?.addEventListener("change", updateBudgetPreview);
+        marketingSelect?.addEventListener("change", updateBudgetPreview);
+    }
+    const storedSelection = sessionStorage.getItem(selectionStorageKey);
+    selectCompanyItem(availableKeys.has(storedSelection) ? storedSelection : dashboard.dataset.selectedCompanyKey);
 }
+
+function setupCompanyPreparation() {
+    const preparation = document.querySelector("[data-company-preparation]");
+    if (!preparation) {
+        return;
+    }
+
+    const amountInput = preparation.querySelector("#companyInvestmentAmount");
+    const presetButtons = [...preparation.querySelectorAll("[data-company-investment-preset]")];
+    const allButton = preparation.querySelector("[data-company-investment-all]");
+    const validation = preparation.querySelector("#companyInvestmentValidation");
+    const corporateCash = preparation.querySelector("#companyCorporateCashPreview");
+    const twelveMonthCash = preparation.querySelector("#companyTwelveMonthCashPreview");
+    const runway = preparation.querySelector("#companyRunwayPreview");
+    const runwayTone = preparation.querySelector("#companyRunwayTone");
+    const personalCash = Number(preparation.dataset.personalCash);
+    const minimumInvestment = Number(preparation.dataset.minimumInvestment);
+    const trainingCost = Number(preparation.dataset.trainingCost);
+    const monthlyFixedCost = Number(preparation.dataset.monthlyFixedCost);
+
+    function formatCompanyMoney(value) {
+        const sign = value < 0 ? "-" : "";
+        let remaining = Math.abs(Math.trunc(value));
+        const jo = Math.floor(remaining / 1_000_000_000_000);
+        remaining %= 1_000_000_000_000;
+        const eok = Math.floor(remaining / 100_000_000);
+        remaining %= 100_000_000;
+        const man = Math.floor(remaining / 10_000);
+        const parts = [];
+        if (jo > 0) parts.push(`${jo}조`);
+        if (eok > 0) parts.push(`${eok}억`);
+        if (man > 0 && jo === 0) parts.push(`${man}만`);
+        if (parts.length === 0) parts.push(`${remaining}`);
+        return `${sign}${parts.join("")}원`;
+    }
+
+    function renderPreview() {
+        const investment = Math.max(0, Math.trunc(Number(amountInput.value) || 0));
+        const afterTraining = investment - trainingCost;
+        const afterTwelveMonths = afterTraining - monthlyFixedCost * 12;
+        const runwayMonths = afterTraining > 0 ? afterTraining / monthlyFixedCost : 0;
+        const valid = investment >= minimumInvestment && investment <= personalCash;
+
+        corporateCash.textContent = formatCompanyMoney(afterTraining);
+        twelveMonthCash.textContent = formatCompanyMoney(afterTwelveMonths);
+        twelveMonthCash.classList.toggle("negative", afterTwelveMonths < 0);
+        runway.textContent = `${runwayMonths.toFixed(1)}개월`;
+        runwayTone.textContent = runwayMonths < 12 ? "자금 주의" : "12개월 이상";
+        runwayTone.classList.toggle("warn", runwayMonths < 12);
+
+        if (investment < minimumInvestment) {
+            validation.textContent = "최소 출자금은 1,500억원입니다.";
+        } else if (investment > personalCash) {
+            validation.textContent = "보유한 개인 현금을 초과할 수 없습니다.";
+        } else {
+            validation.textContent = "출자 가능한 금액입니다.";
+        }
+        validation.classList.toggle("valid", valid);
+        presetButtons.forEach((button) => button.classList.toggle("active", Number(button.dataset.amount) === investment));
+        allButton.classList.toggle("active", investment === personalCash);
+    }
+
+    presetButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            amountInput.value = button.dataset.amount;
+            renderPreview();
+        });
+    });
+    allButton.addEventListener("click", () => {
+        amountInput.value = String(personalCash);
+        renderPreview();
+    });
+    amountInput.addEventListener("input", renderPreview);
+    renderPreview();
+}
+
+function setupCompanyHiring() {
+    const hiring = document.querySelector("[data-company-hiring]");
+    if (!hiring) return;
+    const checkboxes = [...hiring.querySelectorAll('input[name="candidateKeys"]')];
+    const submit = hiring.querySelector("[data-company-hiring-submit]");
+    const selectedCount = hiring.querySelector("[data-company-selected-count]");
+    const signingTotal = hiring.querySelector("[data-company-signing-total]");
+
+    function renderHiring() {
+        const selected = checkboxes.filter((checkbox) => checkbox.checked);
+        const counts = { AI_DEVELOPMENT: 0, SALES_MARKETING: 0, SERVICE_OPERATIONS: 0 };
+        let total = 0;
+        selected.forEach((checkbox) => {
+            const row = checkbox.closest("[data-department]");
+            counts[row.dataset.department] += 1;
+            total += Number(row.dataset.signingBonus);
+        });
+        selectedCount.textContent = String(selected.length);
+        Object.entries(counts).forEach(([department, count]) => {
+            hiring.querySelector(`[data-company-count="${department}"]`).textContent = String(count);
+        });
+        signingTotal.textContent = new Intl.NumberFormat("ko-KR").format(total) + "원";
+        checkboxes.forEach((checkbox) => {
+            checkbox.disabled = !checkbox.checked && selected.length >= 6;
+        });
+        submit.disabled = !(selected.length === 6 && counts.AI_DEVELOPMENT >= 2
+            && counts.SALES_MARKETING >= 1 && counts.SERVICE_OPERATIONS >= 1);
+    }
+    checkboxes.forEach((checkbox) => checkbox.addEventListener("change", renderHiring));
+    renderHiring();
+}
+
+function setupCompanyCommandConfirmation() {
+    const dialog = document.querySelector("[data-company-command-dialog]");
+    if (!dialog) {
+        return;
+    }
+    const importantActions = [
+        "/companies/funding",
+        "/companies/finance/",
+        "/companies/workforce/hire",
+        "/companies/workforce/core-hire",
+        "/companies/workforce/training",
+        "/companies/workforce/retention",
+        "/companies/departments",
+        "/companies/organization/upgrade",
+        "/companies/infrastructure/",
+        "/companies/projects/",
+        "/companies/contracts/",
+        "/companies/incidents/"
+    ];
+    const confirmedForms = new WeakSet();
+    const title = dialog.querySelector("[data-company-command-title]");
+    const messageText = dialog.querySelector("[data-company-command-message]");
+    const confirmButton = dialog.querySelector("[data-company-command-confirm]");
+    const cancelButtons = dialog.querySelectorAll("[data-company-command-cancel]");
+    let pendingForm = null;
+    let pendingSubmitter = null;
+
+    const closeDialog = () => {
+        pendingForm = null;
+        pendingSubmitter = null;
+        dialog.close();
+    };
+
+    cancelButtons.forEach((button) => button.addEventListener("click", closeDialog));
+    dialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeDialog();
+    });
+    dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) {
+            closeDialog();
+        }
+    });
+    dialog.addEventListener("close", syncGamePauseState);
+    confirmButton.addEventListener("click", () => {
+        if (!pendingForm) {
+            return;
+        }
+        const form = pendingForm;
+        const submitter = pendingSubmitter;
+        pendingForm = null;
+        pendingSubmitter = null;
+        confirmedForms.add(form);
+        dialog.close();
+        if (submitter) {
+            form.requestSubmit(submitter);
+        } else {
+            form.requestSubmit();
+        }
+    });
+
+    document.querySelectorAll('form[method="post"][action^="/companies"]').forEach((form) => {
+        const action = form.getAttribute("action") || "";
+        const customMessage = form.dataset.companyConfirm;
+        if (!customMessage && !importantActions.some((prefix) => action.startsWith(prefix))) {
+            return;
+        }
+        form.addEventListener("submit", (event) => {
+            if (confirmedForms.has(form)) {
+                confirmedForms.delete(form);
+                const submitButton = event.submitter || form.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                }
+                return;
+            }
+            event.preventDefault();
+            const message = customMessage
+                || "비용, 인력 또는 진행 상태가 즉시 변경됩니다. 이 명령을 실행합니까?";
+            pendingForm = form;
+            pendingSubmitter = event.submitter || form.querySelector('button[type="submit"]');
+            title.textContent = action.startsWith("/companies/incidents/")
+                ? "서비스 장애 대응을 확정합니까?"
+                : "기업 명령을 실행합니까?";
+            messageText.textContent = message;
+            dialog.showModal();
+            syncGamePauseState();
+            confirmButton.focus();
+        });
+    });
+}
+
+setupCompanyDashboard();
+setupCompanyPreparation();
+setupCompanyHiring();
+setupCompanyCommandConfirmation();
 
 async function advanceDay() {
     /*
@@ -1471,7 +2034,7 @@ async function advanceDay() {
     }
     ticking = true;
     try {
-        const view = document.querySelector(".stock-panel") ? "stocks" : "city";
+        const view = document.body.dataset.viewMode || "city";
         const expectedElapsedDays = Number(document.body.dataset.elapsedDays);
         const response = await fetch(`/tick?view=${view}&expectedElapsedDays=${expectedElapsedDays}`, { method: "POST" });
         const result = await response.json();
@@ -1563,7 +2126,7 @@ function updateDayProgress() {
     }
 }
 
-if (document.querySelector(".city-panel") || document.querySelector(".stock-panel")) {
+if (document.querySelector(".city-panel") || document.querySelector(".stock-panel") || document.body.classList.contains("view-company")) {
     window.setInterval(updateDayProgress, 100);
     window.addEventListener("pagehide", () => persistTickProgress());
 }

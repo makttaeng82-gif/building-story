@@ -3,18 +3,23 @@ package com.game.buildingstory.service;
 import com.game.buildingstory.domain.MonthlyRecord;
 import com.game.buildingstory.domain.OwnedBuilding;
 import com.game.buildingstory.domain.OwnedSecretary;
+import com.game.buildingstory.domain.CompanyCashFlowType;
+import com.game.buildingstory.domain.CompanyTutorialStage;
 import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.RecordType;
 import com.game.buildingstory.repo.MonthlyRecordRepository;
 import com.game.buildingstory.repo.OwnedBuildingRepository;
 import com.game.buildingstory.repo.OwnedSecretaryRepository;
+import com.game.buildingstory.repo.OwnedPropertyManagerRepository;
 import com.game.buildingstory.repo.PlayerRepository;
+import com.game.buildingstory.repo.PlayerCompanyRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -32,27 +37,36 @@ public class SecretaryOperationsService {
     private final PlayerRepository playerRepository;
     private final OwnedBuildingRepository ownedBuildingRepository;
     private final OwnedSecretaryRepository ownedSecretaryRepository;
+    private final OwnedPropertyManagerRepository propertyManagerRepository;
+    private final PlayerCompanyRepository playerCompanyRepository;
     private final MonthlyRecordRepository monthlyRecordRepository;
     private final BuildingCatalog buildingCatalog;
     private final ReputationCatalog reputationCatalog;
     private final SecretaryCatalog secretaryCatalog;
+    private final CompanyCashLedgerService cashLedgerService;
 
     public SecretaryOperationsService(
             PlayerRepository playerRepository,
             OwnedBuildingRepository ownedBuildingRepository,
             OwnedSecretaryRepository ownedSecretaryRepository,
+            OwnedPropertyManagerRepository propertyManagerRepository,
+            PlayerCompanyRepository playerCompanyRepository,
             MonthlyRecordRepository monthlyRecordRepository,
             BuildingCatalog buildingCatalog,
             ReputationCatalog reputationCatalog,
-            SecretaryCatalog secretaryCatalog
+            SecretaryCatalog secretaryCatalog,
+            CompanyCashLedgerService cashLedgerService
     ) {
         this.playerRepository = playerRepository;
         this.ownedBuildingRepository = ownedBuildingRepository;
         this.ownedSecretaryRepository = ownedSecretaryRepository;
+        this.propertyManagerRepository = propertyManagerRepository;
+        this.playerCompanyRepository = playerCompanyRepository;
         this.monthlyRecordRepository = monthlyRecordRepository;
         this.buildingCatalog = buildingCatalog;
         this.reputationCatalog = reputationCatalog;
         this.secretaryCatalog = secretaryCatalog;
+        this.cashLedgerService = cashLedgerService;
     }
 
     public String hireFirstSecretary(long playerId) {
@@ -125,8 +139,19 @@ public class SecretaryOperationsService {
     }
 
     @Transactional(readOnly = true)
+    public boolean isAssignedToCompany(Player player, OwnedSecretary secretary) {
+        return player != null
+                && secretary != null
+                && secretary.getAssignedCity() == null
+                && playerCompanyRepository.findByPlayer(player).isPresent();
+    }
+
+    @Transactional(readOnly = true)
     public boolean canAssignSecretaryToCity(Player player, OwnedSecretary targetSecretary, String city) {
         if (player == null || targetSecretary == null || city == null) {
+            return false;
+        }
+        if (propertyManagerRepository.findByPlayerAndCity(player, city).isPresent()) {
             return false;
         }
         return ownedSecretaryRepository.findByPlayerAndAssignedCityOrderById(player, city).stream()
@@ -167,6 +192,9 @@ public class SecretaryOperationsService {
         if (!reputationCatalog.isCityUnlocked(city, player.getReputation(), !player.isEmployed())) {
             return "해금되지 않은 도시";
         }
+        if (propertyManagerRepository.findByPlayerAndCity(player, city).isPresent()) {
+            return "부동산 관리직원이 배치된 도시에는 비서를 배치할 수 없음";
+        }
         OwnedSecretary secretary = ownedSecretaryRepository.findById(ownedSecretaryId).orElseThrow();
         if (!secretary.getPlayer().getId().equals(player.getId())) {
             return "잘못된 비서";
@@ -194,9 +222,14 @@ public class SecretaryOperationsService {
     }
 
     public String processAutoRepairs(Player player) {
+        return processAutoRepairs(player, Set.of());
+    }
+
+    /** 관리직원에게 인계된 도시는 비서 자동수리 대상에서 제외한다. */
+    public String processAutoRepairs(Player player, Set<String> managerAssignedCities) {
         String notice = "";
         for (OwnedSecretary secretary : ownedSecretaryRepository.findByPlayerOrderById(player)) {
-            if (secretary.getAssignedCity() == null) {
+            if (secretary.getAssignedCity() == null || managerAssignedCities.contains(secretary.getAssignedCity())) {
                 continue;
             }
             SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElse(null);
@@ -237,24 +270,80 @@ public class SecretaryOperationsService {
     }
 
     public void processSalaries(Player player) {
+        List<OwnedSecretary> secretaries = ownedSecretaryRepository.findByPlayerOrderById(player);
+        var company = playerCompanyRepository.findByPlayer(player);
+        if (company.isPresent() && company.get().getTutorialStage().isOperational()) {
+            return;
+        }
+        long corporatePayroll = totalMonthlySalary(secretaries);
+        boolean corporatePayrollPaid = company.isPresent() && cashLedgerService.withdraw(
+                company.get(),
+                "secretary-payroll:" + player.getElapsedDays(),
+                CompanyCashFlowType.OPERATING,
+                "비서 급여",
+                corporatePayroll
+        );
+
+        for (OwnedSecretary secretary : secretaries) {
+            SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElse(null);
+            if (spec == null) {
+                continue;
+            }
+            long salary = spec.monthlySalaryForProficiency(secretary.getProficiency());
+            boolean salaryPaid = company.isPresent() ? corporatePayrollPaid : player.paySecretarySalary(salary);
+            if (salaryPaid) {
+                secretary.recordSalaryPaid();
+                saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급", -salary, 0, null,
+                        spec.name() + " · 숙련도 " + secretary.getProficiency() + (company.isPresent() ? " · 법인 지급" : ""));
+                continue;
+            }
+            secretary.recordUnpaidSalary();
+            saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급 미지급", null, 0, null, spec.name() + " · 효과 정지 · 미지급 " + secretary.getUnpaidSalaryMonths() + "개월");
+            if (company.isEmpty() && secretary.getUnpaidSalaryMonths() >= 2) {
+                ownedSecretaryRepository.delete(secretary);
+                saveRecord(player, RecordType.SECRETARY_SALARY, "비서 계약 종료", null, 0, null, spec.name() + " · 월급 2개월 미지급");
+            }
+        }
+    }
+
+    /**
+     * 출시된 기업의 월 손익 계산에서 사용할 비서 급여 총액이다.
+     * 실제 차감은 기업 월 정산이 모든 운영비와 함께 한 번만 수행한다.
+     */
+    @Transactional(readOnly = true)
+    public long companyMonthlyPayroll(Player player) {
+        return totalMonthlySalary(ownedSecretaryRepository.findByPlayerOrderById(player));
+    }
+
+    /**
+     * 기업 월 정산 결과를 각 비서의 급여 상태와 최근 기록에 반영한다.
+     * 이 메서드는 이미 정산된 현금을 다시 차감하지 않는다.
+     */
+    public void recordCompanySalarySettlement(Player player, boolean paid) {
         for (OwnedSecretary secretary : ownedSecretaryRepository.findByPlayerOrderById(player)) {
             SecretarySpec spec = secretaryCatalog.find(secretary.getSecretaryKey()).orElse(null);
             if (spec == null) {
                 continue;
             }
             long salary = spec.monthlySalaryForProficiency(secretary.getProficiency());
-            if (player.paySecretarySalary(salary)) {
+            if (paid) {
                 secretary.recordSalaryPaid();
-                saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급", -salary, 0, null, spec.name() + " · 숙련도 " + secretary.getProficiency());
-                continue;
-            }
-            secretary.recordUnpaidSalary();
-            saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급 미지급", null, 0, null, spec.name() + " · 효과 정지 · 미지급 " + secretary.getUnpaidSalaryMonths() + "개월");
-            if (secretary.getUnpaidSalaryMonths() >= 2) {
-                ownedSecretaryRepository.delete(secretary);
-                saveRecord(player, RecordType.SECRETARY_SALARY, "비서 계약 종료", null, 0, null, spec.name() + " · 월급 2개월 미지급");
+                saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급", -salary, 0, null,
+                        spec.name() + " · 숙련도 " + secretary.getProficiency() + " · 법인 지급");
+            } else {
+                secretary.recordUnpaidSalary();
+                saveRecord(player, RecordType.SECRETARY_SALARY, "비서 월급 미지급", null, 0, null,
+                        spec.name() + " · 법인 운영 중단 · 미지급 " + secretary.getUnpaidSalaryMonths() + "개월");
             }
         }
+    }
+
+    private long totalMonthlySalary(List<OwnedSecretary> secretaries) {
+        return secretaries.stream()
+                .mapToLong(secretary -> secretaryCatalog.find(secretary.getSecretaryKey())
+                        .map(spec -> spec.monthlySalaryForProficiency(secretary.getProficiency()))
+                        .orElse(0L))
+                .sum();
     }
 
     @Transactional(readOnly = true)

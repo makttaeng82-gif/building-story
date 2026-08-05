@@ -26,7 +26,6 @@
                 <div><dt>상태</dt><dd th:text="${@gameService.secretaryTenantStatusText(building).isBlank() ? (building.occupied ? (building.protectedTenant ? '후배 거주중' : (building.tenantProtectedDaysLeft(player.elapsedDays) > 0 ? '입주중 · 퇴거보호 ' + player.ddayText(building.tenantProtectedDaysLeft(player.elapsedDays)) : '입주중')) : '공실') : @gameService.secretaryTenantStatusText(building)}">상태</dd></div>
                 <div><dt>수리</dt><dd th:text="${building.repairRequested ? '요청중 · 비용 ' + @moneyText.format(building.repairCost()) : '요청 없음'}">수리</dd></div>
                 <div><dt>판매 가능</dt><dd th:text="${@gameService.sellAvailabilityText(player, building)}">D-0</dd></div>
-                <div th:if="${building.governmentSupportClawback(player.elapsedDays) > 0}"><dt>정부지원 환수</dt><dd th:text="${@moneyText.format(building.governmentSupportClawback(player.elapsedDays))} + ' · ' + ${player.ddayText(building.governmentSupportClawbackDaysLeft(player.elapsedDays))}">환수액</dd></div>
             </dl>
             <div class="button-row">
                 <form method="post" th:action="@{/buildings/{id}/repair(id=${building.id})}">

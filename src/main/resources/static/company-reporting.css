@@ -1,0 +1,572 @@
+/* 기업 화면 하단 보고·뉴스·팝업과 연결된 상호작용 위젯 스타일 */
+.company-bottom-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    height: 340px;
+    min-width: 0;
+}
+
+.company-list-panel {
+    display: grid;
+    grid-template-rows: 58px 28px minmax(0, 1fr);
+}
+
+.company-list-panel:has(.company-financial-forecast) {
+    grid-template-rows: 58px auto 28px minmax(0, 1fr);
+}
+
+.company-panel-count {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 7px;
+    min-width: max-content;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.company-panel-head > .company-panel-count {
+    display: flex;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    gap: 7px;
+}
+
+.company-panel-count b {
+    color: var(--company-muted);
+    font-size: 11px;
+}
+
+.company-panel-count em {
+    padding: 3px 6px;
+    border: 1px solid #8a6722;
+    border-radius: 3px;
+    background: #2a210f;
+    color: var(--company-orange);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.company-financial-forecast {
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--company-line-soft);
+    background: #111c27;
+    color: var(--company-faint);
+}
+
+.company-financial-forecast header,
+.company-financial-forecast div,
+.company-financial-forecast p {
+    display: flex;
+    align-items: center;
+}
+
+.company-financial-forecast header {
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.company-financial-forecast header strong {
+    color: var(--company-text);
+    font-size: 10px;
+}
+
+.company-financial-forecast header span,
+.company-financial-forecast small {
+    font-size: 10px;
+}
+
+.company-financial-forecast div {
+    gap: 12px;
+}
+
+.company-financial-forecast p {
+    display: grid;
+    flex: 1 1 0;
+    min-width: 0;
+    align-content: start;
+    gap: 2px;
+    margin: 0;
+    font-size: 10px;
+}
+
+.company-financial-forecast p b {
+    color: var(--company-text);
+    font-size: 10px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.company-financial-forecast small {
+    display: block;
+    margin-top: 5px;
+}
+
+.company-table-head,
+.company-table-row {
+    display: grid;
+    align-items: center;
+    column-gap: 10px;
+    min-width: 0;
+    padding: 0 13px;
+}
+
+.company-table-head {
+    border-bottom: 1px solid var(--company-line-soft);
+    background: #111c27;
+    color: var(--company-faint);
+    font-size: 11px;
+}
+
+.company-scroll-list {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-color: var(--company-faint) transparent;
+    scrollbar-color: var(--company-faint) var(--company-surface-2);
+    scrollbar-width: auto;
+}
+
+.company-table-row {
+    position: relative;
+    min-height: 37px;
+    border-bottom: 1px solid var(--company-line-soft);
+    color: var(--company-muted);
+    font-size: 11px;
+}
+
+.company-work-row {
+    width: 100%;
+    border-top: 0;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    background: transparent;
+    text-align: left;
+}
+
+.company-work-row:not(:disabled) {
+    cursor: pointer;
+}
+
+.company-work-row:not(:disabled):hover,
+.company-work-row:not(:disabled):focus-visible {
+    background: var(--company-surface-soft);
+}
+
+.company-work-row:disabled {
+    cursor: default;
+    opacity: 1;
+}
+
+.company-table-row strong,
+.company-table-row span,
+.company-table-row b {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.company-table-row strong {
+    color: var(--company-text);
+    font-size: 12px;
+}
+
+.work-columns {
+    grid-template-columns: 64px minmax(150px, 1fr) minmax(96px, 112px) 86px 72px;
+}
+
+.news-columns {
+    grid-template-columns: 48px 52px minmax(190px, 1fr) 72px;
+}
+
+.report-columns {
+    grid-template-columns: 70px 90px 90px minmax(130px, 1fr);
+}
+
+.company-news-category {
+    color: var(--company-blue);
+}
+
+.company-information-row {
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    text-align: left;
+    padding-right: 28px;
+    cursor: pointer;
+}
+
+.company-information-row:hover,
+.company-information-row.unread {
+    background: rgba(52, 142, 255, 0.07);
+}
+
+.company-new-mark {
+    display: inline-block;
+    margin-right: 5px;
+    color: var(--company-amber);
+    font-size: 9px;
+    font-style: normal;
+}
+
+.company-list-empty {
+    margin: 18px 13px;
+    color: var(--company-faint);
+    font-size: 10px;
+}
+
+.company-detail-dialog {
+    width: min(680px, calc(100vw - 40px));
+    max-height: min(720px, calc(100vh - 48px));
+    padding: 0;
+    border: 1px solid var(--company-line);
+    border-radius: 6px;
+    background: var(--company-surface);
+    color: var(--company-text);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+.company-detail-dialog::backdrop {
+    background: rgba(2, 8, 14, 0.78);
+}
+
+.company-detail-dialog > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 68px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--company-line);
+}
+
+.company-detail-dialog > header span {
+    color: var(--company-blue);
+    font-size: 9px;
+}
+
+.company-detail-dialog > header h2 {
+    margin: 3px 0 0;
+    font-size: 17px;
+}
+
+.company-detail-dialog > header > div:last-child {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--company-amber);
+    font-size: 10px;
+}
+
+.company-detail-dialog > header button {
+    width: 30px;
+    min-height: 30px;
+    padding: 0;
+    border: 1px solid var(--company-line);
+    background: var(--company-surface-2);
+    color: var(--company-muted);
+    box-shadow: none;
+    font-size: 18px;
+}
+
+.company-detail-dialog > article {
+    padding: 22px 20px 26px;
+    overflow-y: auto;
+}
+
+.company-detail-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--company-muted);
+    font-size: 9px;
+}
+
+.company-detail-meta span {
+    color: var(--company-blue);
+}
+
+.company-detail-dialog h3 {
+    margin: 18px 0 12px;
+    font-size: 19px;
+}
+
+.company-detail-dialog article > p {
+    margin: 0;
+    color: var(--company-muted);
+    font-size: 12px;
+    line-height: 1.8;
+}
+
+.company-detail-dialog > footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 18px;
+    border-top: 1px solid var(--company-line);
+}
+
+.company-detail-dialog > footer button {
+    min-width: 90px;
+    min-height: 34px;
+    background: var(--company-blue);
+    color: #fff;
+}
+
+.company-command-dialog {
+    width: min(520px, calc(100vw - 40px));
+}
+
+.company-command-dialog > article {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.company-command-dialog > article h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+.company-command-dialog > article p {
+    line-height: 1.65;
+}
+
+.company-command-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #8a6722;
+    border-radius: 50%;
+    background: #2a210f;
+    color: var(--company-amber);
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.company-command-dialog > footer {
+    gap: 8px;
+}
+
+.company-command-dialog > footer button.secondary {
+    border: 1px solid var(--company-line);
+    background: var(--company-surface-2);
+    color: var(--company-muted);
+}
+
+.company-report-lines {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 18px;
+    border-top: 1px solid var(--company-line);
+    border-left: 1px solid var(--company-line);
+}
+
+.company-report-lines > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 38px;
+    padding: 10px 12px;
+    border-right: 1px solid var(--company-line);
+    border-bottom: 1px solid var(--company-line);
+    color: var(--company-muted);
+    font-size: 10px;
+}
+
+.company-report-lines b {
+    color: var(--company-text);
+}
+
+.company-report-lines b.good {
+    color: var(--company-green);
+}
+
+.company-report-lines b.danger {
+    color: var(--company-red);
+}
+
+.company-report-note {
+    margin-top: 16px !important;
+    color: var(--company-faint) !important;
+    font-size: 9px !important;
+}
+
+.view-company .logout-form {
+    margin-top: 12px;
+}
+
+.view-company .logout-form button {
+    border-color: var(--company-line);
+    background: var(--company-surface-2);
+    color: var(--company-muted);
+}
+
+.company-header-logout {
+    flex: 0 0 auto;
+    margin-left: 2px;
+}
+
+.company-header-logout button {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--company-line);
+    border-radius: 4px;
+    background: var(--company-surface-2);
+    color: var(--company-muted);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.company-header-logout button:hover {
+    border-color: var(--company-blue);
+    color: var(--company-text);
+}
+
+.company-tutorial-panel { min-height: 420px; }
+.company-tutorial-panel > section { height: 100%; }
+.company-hiring-rule,
+.company-project-note { margin: 12px 14px; color: var(--company-muted); font-size: 11px; }
+.company-candidate-list { max-height: 292px; overflow-y: auto; border-top: 1px solid var(--company-line-soft); border-bottom: 1px solid var(--company-line-soft); }
+.company-candidate { display: grid; grid-template-columns: 20px minmax(145px, 1.2fr) minmax(130px, 1fr) 94px; align-items: center; gap: 10px; min-height: 48px; padding: 7px 13px; border-bottom: 1px solid var(--company-line-soft); cursor: pointer; }
+.company-candidate:hover { background: var(--company-surface-2); }
+.company-candidate:has(input:checked) { background: rgba(52, 142, 255, .10); }
+.company-candidate span { display: grid; gap: 3px; min-width: 0; }
+.company-candidate b,
+.company-candidate strong { color: var(--company-text); font-size: 10px; }
+.company-candidate small { color: var(--company-muted); font-size: 9px; }
+.company-candidate > strong { text-align: right; }
+.company-hiring-summary { display: grid; grid-template-columns: repeat(3, 72px) minmax(130px, 1fr); gap: 8px; padding: 10px 13px; }
+.company-hiring-summary span { color: var(--company-muted); font-size: 9px; }
+.company-hiring-summary b { display: block; margin-top: 3px; color: var(--company-text); font-size: 11px; }
+.company-tutorial-panel .company-foundation-submit { width: calc(100% - 26px); margin: 0 13px 13px; }
+.company-tutorial-panel .company-foundation-submit.secondary { background: transparent; color: var(--company-muted); border: 1px dashed var(--company-line); box-shadow: none; }
+.company-funding-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 0.7fr); gap: 8px; margin: 0 13px 13px; }
+.company-funding-form input { min-width: 0; border: 1px solid var(--company-line); background: var(--company-surface-soft); color: var(--company-text); padding: 0 10px; }
+.company-funding-form .company-foundation-submit { width: 100%; margin: 0; }
+.company-tutorial-facts { display: grid; grid-template-columns: repeat(2, 1fr); margin: 14px; border: 1px solid var(--company-line-soft); }
+.company-tutorial-facts.launch { grid-template-columns: repeat(3, 1fr); }
+.company-tutorial-facts > div { display: grid; gap: 5px; padding: 15px; border-right: 1px solid var(--company-line-soft); border-bottom: 1px solid var(--company-line-soft); }
+.company-tutorial-facts span { color: var(--company-muted); font-size: 9px; }
+.company-tutorial-facts strong { color: var(--company-text); font-size: 13px; }
+.company-department-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px; }
+.company-department-summary span { display: grid; gap: 5px; padding: 13px; background: var(--company-surface-2); }
+.company-department-summary b { color: var(--company-text); font-size: 10px; }
+.company-department-summary small { color: var(--company-muted); font-size: 9px; }
+.company-project-visual { height: 8px; margin: 20px 14px; background: var(--company-surface-2); overflow: hidden; }
+.company-project-visual span { display: block; height: 100%; background: var(--company-blue); }
+.company-project-note.danger { color: var(--company-red); }
+
+.company-tutorial-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 10px;
+    padding: 9px 12px;
+    border: 1px solid rgba(245, 166, 35, .35);
+    background: rgba(245, 166, 35, .08);
+    color: var(--company-amber);
+    font-size: 11px;
+}
+
+.company-tutorial-notice button {
+    flex: 0 0 auto;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid rgba(245, 184, 75, 0.65);
+    background: rgba(245, 184, 75, 0.12);
+    color: var(--company-orange);
+    font-size: 10px;
+    box-shadow: none;
+}
+
+.company-dashboard button:focus-visible,
+.company-dashboard input:focus-visible,
+.company-dashboard select:focus-visible,
+.company-detail-dialog button:focus-visible {
+    outline: 2px solid #8fc8ff;
+    outline-offset: 2px;
+}
+
+.company-operation-row:focus-visible,
+.company-information-row:focus-visible {
+    position: relative;
+    z-index: 2;
+    background: #1a3044;
+}
+
+.company-detail-view::-webkit-scrollbar,
+.company-secretary-view::-webkit-scrollbar,
+.company-scroll-list::-webkit-scrollbar,
+.company-operations-panel::-webkit-scrollbar {
+    width: 9px;
+}
+
+.company-detail-view::-webkit-scrollbar-track,
+.company-secretary-view::-webkit-scrollbar-track,
+.company-scroll-list::-webkit-scrollbar-track,
+.company-operations-panel::-webkit-scrollbar-track {
+    background: var(--company-surface-2);
+}
+
+.company-detail-view::-webkit-scrollbar-thumb,
+.company-secretary-view::-webkit-scrollbar-thumb,
+.company-scroll-list::-webkit-scrollbar-thumb,
+.company-operations-panel::-webkit-scrollbar-thumb {
+    border: 2px solid var(--company-surface-2);
+    border-radius: 8px;
+    background: var(--company-faint);
+}
+
+.company-budget-policy form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--company-line-soft);
+}
+
+.company-budget-policy form label {
+    display: grid;
+    gap: 5px;
+    color: var(--company-muted);
+    font-size: 9px;
+}
+
+.company-budget-policy form select {
+    min-width: 0;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--company-line);
+    background: var(--company-surface-2);
+    color: var(--company-text);
+}
+
+.company-budget-policy form button {
+    align-self: end;
+    min-height: 32px;
+    padding: 0 14px;
+}
+
+.company-product-project-active form {
+    margin-top: 8px;
+}
+
+.company-product-project-active form button.secondary {
+    min-height: 28px;
+    border: 1px solid var(--company-line);
+    background: transparent;
+    color: var(--company-muted);
+    box-shadow: none;
+}
+
+/* 기업 라이트 모드는 도시 화면과 같은 밝은 청회색 바탕과 흰 작업면을 사용한다. */

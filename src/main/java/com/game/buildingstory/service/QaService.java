@@ -27,7 +27,7 @@ public class QaService {
      * 플레이 중 특정 조건을 빠르게 만들기 위해 현금, 평판, 이벤트, 비서 상태를 직접 조정한다.
      * 운영용 게임 규칙이 아니라 개발 검증 시간을 줄이기 위한 우회 도구다.
      */
-    private static final long TEST_CASH_AMOUNT = 30_000_000L;
+    private static final long TEST_CASH_AMOUNT = 1_000_000_000_000L;
 
     private final PlayerRepository playerRepository;
     private final OwnedBuildingRepository ownedBuildingRepository;
@@ -42,6 +42,7 @@ public class QaService {
     private final LuxuryItemCatalog luxuryItemCatalog;
     private final SecretaryTenantEventService secretaryTenantEventService;
     private final SettlementService settlementService;
+    private final CompanyTutorialService companyTutorialService;
 
     public QaService(
             PlayerRepository playerRepository,
@@ -56,7 +57,8 @@ public class QaService {
             SecretaryCatalog secretaryCatalog,
             LuxuryItemCatalog luxuryItemCatalog,
             SecretaryTenantEventService secretaryTenantEventService,
-            SettlementService settlementService
+            SettlementService settlementService,
+            CompanyTutorialService companyTutorialService
     ) {
         this.playerRepository = playerRepository;
         this.ownedBuildingRepository = ownedBuildingRepository;
@@ -71,12 +73,18 @@ public class QaService {
         this.luxuryItemCatalog = luxuryItemCatalog;
         this.secretaryTenantEventService = secretaryTenantEventService;
         this.settlementService = settlementService;
+        this.companyTutorialService = companyTutorialService;
     }
 
     public String addTestCash(long playerId) {
         Player player = playerRepository.findById(playerId).orElseThrow();
         player.addCash(TEST_CASH_AMOUNT);
-        return "테스트 현금 30,000,000원 지급";
+        playerRepository.save(player);
+        return "테스트 현금 1조원 지급";
+    }
+
+    public String skipCompanyCommercialization(long playerId) {
+        return companyTutorialService.skipCommercializationForTest(playerId);
     }
 
     public String updateTestReputation(long playerId, int reputation) {

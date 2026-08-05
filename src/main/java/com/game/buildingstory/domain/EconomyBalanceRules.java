@@ -33,22 +33,34 @@ public final class EconomyBalanceRules {
         return basisPoints(amount, AUCTION_DEPOSIT_BASIS_POINTS);
     }
 
-    public static int governmentPurchaseSupportPercent(String city) {
+    public static long governmentCityEntryGrant(String city) {
         return switch (city) {
-            case "청주", "세종", "대전" -> 40;
-            case "부산" -> 30;
-            case "인천" -> 20;
-            case "서울" -> 10;
-            default -> 0;
+            case "청주" -> 30_000_000L;
+            case "세종" -> 150_000_000L;
+            case "대전" -> 400_000_000L;
+            case "부산" -> 1_000_000_000L;
+            case "인천" -> 2_500_000_000L;
+            case "서울" -> 10_000_000_000L;
+            default -> 0L;
         };
     }
 
+    /**
+     * 과거 저장 데이터와 시뮬레이션 코드의 컴파일 호환성을 위한 메서드다.
+     * 정부지원은 구매 할인에서 도시 첫 진입 현금 지급으로 변경되어 항상 0%다.
+     */
+    @Deprecated
+    public static int governmentPurchaseSupportPercent(String city) {
+        return 0;
+    }
+
+    /** 구매가격 할인은 더 이상 적용하지 않는다. */
+    @Deprecated
     public static long governmentSupportedPrice(long amount, String city) {
         if (amount < 0) {
             throw new IllegalArgumentException("기준 금액은 음수일 수 없습니다");
         }
-        int playerPaymentPercent = 100 - governmentPurchaseSupportPercent(city);
-        return Math.multiplyExact(amount, playerPaymentPercent) / 100;
+        return amount;
     }
 
     public static int buildingMilestoneReputation(String city, int slot) {

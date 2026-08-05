@@ -17,12 +17,13 @@
             </div>
             <div class="secretary-list">
                 <article class="secretary-card" th:each="secretary : ${secretarySpecs}"
-                         th:with="owned=${@gameService.ownedSecretary(player, secretary).orElse(null)}, secretaryOwned=${owned != null}, secretaryHireable=${@gameService.canHireSecretary(player, secretary)}"
+                         th:with="owned=${@gameService.ownedSecretary(player, secretary).orElse(null)}, secretaryOwned=${owned != null}, secretaryHireable=${@gameService.canHireSecretary(player, secretary)}, companyAssigned=${secretaryOwned && @gameService.isSecretaryAssignedToCompany(player, owned)}"
                          th:classappend="${!secretaryOwned && !secretaryHireable} ? ' locked-secretary'">
                     <img class="secretary-thumb" th:src="${secretary.imagePath()}" th:alt="${secretary.name()} + ' 비서 이미지'">
                     <div>
                         <div class="secretary-status-row">
-                            <span class="badge" th:classappend="${secretaryOwned} ? ' good'" th:text="${secretaryOwned ? (owned.assignedCity == null ? '보유중 · 미배치' : '보유중 · ' + owned.assignedCity + ' 배치') : (secretaryHireable ? '고용 가능' : '조건 미달')}">상태</span>
+                            <span class="badge" th:classappend="${secretaryOwned} ? ' good'"
+                                  th:text="${secretaryOwned ? (companyAssigned ? '기업배치' : (owned.assignedCity == null ? '보유중 · 미배치' : '보유중 · ' + owned.assignedCity + ' 배치')) : (secretaryHireable ? '고용 가능' : '조건 미달')}">상태</span>
                             <span class="badge" th:text="'숙련도 ' + ${secretaryOwned ? owned.proficiency : secretary.baseProficiency()} + '/30 · 호감도 ' + ${secretaryOwned ? owned.affinity : 1} + '/30'">숙련도</span>
                         </div>
                         <h3>
@@ -145,7 +146,6 @@
                 </p>
                 <p>시장가 대비 얼마로 경매 하시겠습니까?</p>
                 <div class="auction-bid-grid">
-                    <span class="badge good" th:if="${activeAuction.isGovernmentSupportEligible(player)}" th:text="'정부지원 ' + ${activeAuction.governmentSupportPercent(player)} + '% 적용'">정부지원 적용</span>
                     <form method="post" th:action="@{/auctions/{id}/bid(id=${activeAuction.id})}">
                         <input type="hidden" name="rate" value="95">
                           <button type="submit" th:disabled="${player.cash < activeAuction.totalPurchasePrice(95, player)}">

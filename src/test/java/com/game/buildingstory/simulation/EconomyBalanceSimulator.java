@@ -70,6 +70,7 @@ public final class EconomyBalanceSimulator {
         state.buildings.add(new SimBuilding(starter, 0L, 0L, 0L, true, true, 0));
         state.claimedMilestones.put(key(starter), true);
         state.cityUnlockMonth.put("청주", 0);
+        state.cash += EconomyBalanceRules.governmentCityEntryGrant("청주");
 
         for (int month = 1; month <= MAX_MONTHS; month++) {
             state.month = month;
@@ -202,8 +203,7 @@ public final class EconomyBalanceSimulator {
                 continue;
             }
             long forcedSale = currentValue(state, loan.building) * 90 / 100;
-            long supportClawback = loan.building.ageMonths < 13 ? loan.building.governmentSupportAmount : 0L;
-            state.cash += Math.max(0L, forcedSale - loan.principal - supportClawback);
+            state.cash += Math.max(0L, forcedSale - loan.principal);
             state.buildings.remove(loan.building);
             state.loans.remove(index);
             state.foreclosures++;
@@ -297,12 +297,8 @@ public final class EconomyBalanceSimulator {
 
     private void purchase(State state, BuildingSpec spec, long originalPrice, long purchasePrice, long loan, long cashCost) {
         state.cash -= cashCost;
-        long governmentSupportAmount = originalPrice - purchasePrice;
-        SimBuilding building = new SimBuilding(spec, purchasePrice, cashCost, governmentSupportAmount, false, false, 0);
+        SimBuilding building = new SimBuilding(spec, purchasePrice, cashCost, 0L, false, false, 0);
         state.buildings.add(building);
-        if (governmentSupportAvailable(state, spec)) {
-            state.governmentSupportedCities.put(spec.city(), true);
-        }
         if (loan > 0) {
             state.loans.add(new SimLoan(building, loan));
         }
@@ -314,14 +310,7 @@ public final class EconomyBalanceSimulator {
     }
 
     private long effectivePurchasePrice(State state, BuildingSpec spec, long originalPrice) {
-        return governmentSupportAvailable(state, spec)
-                ? EconomyBalanceRules.governmentSupportedPrice(originalPrice, spec.city())
-                : originalPrice;
-    }
-
-    private boolean governmentSupportAvailable(State state, BuildingSpec spec) {
-        return EconomyBalanceRules.governmentPurchaseSupportPercent(spec.city()) > 0
-                && !state.governmentSupportedCities.containsKey(spec.city());
+        return originalPrice;
     }
 
     private void sellTradingBuilding(State state, Random random) {
@@ -391,6 +380,7 @@ public final class EconomyBalanceSimulator {
                     && state.reputation >= CITY_REPUTATION.get(city)
                     && (!city.equals("세종") || !state.employed)) {
                 state.cityUnlockMonth.put(city, state.month);
+                state.cash += EconomyBalanceRules.governmentCityEntryGrant(city);
             }
         }
     }
@@ -586,7 +576,7 @@ public final class EconomyBalanceSimulator {
                     .append("- 최대 기간: ").append(MAX_MONTHS).append("게임월\n\n")
                     .append("## 모델 가정\n\n")
                     .append("- 가격·월세·쿨타임·거래비용·대출이자·비서 급여는 실제 카탈로그와 계산식을 사용한다.\n")
-                    .append("- 첫 유상 취득 정부지원은 청주·세종·대전 40%, 부산 30%, 인천 20%, 서울 10%이며 1년 내 매각 시 전액 환수한다.\n")
+                    .append("- 도시 첫 진입 시 청주 3천만원, 세종 1억5천만원, 대전 4억원, 부산 10억원, 인천 25억원, 서울 100억원을 현금으로 지급한다.\n")
                     .append("- 플레이어는 매월 최대 한 번 부동산 투자 결정을 한다. 부업과 선물 구매는 제외한다.\n")
                     .append("- 입주·퇴거·수리는 실제 월 2회 판정 확률을 사용하고, 도시지수는 월 변동 범위를 적용한다.\n")
                     .append("- 주식 해금 후 여유 현금의 20~40%를 투자하며 월 수익률은 평균 0.3~0.5%, 표준편차 3.5%로 가정한다.\n")
@@ -772,7 +762,6 @@ public final class EconomyBalanceSimulator {
         private final List<SimSecretary> hiredSecretaries = new ArrayList<>();
         private final Map<String, Boolean> hiredSecretaryKeys = new HashMap<>();
         private final Map<String, Boolean> claimedMilestones = new HashMap<>();
-        private final Map<String, Boolean> governmentSupportedCities = new HashMap<>();
         private final Map<String, Integer> nextPurchaseMonth = new HashMap<>();
         private final Map<String, Double> cityIndex = new HashMap<>();
         private final Map<String, Integer> cityUnlockMonth = new LinkedHashMap<>();

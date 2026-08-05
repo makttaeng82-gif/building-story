@@ -1735,6 +1735,234 @@ img.event-image {
     width: 100%;
 }
 
+.property-manager-handoff {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid #d8e3ec;
+    border-radius: 8px;
+    background: #f6f9fc;
+}
+
+.property-manager-handoff.hired {
+    border-color: #b9d8ca;
+    background: #f3faf6;
+}
+
+.property-manager-copy {
+    min-width: 0;
+}
+
+.property-manager-copy > span {
+    display: block;
+    color: #6f8090;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.property-manager-copy strong {
+    display: block;
+    margin-top: 3px;
+    color: #17212b;
+    font-size: 14px;
+}
+
+.property-manager-copy p,
+.property-manager-state small {
+    margin-top: 3px;
+    color: #6f8090;
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.property-manager-state {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.property-manager-state .badge.active {
+    border: 1px solid #9ed0b8;
+    background: #e8f7ef;
+    color: #16734a;
+}
+
+.property-manager-state .badge.suspended {
+    border: 1px solid #efb8b8;
+    background: #fff0f0;
+    color: #bd3535;
+}
+
+.property-manager-handoff form button {
+    white-space: nowrap;
+}
+
+.property-management-mode {
+    display: grid;
+    gap: 12px;
+}
+
+.property-management-headquarters {
+    display: grid;
+    gap: 12px;
+}
+
+.property-management-headquarters > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.property-management-headquarters > header span:first-child {
+    color: #2f80ed;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.property-management-headquarters h2 {
+    margin: 4px 0;
+    color: var(--ink);
+    font-size: 21px;
+}
+
+.property-management-headquarters header p,
+.property-management-profile p,
+.property-management-hire p {
+    margin: 0;
+    color: #6f8090;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.property-management-profile {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    padding: 10px;
+    border: 1px solid #d8e3ec;
+    border-radius: 8px;
+    background: #f6f9fc;
+}
+
+.property-management-profile img {
+    width: 112px;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.property-management-profile span {
+    color: #2f80ed;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.property-management-profile strong {
+    display: block;
+    margin: 5px 0;
+    color: #17212b;
+    font-size: 16px;
+}
+
+.property-management-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin: 0;
+    border-top: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+}
+
+.property-management-summary > div {
+    display: grid;
+    gap: 4px;
+    padding: 9px 10px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+
+.property-management-summary dt {
+    color: #6f8090;
+    font-size: 10px;
+}
+
+.property-management-summary dd {
+    margin: 0;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.property-management-city-list {
+    display: grid;
+    max-height: 178px;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+
+.property-management-city-list article {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 48px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+}
+
+.property-management-city-list article:last-child {
+    border-bottom: 0;
+}
+
+.property-management-city-list article.current {
+    background: #eef6ff;
+}
+
+.property-management-city-list article > div {
+    display: grid;
+    gap: 3px;
+}
+
+.property-management-city-list strong {
+    color: var(--ink);
+    font-size: 12px;
+}
+
+.property-management-city-list small {
+    color: #6f8090;
+    font-size: 10px;
+}
+
+.property-management-city-list .badge.active {
+    border: 1px solid #9ed0b8;
+    background: #e8f7ef;
+    color: #16734a;
+}
+
+.property-management-city-list .badge.suspended {
+    border: 1px solid #efb8b8;
+    background: #fff0f0;
+    color: #bd3535;
+}
+
+.property-management-hire {
+    display: grid;
+    gap: 7px;
+}
+
+.property-management-hire button {
+    width: 100%;
+}
+
+.property-management-mode .secretary-panel-actions {
+    grid-template-columns: 1fr;
+}
+
 .panel { padding: 18px; }
 
 .badge {
@@ -2213,7 +2441,10 @@ dd { margin: 0; font-weight: 800; }
     font-size: 12px;
 }
 .secretary-modal .secretary-card dl dd {
-    white-space: nowrap;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
 }
 .secretary-modal .secretary-card dl {
     gap: 6px;
@@ -2460,6 +2691,49 @@ dd { margin: 0; font-weight: 800; }
     margin-top: 20px;
     border-top: 1px solid var(--line);
     padding-top: 18px;
+}
+
+.info-guide-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 14px;
+    border: 1px solid var(--line);
+    background: #f8fbfd;
+    padding: 12px;
+}
+
+.info-guide-entry > div {
+    display: grid;
+    gap: 4px;
+}
+
+.info-guide-entry b {
+    font-size: 14px;
+}
+
+.info-guide-entry span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.info-company-link {
+    flex: 0 0 auto;
+    border: 1px solid var(--blue);
+    border-radius: 6px;
+    color: var(--blue);
+    padding: 9px 12px;
+    font-size: 12px;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.info-company-link:hover {
+    background: var(--blue);
+    color: white;
 }
 
 .info-guide-block h3 {
@@ -2997,6 +3271,8 @@ td {
     .loan-rule-grid { grid-template-columns: 1fr; }
     .info-rule-grid { grid-template-columns: 1fr; }
     .info-step-list li { grid-template-columns: 1fr; gap: 4px; }
+    .info-guide-entry { align-items: stretch; flex-direction: column; }
+    .info-company-link { text-align: center; }
     .secretary-card dl { grid-template-columns: 1fr; }
     .secretary-card dl > .wide,
     .secretary-card dl > .dl-detail { grid-column: auto; }

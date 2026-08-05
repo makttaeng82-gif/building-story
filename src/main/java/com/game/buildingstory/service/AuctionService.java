@@ -117,7 +117,6 @@ public class AuctionService {
             throw new IllegalArgumentException("잘못된 입찰가");
         }
         long originalBidPrice = auction.bidPrice(rate);
-        boolean governmentSupported = auction.isGovernmentSupportEligible();
         long price = auction.effectiveBidPrice(rate);
         long purchaseFee = EconomyBalanceRules.purchaseFee(price);
         long totalPurchasePrice = price + purchaseFee;
@@ -139,14 +138,11 @@ public class AuctionService {
                     price,
                     auction.getMonthlyRent(),
                     auction.getTradeCooldownDays(),
-                    governmentSupported ? originalBidPrice - price : 0L
+                    0L
             ));
-            if (governmentSupported) {
-                player.claimGovernmentPurchaseSupport(auction.getCity());
-            }
             awardBuildingMilestone(player, purchasedBuilding);
             secretaryTenantEventService.tryActivateIntro(player, purchasedBuilding);
-            saveRecord(player, RecordType.BUILDING_BUY, "경매 낙찰", -totalPurchasePrice, 0, auction.getName(), "시장가 " + rate + "% 입찰 · " + (governmentSupported ? "정부지원 " + (originalBidPrice - price) + "원 · " : "") + "부대비용 " + purchaseFee + "원");
+            saveRecord(player, RecordType.BUILDING_BUY, "경매 낙찰", -totalPurchasePrice, 0, auction.getName(), "시장가 " + rate + "% 입찰 · 부대비용 " + purchaseFee + "원");
             auction.resolve(rate, successChance, true, "경매 낙찰 성공");
         } else {
             long deposit = EconomyBalanceRules.auctionDeposit(originalBidPrice);

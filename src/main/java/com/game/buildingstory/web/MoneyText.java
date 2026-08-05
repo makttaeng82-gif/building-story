@@ -13,6 +13,9 @@ public class MoneyText {
         if (amount == 0) {
             return "0원";
         }
+        if (amount < 0) {
+            return "-" + format(Math.negateExact(amount));
+        }
 
         long jo = amount / 1_000_000_000_000L;
         amount %= 1_000_000_000_000L;

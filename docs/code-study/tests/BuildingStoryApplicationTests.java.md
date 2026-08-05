@@ -203,10 +203,10 @@ class BuildingStoryApplicationTests {
 		Player player = playerRepository.save(new Player("qa-cash-test", "hash"));
 		// 해설: Repository에 엔티티 저장을 요청한다. 새 객체 저장이나 변경 감지 대상 등록에 사용된다.
 
-		assertThat(qaService.addTestCash(player.getId())).isEqualTo("테스트 현금 30,000,000원 지급");
+		assertThat(qaService.addTestCash(player.getId())).isEqualTo("테스트 현금 1조원 지급");
 		// 해설: 도메인 객체의 상태 변경 메서드를 호출한다. 실제 필드 변경은 해당 객체 안에서 캡슐화된다.
 
-		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(30_000_000L);
+		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(1_000_000_000_000L);
 		// 해설: 테스트 검증문이다. 실제 결과가 기대값과 다르면 테스트가 실패한다.
 	}
 

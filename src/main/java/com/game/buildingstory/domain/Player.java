@@ -39,8 +39,10 @@ public class Player {
     private String title = "첫 건물주";
     private Long cumulativeDonation = 0L;
     private String rewardedBuildingMilestones = "";
-    // 정부지원 대상 도시에서 최초 유상 취득 지원을 이미 사용한 도시를 |도시| 형식으로 저장한다.
+    // 과거 구매 할인 이력이다. 기존 데이터 호환을 위해 컬럼은 유지하지만 신규 지원금 판정에는 사용하지 않는다.
     private String governmentSupportedCities = "";
+    // 도시 첫 진입 현금 지원금을 받은 도시를 |청주| 형식으로 저장한다.
+    private String governmentGrantClaimedCities = "";
     private Integer economyVersion = 7;
     // 퇴사 전에는 월급을 받지만, 일부 평판 조건에는 고용 상태가 반대로 작동한다.
     private Boolean employed = true;
@@ -56,8 +58,12 @@ public class Player {
     private int day = 1;
     // 아래 monthly* 값들은 이번 달 누적 기록이다. 월이 바뀌면 SettlementService가 월간 기록으로 남기고 초기화한다.
     private long monthlyRentIncome;
-    private long monthlySideIncome;
-    private Integer lastSideJobElapsedDay;
+    /*
+     * 부업 기능은 제거됐지만 기존 운영 DB의 MONTHLY_SIDE_INCOME 열은 NOT NULL이다.
+     * 신규 회원 INSERT가 실패하지 않도록 항상 0으로 저장하는 스키마 호환 필드만 유지한다.
+     */
+    @Column(name = "monthly_side_income")
+    private long legacyMonthlySideIncome;
     private Long monthlySalaryIncome = 0L;
     private long monthlyAdCost;
     private long monthlySecretarySalary;
@@ -170,6 +176,7 @@ public class Player {
         this.cumulativeDonation = 0L;
         this.rewardedBuildingMilestones = "";
         this.governmentSupportedCities = "";
+        this.governmentGrantClaimedCities = "";
     }
 
     public void advanceDay() {
@@ -296,20 +303,6 @@ public class Player {
         cash += amount;
     }
 
-    public long getMonthlySideIncome() {
-        return monthlySideIncome;
-    }
-
-    public void addSideIncome(long amount) {
-        monthlySideIncome += amount;
-        cash += amount;
-        lastSideJobElapsedDay = getElapsedDays();
-    }
-
-    public boolean canDoSideJobToday() {
-        return lastSideJobElapsedDay == null || lastSideJobElapsedDay != getElapsedDays();
-    }
-
     public long getMonthlySalaryIncome() {
         return monthlySalaryIncome == null ? 0L : monthlySalaryIncome;
     }
@@ -348,20 +341,20 @@ public class Player {
         return true;
     }
 
-    public boolean canUseGovernmentPurchaseSupport(String city) {
-        if (EconomyBalanceRules.governmentPurchaseSupportPercent(city) == 0) {
+    public boolean canClaimGovernmentCityGrant(String city) {
+        if (EconomyBalanceRules.governmentCityEntryGrant(city) == 0L) {
             return false;
         }
         String supportKey = "|" + city + "|";
-        String usedCities = governmentSupportedCities == null ? "" : governmentSupportedCities;
+        String usedCities = governmentGrantClaimedCities == null ? "" : governmentGrantClaimedCities;
         return !usedCities.contains(supportKey);
     }
 
-    public boolean claimGovernmentPurchaseSupport(String city) {
-        if (!canUseGovernmentPurchaseSupport(city)) {
+    public boolean claimGovernmentCityGrant(String city) {
+        if (!canClaimGovernmentCityGrant(city)) {
             return false;
         }
-        governmentSupportedCities = (governmentSupportedCities == null ? "" : governmentSupportedCities)
+        governmentGrantClaimedCities = (governmentGrantClaimedCities == null ? "" : governmentGrantClaimedCities)
                 + "|" + city + "|";
         return true;
     }
@@ -399,7 +392,7 @@ public class Player {
     }
 
     public long monthlyNetIncome() {
-        return monthlyRentIncome + monthlySideIncome + getMonthlySalaryIncome() - monthlyAdCost - monthlySecretarySalary - monthlyLoanPayment;
+        return monthlyRentIncome + getMonthlySalaryIncome() - monthlyAdCost - monthlySecretarySalary - monthlyLoanPayment;
     }
 
     public int getMoveInChancePercent() {

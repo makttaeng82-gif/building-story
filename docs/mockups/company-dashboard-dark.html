@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>기업 경영 화면 시안</title>
+    <style>
+        :root {
+            --bg: #0d1218;
+            --surface: #151c24;
+            --surface-2: #1a232d;
+            --surface-3: #202b36;
+            --line: #2b3947;
+            --line-soft: #23303c;
+            --text: #eef4fa;
+            --muted: #8fa0b1;
+            --faint: #667687;
+            --blue: #4da3ff;
+            --blue-soft: #163b5f;
+            --green: #5fd19a;
+            --orange: #f1b55e;
+            --red: #f26d78;
+            --radius: 6px;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body { margin: 0; min-width: 1180px; min-height: 100%; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: Pretendard, "Noto Sans KR", "Malgun Gothic", Arial, sans-serif;
+            font-size: 13px;
+            letter-spacing: 0;
+        }
+
+        button { font: inherit; }
+
+        .app-shell { min-height: 100vh; }
+
+        .game-header {
+            height: 68px;
+            display: grid;
+            grid-template-columns: 260px repeat(5, minmax(150px, 1fr));
+            gap: 8px;
+            align-items: stretch;
+            padding: 8px 22px;
+            border-bottom: 1px solid var(--line);
+            background: #111820;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            display: grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 5px;
+            color: white;
+            background: var(--blue);
+            font-weight: 800;
+        }
+
+        .brand strong { display: block; font-size: 17px; }
+        .brand small { color: var(--muted); }
+
+        .header-metric {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 13px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--surface-2);
+        }
+
+        .label {
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .header-metric strong { margin-top: 2px; font-size: 14px; }
+        .header-metric small { margin-top: 2px; color: var(--faint); font-size: 10px; }
+        .date strong { color: var(--blue); }
+
+        .nav-bar {
+            height: 46px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 0 22px;
+            border-bottom: 1px solid var(--line);
+            background: #10161d;
+        }
+
+        .nav-button {
+            min-width: 60px;
+            height: 30px;
+            border: 1px solid var(--line);
+            border-radius: 5px;
+            color: var(--muted);
+            background: var(--surface);
+        }
+
+        .nav-button.active {
+            color: #dceeff;
+            border-color: var(--blue);
+            background: var(--blue-soft);
+        }
+
+        .nav-button.resume {
+            margin-left: 4px;
+            color: var(--orange);
+            border-color: #8d642b;
+            background: #2d2418;
+        }
+
+        .company-strip {
+            display: grid;
+            grid-template-columns: 250px repeat(7, minmax(120px, 1fr));
+            min-height: 96px;
+            margin: 14px 22px 12px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--surface);
+            overflow: hidden;
+        }
+
+        .company-identity {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 16px 18px;
+            border-right: 1px solid var(--line);
+        }
+
+        .eyebrow {
+            color: var(--blue);
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .company-identity h1 {
+            margin: 5px 0 2px;
+            font-size: 21px;
+            line-height: 1.15;
+        }
+
+        .company-identity p { margin: 0; color: var(--muted); }
+
+        .summary-cell {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
+            padding: 14px 13px;
+            border-right: 1px solid var(--line-soft);
+        }
+
+        .summary-cell:last-child { border-right: 0; }
+        .summary-cell strong { margin-top: 7px; font-size: 15px; white-space: nowrap; }
+        .summary-cell small { margin-top: 5px; color: var(--faint); white-space: nowrap; }
+        .positive { color: var(--green) !important; }
+        .warning { color: var(--orange) !important; }
+        .negative { color: var(--red) !important; }
+        .accent { color: var(--blue) !important; }
+
+        .company-layout {
+            display: grid;
+            grid-template-columns: 310px minmax(620px, 1fr) 320px;
+            grid-template-areas:
+                "detail overview secretary"
+                "bottom bottom bottom";
+            gap: 12px;
+            padding: 0 22px 22px;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--surface);
+            overflow: hidden;
+        }
+
+        .detail-panel { grid-area: detail; height: 640px; }
+        .overview-panel { grid-area: overview; height: 640px; }
+        .secretary-panel { grid-area: secretary; height: 640px; }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 54px;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .panel-head h2 { margin: 2px 0 0; font-size: 16px; }
+        .panel-head strong { font-size: 12px; }
+
+        .section-label {
+            padding: 11px 15px 8px;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .detail-hero {
+            padding: 15px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .detail-hero h3 { margin: 5px 0 4px; font-size: 21px; }
+        .detail-hero p { margin: 0; color: var(--muted); line-height: 1.5; }
+
+        .score-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1px;
+            margin-top: 14px;
+            border: 1px solid var(--line-soft);
+            background: var(--line-soft);
+        }
+
+        .score-row > div { padding: 11px; background: var(--surface-2); }
+        .score-row strong { display: block; margin-top: 4px; font-size: 17px; }
+
+        .metric-list { margin: 0; padding: 0 15px; }
+        .metric-list > div {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--line-soft);
+        }
+        .metric-list dt { color: var(--muted); }
+        .metric-list dd { margin: 0; font-weight: 700; }
+
+        .bar-block { padding: 14px 15px; }
+        .bar-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .bar {
+            height: 7px;
+            border-radius: 3px;
+            background: #26323e;
+            overflow: hidden;
+        }
+        .bar > span { display: block; height: 100%; background: var(--blue); }
+        .bar.green > span { background: var(--green); }
+        .bar.orange > span { background: var(--orange); }
+
+        .action-stack { display: grid; gap: 8px; padding: 0 15px 15px; }
+        .primary-action, .secondary-action {
+            height: 38px;
+            border-radius: 5px;
+            font-weight: 800;
+        }
+        .primary-action { border: 1px solid var(--blue); color: white; background: #2f86df; }
+        .secondary-action { border: 1px solid var(--line); color: var(--text); background: var(--surface-2); }
+
+        .overview-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--line);
+        }
+        .overview-title h2 { margin: 0; font-size: 17px; }
+        .status-badge {
+            padding: 5px 8px;
+            border: 1px solid #385d48;
+            border-radius: 4px;
+            color: var(--green);
+            background: #15271f;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .column-head, .operation-row {
+            display: grid;
+            grid-template-columns: minmax(170px, 1.5fr) 92px 112px 112px minmax(120px, 1fr);
+            align-items: center;
+        }
+
+        .column-head {
+            min-height: 33px;
+            padding: 0 16px;
+            color: var(--faint);
+            font-size: 10px;
+            border-bottom: 1px solid var(--line-soft);
+        }
+
+        .operation-row {
+            min-height: 50px;
+            width: 100%;
+            padding: 0 16px;
+            border: 0;
+            border-bottom: 1px solid var(--line-soft);
+            color: inherit;
+            text-align: left;
+            background: transparent;
+        }
+
+        .operation-row:hover { background: #1a2530; }
+        .operation-row.active {
+            box-shadow: inset 3px 0 0 var(--blue);
+            background: #17283a;
+        }
+
+        .row-title { min-width: 0; }
+        .row-title strong { display: block; font-size: 13px; }
+        .row-title small { display: block; margin-top: 4px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .row-value { font-weight: 750; }
+        .row-value small { display: block; margin-top: 3px; color: var(--faint); font-size: 10px; font-weight: 500; }
+
+        .mini-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+        .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+        .dot.orange { background: var(--orange); }
+        .dot.faint { background: var(--faint); }
+
+        .secretary-profile {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--line);
+        }
+        .avatar {
+            display: grid;
+            place-items: center;
+            width: 48px;
+            height: 48px;
+            border: 1px solid #315d82;
+            border-radius: 50%;
+            color: #cfe8ff;
+            background: #19344c;
+            font-size: 16px;
+            font-weight: 800;
+        }
+        .secretary-profile h3 { margin: 3px 0 2px; font-size: 18px; }
+        .secretary-profile p { margin: 0; color: var(--muted); }
+
+        .effect-box {
+            margin: 14px 15px;
+            padding: 12px;
+            border-left: 3px solid var(--blue);
+            background: var(--surface-2);
+        }
+        .effect-box strong { display: block; margin-bottom: 5px; }
+        .effect-box p { margin: 0; color: var(--muted); line-height: 1.55; }
+
+        .secretary-note { padding: 0 15px 12px; }
+        .secretary-note article {
+            padding: 9px 0;
+            border-bottom: 1px solid var(--line-soft);
+        }
+        .secretary-note h4 { margin: 0 0 5px; font-size: 12px; }
+        .secretary-note p { margin: 0; color: var(--muted); line-height: 1.5; }
+
+        .bottom-grid {
+            grid-area: bottom;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .bottom-panel { height: 270px; }
+        .bottom-panel .panel-head { min-height: 48px; }
+        .count { color: var(--muted); font-size: 11px; }
+
+        .list { height: 220px; overflow: hidden; }
+        .list-row {
+            display: grid;
+            grid-template-columns: 82px minmax(0, 1fr) auto;
+            gap: 11px;
+            align-items: center;
+            min-height: 54px;
+            padding: 9px 15px;
+            border-bottom: 1px solid var(--line-soft);
+        }
+        .list-row .type { color: var(--muted); font-size: 11px; }
+        .list-row strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .list-row small { display: block; margin-top: 4px; color: var(--faint); }
+        .list-row time { color: var(--faint); font-size: 10px; }
+
+        .progress { width: 82px; }
+        .progress strong { text-align: right; font-size: 11px; }
+        .progress .bar { margin-top: 6px; height: 5px; }
+
+        .news-tag {
+            display: inline-block;
+            min-width: 36px;
+            padding: 3px 5px;
+            border: 1px solid var(--line);
+            border-radius: 3px;
+            color: var(--blue);
+            text-align: center;
+            font-size: 10px;
+        }
+
+        .new-mark { color: var(--orange); font-size: 9px; font-weight: 900; }
+
+        .report-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--line-soft);
+        }
+        .report-row strong { font-size: 12px; }
+        .report-row p { margin: 5px 0 0; color: var(--muted); line-height: 1.45; }
+        .report-value { text-align: right; font-weight: 800; }
+        .report-value small { display: block; margin-top: 4px; color: var(--faint); font-weight: 500; }
+
+        @media (max-width: 1439px) {
+            .company-strip { grid-template-columns: 220px repeat(7, minmax(105px, 1fr)); }
+            .company-layout { grid-template-columns: 280px minmax(560px, 1fr) 300px; }
+            .column-head, .operation-row { grid-template-columns: minmax(155px, 1.4fr) 78px 96px 96px minmax(110px, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="app-shell">
+    <header class="game-header">
+        <div class="brand">
+            <div class="brand-mark">B</div>
+            <div><strong>건물주이야기</strong><small>codexui1748338250471</small></div>
+        </div>
+        <div class="header-metric"><span class="label">현금</span><strong>8,104억 7,535만원</strong><small>대출 1억 8,720만원</small></div>
+        <div class="header-metric"><span class="label">총 월세</span><strong>19억 7,982만원</strong><small>부동산 관리직원 6명</small></div>
+        <div class="header-metric"><span class="label">증권 예수금</span><strong>494억 857만원</strong><small>평가손익 +12억 4,890만원</small></div>
+        <div class="header-metric"><span class="label">평판</span><strong>2만 6,734</strong><small>칭호 자본시장 투자자</small></div>
+        <div class="header-metric date"><span class="label">날짜</span><strong>5월 19일</strong><small>일시정지</small></div>
+    </header>
+
+    <nav class="nav-bar" aria-label="주요 화면">
+        <button class="nav-button">청주</button><button class="nav-button">세종</button><button class="nav-button">대전</button>
+        <button class="nav-button">부산</button><button class="nav-button">인천</button><button class="nav-button">서울</button>
+        <button class="nav-button">주식</button><button class="nav-button active">기업</button><button class="nav-button">정보</button>
+        <button class="nav-button resume">진행 재개</button>
+    </nav>
+
+    <section class="company-strip">
+        <div class="company-identity">
+            <span class="eyebrow">PRIVATE AI COMPANY</span>
+            <h1>아틀라스 인텔리전스</h1>
+            <p>NEXUS AI · 성장기업</p>
+        </div>
+        <div class="summary-cell"><span class="label">법인현금</span><strong>4,820억원</strong><small class="warning">소진기간 14개월</small></div>
+        <div class="summary-cell"><span class="label">월 반복매출</span><strong>286억원</strong><small class="positive">전월 +8.4%</small></div>
+        <div class="summary-cell"><span class="label">분기 영업손익</span><strong>+41억원</strong><small class="positive">이익률 5.1%</small></div>
+        <div class="summary-cell"><span class="label">AI 벤치마크</span><strong>428점 · 3위</strong><small>선두 463점</small></div>
+        <div class="summary-cell"><span class="label">유료 이용자</span><strong>46만 8,200명</strong><small>점유율 15.8%</small></div>
+        <div class="summary-cell"><span class="label">임직원</span><strong>핵심 9 · 일반 184</strong><small>관리한도 500명</small></div>
+        <div class="summary-cell"><span class="label">회사 상태</span><strong class="positive">정상 운영</strong><small>주요 업무 2 / 3</small></div>
+    </section>
+
+    <main class="company-layout">
+        <aside class="panel detail-panel">
+            <div class="panel-head"><div><span class="eyebrow">SELECTED</span><h2>핵심제품</h2></div><strong class="positive">정상</strong></div>
+            <div class="detail-hero">
+                <span class="label">생성형 AI 플랫폼</span>
+                <h3>NEXUS AI 2.3</h3>
+                <p>일반·프로 요금제를 운영 중이며 모델 안정화 프로젝트가 진행되고 있습니다.</p>
+                <div class="score-row">
+                    <div><span class="label">벤치마크</span><strong>428점</strong></div>
+                    <div><span class="label">시장 순위</span><strong>3위</strong></div>
+                </div>
+            </div>
+            <div class="bar-block">
+                <div class="bar-head"><span class="label">제품 완성도</span><strong>74</strong></div>
+                <div class="bar green"><span style="width:74%"></span></div>
+            </div>
+            <dl class="metric-list">
+                <div><dt>기능</dt><dd>68</dd></div><div><dt>안정성</dt><dd>81</dd></div><div><dt>보안</dt><dd>72</dd></div>
+                <div><dt>연산효율</dt><dd>64</dd></div><div><dt>기술부채</dt><dd class="warning">22 · 주의</dd></div>
+                <div><dt>월 구독매출</dt><dd>248억원</dd></div><div><dt>다음 출시 예상</dt><dd>D-38</dd></div>
+            </dl>
+            <div class="action-stack">
+                <button class="primary-action">제품 개선 프로젝트</button>
+                <button class="secondary-action">요금제·이용자 상세</button>
+            </div>
+        </aside>
+
+        <section class="panel overview-panel">
+            <div class="overview-title"><div><span class="eyebrow">COMPANY OPERATIONS</span><h2>회사 현황</h2></div><span class="status-badge">운영 정상</span></div>
+            <div class="section-label">조직</div>
+            <div class="column-head"><span>부서</span><span>전문성</span><span>처리능력</span><span>가동률</span><span>현재 업무</span></div>
+            <button class="operation-row">
+                <span class="row-title"><strong>AI개발팀</strong><small>핵심 4명 · 일반 62명 · 팀장 공석</small></span><span class="row-value">71</span><span class="row-value">1,248<small>업무량/월</small></span><span class="row-value warning">88%</span><span class="mini-status"><i class="dot orange"></i>모델 안정화</span>
+            </button>
+            <button class="operation-row">
+                <span class="row-title"><strong>영업마케팅팀</strong><small>핵심 2명 · 일반 41명 · 팀장 1명</small></span><span class="row-value">64</span><span class="row-value">930<small>업무량/월</small></span><span class="row-value">72%</span><span class="mini-status"><i class="dot"></i>프로 요금제 확장</span>
+            </button>
+            <button class="operation-row">
+                <span class="row-title"><strong>서비스운영팀</strong><small>핵심 2명 · 일반 58명 · 팀장 1명</small></span><span class="row-value">76</span><span class="row-value">1,120<small>업무량/월</small></span><span class="row-value">79%</span><span class="mini-status"><i class="dot"></i>서비스 유지</span>
+            </button>
+            <button class="operation-row">
+                <span class="row-title"><strong>인사조직팀</strong><small>핵심 1명 · 일반 23명 · 팀장 공석</small></span><span class="row-value">48</span><span class="row-value">310<small>업무량/월</small></span><span class="row-value">51%</span><span class="mini-status"><i class="dot"></i>정기 채용</span>
+            </button>
+            <button class="operation-row">
+                <span class="row-title"><strong>전략재무팀</strong><small>직원 200명 조건 · 현재 193명</small></span><span class="row-value">잠김</span><span class="row-value">-</span><span class="row-value">-</span><span class="mini-status"><i class="dot faint"></i>해금 96%</span>
+            </button>
+
+            <div class="section-label">사업</div>
+            <div class="column-head"><span>영역</span><span>핵심지표</span><span>수요/용량</span><span>상태</span><span>다음 일정</span></div>
+            <button class="operation-row active">
+                <span class="row-title"><strong>핵심제품</strong><small>NEXUS AI 2.3 · 기술부채 22</small></span><span class="row-value accent">428점</span><span class="row-value">46.8만<small>유료 이용자</small></span><span class="row-value">정상</span><span class="mini-status"><i class="dot orange"></i>출시 D-38</span>
+            </button>
+            <button class="operation-row">
+                <span class="row-title"><strong>프로젝트</strong><small>주요 업무 2 / 3 · 후보 4건</small></span><span class="row-value">2건</span><span class="row-value">1슬롯<small>사용 가능</small></span><span class="row-value warning">주의 1</span><span class="mini-status"><i class="dot"></i>최단 D-18</span>
+            </button>
+            <button class="operation-row">
+                <span class="row-title"><strong>기업계약</strong><small>활성 3건 · 후보 2건 · SLA 정상</small></span><span class="row-value">38억원</span><span class="row-value">3 / 5<small>계약 한도</small></span><span class="row-value">정상</span><span class="mini-status"><i class="dot"></i>갱신 D-24</span>
+            </button>
+            <button class="operation-row">
+                <span class="row-title"><strong>연산인프라</strong><small>성장 클라우드 · 자체 연산망 미보유</small></span><span class="row-value">78%</span><span class="row-value">156만 / 200만</span><span class="row-value warning">주의</span><span class="mini-status"><i class="dot orange"></i>증설 검토</span>
+            </button>
+        </section>
+
+        <aside class="panel secretary-panel">
+            <div class="panel-head"><div><span class="eyebrow">EXECUTIVE ASSISTANT</span><h2>담당 비서</h2></div><strong>2단계</strong></div>
+            <div class="secretary-profile"><div class="avatar">설</div><div><span class="label">AI개발팀 담당</span><h3>설하은</h3><p>기업 경력 9개월</p></div></div>
+            <div class="bar-block"><div class="bar-head"><span class="label">다음 숙련단계</span><strong>D-3개월</strong></div><div class="bar"><span style="width:50%"></span></div></div>
+            <div class="effect-box"><span class="label">현재 패시브</span><strong>제품 프로젝트 기간 -8%</strong><p>AI개발팀이 참여하는 모델·기능·안정화 프로젝트에 적용됩니다.</p></div>
+            <div class="section-label">담당 보고</div>
+            <div class="secretary-note">
+                <article><h4 class="warning">기술부채가 증가하고 있습니다</h4><p>모델 안정화가 끝날 때까지 새 기능 프로젝트를 시작하면 품질 범위가 낮아집니다.</p></article>
+                <article><h4>추천</h4><p>현재 남은 업무 슬롯은 단기 사업보다 안정화 검증 1개월 연장에 사용하는 편이 안전합니다.</p></article>
+                <article><h4>기존 업무 영향</h4><p>새 제품 프로젝트를 시작하면 AI개발팀 가동률이 약 112%로 상승합니다.</p></article>
+            </div>
+            <div class="action-stack"><button class="primary-action">업무 지시</button><button class="secondary-action">AI개발팀 상세</button></div>
+        </aside>
+
+        <section class="bottom-grid">
+            <article class="panel bottom-panel">
+                <div class="panel-head"><div><span class="eyebrow">WORK QUEUE</span><h2>진행 중 주요 업무</h2></div><span class="count">2 / 3</span></div>
+                <div class="list">
+                    <div class="list-row"><span class="type">제품</span><div><strong>모델 안정화 2.4</strong><small>AI개발 · 서비스운영 · 예상 D-38</small></div><div class="progress"><strong>64%</strong><div class="bar"><span style="width:64%"></span></div></div></div>
+                    <div class="list-row"><span class="type">고객 구축</span><div><strong>한빛전자 사내 AI 구축</strong><small>계약금 120억원 · 예상 D-18</small></div><div class="progress"><strong>82%</strong><div class="bar green"><span style="width:82%"></span></div></div></div>
+                    <div class="list-row"><span class="type">빈 슬롯</span><div><strong>새 업무를 시작할 수 있습니다</strong><small>AI개발팀 가동률을 먼저 확인하십시오</small></div><span class="accent">1개</span></div>
+                </div>
+            </article>
+
+            <article class="panel bottom-panel">
+                <div class="panel-head"><div><span class="eyebrow">MARKET INTELLIGENCE</span><h2>시장·산업 동향</h2></div><span class="count">5건</span></div>
+                <div class="list">
+                    <div class="list-row"><span class="news-tag">인프라</span><div><strong>국내 클라우드 연산비 인하 경쟁</strong><small>성장 계약 변경비용 하락 가능성</small></div><span class="new-mark">NEW</span></div>
+                    <div class="list-row"><span class="news-tag">경쟁사</span><div><strong>프론티어AI, 차세대 모델 공개 예고</strong><small>기술선도사 · 12일 후</small></div><time>오늘</time></div>
+                    <div class="list-row"><span class="news-tag">수요</span><div><strong>대기업 생성형 AI 도입 예산 확대</strong><small>기업계약 후보 발생률 상승</small></div><time>3일 전</time></div>
+                    <div class="list-row"><span class="news-tag">규제</span><div><strong>AI 학습데이터 투명성 지침 검토</strong><small>보안·법무 대응비 증가 가능성</small></div><time>8일 전</time></div>
+                </div>
+            </article>
+
+            <article class="panel bottom-panel">
+                <div class="panel-head"><div><span class="eyebrow">MANAGEMENT REPORT</span><h2>최근 경영보고</h2></div><span class="count">2분기</span></div>
+                <div class="list">
+                    <div class="report-row"><div><strong>영업손익</strong><p>구독자 증가와 신규 계약으로 흑자 전환</p></div><div class="report-value positive">+41억원<small>전분기 +68억원</small></div></div>
+                    <div class="report-row"><div><strong>법인현금 증감</strong><p>채용 계약금과 클라우드 상향 반영</p></div><div class="report-value negative">-126억원<small>투자현금 -84억원</small></div></div>
+                    <div class="report-row"><div><strong>가장 큰 변동 원인</strong><p>프로 요금제 이용자 3만 8,400명 증가</p></div><div class="report-value positive">+29억원<small>월 반복매출</small></div></div>
+                </div>
+            </article>
+        </section>
+    </main>
+</div>
+</body>
+</html>

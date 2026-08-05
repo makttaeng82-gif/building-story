@@ -173,6 +173,10 @@ public class SecretaryOperationsService {
         // 해설: 필수 값이 없으면 배치 가능 여부를 판단할 수 없으므로 false다.
             return false;
         }
+        if (propertyManagerRepository.findByPlayerAndCity(player, city).isPresent()) {
+        // 해설: 관리직원이 업무를 인계받은 도시는 비서를 다시 배치할 수 없다.
+            return false;
+        }
         return ownedSecretaryRepository.findByPlayerAndAssignedCityOrderById(player, city).stream()
         // 해설: 이미 해당 도시에 배치된 비서 목록을 조회한다.
                 .allMatch(secretary -> secretary.getId().equals(targetSecretary.getId()));
@@ -230,6 +234,10 @@ public class SecretaryOperationsService {
         if (!reputationCatalog.isCityUnlocked(city, player.getReputation(), !player.isEmployed())) {
         // 해설: 해금되지 않은 도시는 비서를 배치할 수 없다.
             return "해금되지 않은 도시";
+        }
+        if (propertyManagerRepository.findByPlayerAndCity(player, city).isPresent()) {
+        // 해설: 화면 검사를 우회해 직접 요청해도 관리직원과 비서가 같은 도시에 배치되지 않게 막는다.
+            return "부동산 관리직원이 배치된 도시에는 비서를 배치할 수 없음";
         }
         OwnedSecretary secretary = ownedSecretaryRepository.findById(ownedSecretaryId).orElseThrow();
         // 해설: 배치할 보유 비서를 조회한다.

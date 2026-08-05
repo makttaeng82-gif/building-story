@@ -7,6 +7,7 @@ import com.game.buildingstory.service.StockNewsCertainty;
 import com.game.buildingstory.service.StockNewsCategory;
 import com.game.buildingstory.service.StockNewsDirection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -35,6 +36,7 @@ public class StockNewsArticle {
     private String eventKey;
     private String eventFamily;
     @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(32)")
     private StockNewsCategory category;
     private String industry;
     private String stockKey;

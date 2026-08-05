@@ -113,9 +113,6 @@ public class BuildingTradeService {
             return "구매 쿨타임 D-" + purchaseCooldownDaysLeft;
         }
 
-        boolean governmentSupported = offer.isGovernmentSupportEligible();
-        int governmentSupportPercent = offer.governmentSupportPercent();
-        long governmentSupportAmount = offer.governmentSupportAmount();
         long purchaseFee = offer.purchaseFee();
         long loanAmount = offer.loanAmount();
         long cashCost = loanPurchase ? offer.cashForLoanPurchase() : offer.cashForPurchase();
@@ -123,9 +120,6 @@ public class BuildingTradeService {
             return "현금 부족";
         }
         OwnedBuilding purchasedBuilding = ownedBuildingRepository.save(new OwnedBuilding(player, offer));
-        if (governmentSupported) {
-            player.claimGovernmentPurchaseSupport(offer.getCity());
-        }
         if (loanPurchase) {
             loanRepository.save(new Loan(player, purchasedBuilding, loanAmount));
         }
@@ -137,13 +131,11 @@ public class BuildingTradeService {
                 -cashCost,
                 0,
                 offer.getName(),
-                (governmentSupported ? "정부지원 " + governmentSupportAmount + "원 · " : "")
-                        + "매수 부대비용 " + purchaseFee + "원"
+                "매수 부대비용 " + purchaseFee + "원"
         );
         startPurchaseCooldown(player, offer);
         secretaryTenantEventService.tryActivateIntro(player, purchasedBuilding);
-        String result = loanPurchase ? "대출구매 완료" : "현금구매 완료";
-        return governmentSupported ? result + " · 정부지원 " + governmentSupportPercent + "%" : result;
+        return loanPurchase ? "대출구매 완료" : "현금구매 완료";
     }
 
     public String sellBuilding(long playerId, long buildingId) {
@@ -170,16 +162,13 @@ public class BuildingTradeService {
         long payoutBeforeDebt = sellPrice - sellFee;
         Optional<Loan> securedLoan = loanRepository.findByBuilding(building);
         long debt = securedLoan.map(Loan::getPrincipal).orElse(0L);
-        long governmentSupportClawback = building.governmentSupportClawback(player.getElapsedDays());
-        if (payoutBeforeDebt < debt + governmentSupportClawback) {
-            return governmentSupportClawback > 0
-                    ? "매각대금으로 담보대출과 정부지원 환수금을 상환할 수 없음"
-                    : "매각대금으로 담보대출을 상환할 수 없음";
+        if (payoutBeforeDebt < debt) {
+            return "매각대금으로 담보대출을 상환할 수 없음";
         }
-        long payout = payoutBeforeDebt - debt - governmentSupportClawback;
+        long payout = payoutBeforeDebt - debt;
         securedLoan.ifPresent(loanRepository::delete);
         player.addCash(payout);
-        saveRecord(player, RecordType.BUILDING_SELL, "건물 판매", payout, 0, building.getName(), valuationStatus.label() + " · 매도비용 " + sellFee + "원 · 대출상환 " + debt + "원 · 정부지원 환수 " + governmentSupportClawback + "원");
+        saveRecord(player, RecordType.BUILDING_SELL, "건물 판매", payout, 0, building.getName(), valuationStatus.label() + " · 매도비용 " + sellFee + "원 · 대출상환 " + debt + "원");
         ownedBuildingRepository.delete(building);
         return "건물 판매 완료 · " + valuationStatus.label() + " " + payout + "원";
     }

@@ -104,7 +104,7 @@ public class AuctionEvent {
     }
 
     public boolean isGovernmentSupportEligible(Player supportPlayer) {
-        return supportPlayer.canUseGovernmentPurchaseSupport(city);
+        return false;
     }
 
     public int governmentSupportPercent() {
@@ -112,9 +112,7 @@ public class AuctionEvent {
     }
 
     public int governmentSupportPercent(Player supportPlayer) {
-        return isGovernmentSupportEligible(supportPlayer)
-                ? EconomyBalanceRules.governmentPurchaseSupportPercent(city)
-                : 0;
+        return 0;
     }
 
     public long effectiveBidPrice(int rate) {
@@ -122,10 +120,7 @@ public class AuctionEvent {
     }
 
     public long effectiveBidPrice(int rate, Player supportPlayer) {
-        long price = bidPrice(rate);
-        return isGovernmentSupportEligible(supportPlayer)
-                ? EconomyBalanceRules.governmentSupportedPrice(price, city)
-                : price;
+        return bidPrice(rate);
     }
 
     public long getMarketPrice() {

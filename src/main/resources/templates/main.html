@@ -18,13 +18,21 @@
             } catch (error) {
                 document.documentElement.dataset.stockTheme = "dark";
             }
+            try {
+                const companyTheme = window.localStorage.getItem("buildingStory.companyTheme");
+                document.documentElement.dataset.companyTheme = companyTheme === "light" ? "light" : "dark";
+            } catch (error) {
+                document.documentElement.dataset.companyTheme = "dark";
+            }
         })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=stock-workspace-v14">
-    <link rel="stylesheet" th:if="${viewMode == 'stocks'}" href="/stock.css?v=stock-workspace-v19">
+    <link rel="stylesheet" href="/styles.css?v=property-headquarters-v2">
+    <link rel="stylesheet" th:if="${viewMode == 'stocks'}" href="/stock.css?v=stock-workspace-v20">
+    <link rel="stylesheet" th:if="${viewMode == 'company'}" href="/company-reporting.css?v=company-reporting-v2">
+    <link rel="stylesheet" th:if="${viewMode == 'company'}" href="/company.css?v=company-theme-v7">
 </head>
-<body th:class="${(screenPaused ? 'game-paused ' : '') + (viewMode == 'stocks' ? 'view-stocks' : '')}"
-      th:attr="data-player-paused=${screenPaused},data-elapsed-days=${player.elapsedDays}">
+<body th:class="${(screenPaused ? 'game-paused ' : '') + (viewMode == 'stocks' ? 'view-stocks' : (viewMode == 'company' ? 'view-company' : ''))}"
+      th:attr="data-player-paused=${screenPaused},data-elapsed-days=${player.elapsedDays},data-view-mode=${viewMode}">
 <!--
 main.html은 로그인 후 플레이어가 가장 오래 머무는 메인 화면이다.
 MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})으로 읽어
@@ -46,17 +54,32 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
                 <strong id="cashValue" class="money" th:text="${@moneyText.format(player.cash)}">0원</strong>
                 <small class="status-subline">대출 <b th:text="${@moneyText.format(loanRemainingRepayment)}">0원</b></small>
             </div>
-            <div class="status-card">
+            <div class="status-card" th:if="${viewMode != 'company'}">
                 <span>총 월세</span>
                 <strong id="totalMonthlyRentValue" class="money" th:text="${@moneyText.format(totalMonthlyRent)}">0원</strong>
             </div>
-            <div class="status-card">
+            <div class="status-card" th:if="${viewMode == 'company'}">
+                <span th:text="${companyTopMetrics[0].label}">기업 지표</span>
+                <strong class="money" th:text="${companyTopMetrics[0].value}">0원</strong>
+                <small class="status-subline" th:text="${companyTopMetrics[0].note}">설명</small>
+            </div>
+            <div class="status-card" th:if="${viewMode != 'company'}">
                 <span>증권 예수금</span>
                 <strong id="securitiesCashValue" class="money" th:text="${@gameService.stockMoneyText(player.securitiesCash)}">0원</strong>
             </div>
-            <div class="status-card" th:if="${player.employed}">
+            <div class="status-card" th:if="${viewMode == 'company'}">
+                <span th:text="${companyTopMetrics[1].label}">기업 지표</span>
+                <strong class="money" th:text="${companyTopMetrics[1].value}">0원</strong>
+                <small class="status-subline" th:classappend="${companyTopMetrics[1].tone}" th:text="${companyTopMetrics[1].note}">설명</small>
+            </div>
+            <div class="status-card" th:if="${viewMode != 'company' && player.employed}">
                 <span>직장</span>
                 <strong th:text="${player.employed ? '재직중' : '퇴사'}">재직중</strong>
+            </div>
+            <div class="status-card" th:if="${viewMode == 'company'}">
+                <span th:text="${companyTopMetrics[2].label}">기업 지표</span>
+                <strong class="money" th:text="${companyTopMetrics[2].value}">0원</strong>
+                <small class="status-subline" th:classappend="${companyTopMetrics[2].tone}" th:text="${companyTopMetrics[2].note}">설명</small>
             </div>
             <div class="status-card">
                 <span>평판</span>
@@ -90,10 +113,18 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
         <a class="info-tab" th:if="${stockContentUnlocked}" href="/main?view=stocks" th:classappend="${viewMode == 'stocks'} ? ' active'">주식</a>
         <span class="info-tab locked" th:if="${!stockContentUnlocked}" th:text="'주식 · ' + ${stockContentStatus}">주식</span>
         <a class="info-tab" href="/info">정보</a>
+        <a class="info-tab" href="/main?view=company" th:classappend="${viewMode == 'company'} ? ' active'">기업</a>
         <form class="tab-pause-form" method="post" action="/pause/toggle">
             <input type="hidden" name="redirectView" th:value="${viewMode}">
             <input type="hidden" name="selectedStockKey" th:if="${viewMode == 'stocks'}" th:value="${selectedStockKey}">
             <button class="tab-pause-button" type="submit" th:text="${player.paused ? '진행 재개' : '일시정지'}">일시정지</button>
+        </form>
+        <div class="company-theme-switch" th:if="${viewMode == 'company'}" role="group" aria-label="기업 화면 테마">
+            <button type="button" data-company-theme-option="light">라이트</button>
+            <button type="button" data-company-theme-option="dark">다크</button>
+        </div>
+        <form class="company-header-logout" th:if="${viewMode == 'company'}" method="post" action="/logout">
+            <button type="submit">로그아웃</button>
         </form>
     </nav>
 
@@ -145,8 +176,11 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
             <aside th:replace="~{fragments/main-stock-panel :: stockSidePanel}"></aside>
         </main>
     </th:block>
+    <th:block th:if="${viewMode == 'company'}">
+        <main th:replace="~{fragments/main-company-panel :: companyPanel}"></main>
+    </th:block>
 
-    <form class="logout-form" method="post" action="/logout">
+    <form class="logout-form" th:unless="${viewMode == 'company'}" method="post" action="/logout">
         <button class="secondary" type="submit">로그아웃</button>
     </form>
 
@@ -155,6 +189,6 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
     <div th:replace="~{fragments/main-modals :: modals}"></div>
 </div>
 
-<script type="module" src="/app.js?v=stock-workspace-v19"></script>
+<script type="module" src="/app.js?v=company-detail-v4"></script>
 </body>
 </html>

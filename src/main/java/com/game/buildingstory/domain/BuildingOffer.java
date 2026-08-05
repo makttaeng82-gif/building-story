@@ -137,7 +137,7 @@ public class BuildingOffer {
     }
 
     public boolean isGovernmentSupportEligible(Player supportPlayer) {
-        return supportPlayer.canUseGovernmentPurchaseSupport(city);
+        return false;
     }
 
     public long governmentSupportAmount() {
@@ -145,7 +145,7 @@ public class BuildingOffer {
     }
 
     public long governmentSupportAmount(Player supportPlayer) {
-        return isGovernmentSupportEligible(supportPlayer) ? offerPrice - effectivePurchasePrice(supportPlayer) : 0L;
+        return 0L;
     }
 
     public int governmentSupportPercent() {
@@ -153,9 +153,7 @@ public class BuildingOffer {
     }
 
     public int governmentSupportPercent(Player supportPlayer) {
-        return isGovernmentSupportEligible(supportPlayer)
-                ? EconomyBalanceRules.governmentPurchaseSupportPercent(city)
-                : 0;
+        return 0;
     }
 
     public long effectivePurchasePrice() {
@@ -163,8 +161,6 @@ public class BuildingOffer {
     }
 
     public long effectivePurchasePrice(Player supportPlayer) {
-        return isGovernmentSupportEligible(supportPlayer)
-                ? EconomyBalanceRules.governmentSupportedPrice(offerPrice, city)
-                : offerPrice;
+        return offerPrice;
     }
 }

@@ -38,7 +38,7 @@ public class QaService {
      * 플레이 중 특정 조건을 빠르게 만들기 위해 현금, 평판, 이벤트, 비서 상태를 직접 조정한다.
      * 운영용 게임 규칙이 아니라 개발 검증 시간을 줄이기 위한 우회 도구다.
      */
-    private static final long TEST_CASH_AMOUNT = 30_000_000L;
+    private static final long TEST_CASH_AMOUNT = 1_000_000_000_000L;
 
     private final PlayerRepository playerRepository;
     private final OwnedBuildingRepository ownedBuildingRepository;
@@ -90,7 +90,7 @@ public class QaService {
         Player player = playerRepository.findById(playerId).orElseThrow();
         player.addCash(TEST_CASH_AMOUNT);
         // 해설: 정해진 테스트 현금 금액을 플레이어 현금에 더한다.
-        return "테스트 현금 30,000,000원 지급";
+        return "테스트 현금 1조원 지급";
     }
 
     public String updateTestReputation(long playerId, int reputation) {

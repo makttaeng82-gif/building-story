@@ -54,3 +54,15 @@ tasks.register('stockPriceSimulation', JavaExec) {
 		args project.findProperty('seeds') ?: '500', project.findProperty('years') ?: '10'
 	}
 }
+
+tasks.register('playerCompanySimulation', JavaExec) {
+	group = 'verification'
+	description = 'Runs the fixed-seed player-company balance simulation and writes a Markdown report.'
+	dependsOn testClasses
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.game.buildingstory.simulation.PlayerCompanyLongTermSimulationRunner'
+	jvmArgs '-Dfile.encoding=UTF-8'
+	if (project.hasProperty('seeds') || project.hasProperty('months')) {
+		args project.findProperty('seeds') ?: '1000', project.findProperty('months') ?: '180'
+	}
+}

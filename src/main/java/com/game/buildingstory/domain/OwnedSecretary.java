@@ -35,6 +35,7 @@ public class OwnedSecretary {
     private Integer unpaidSalaryMonths = 0;
     private Integer nextAutoRepairDay = 1;
     private Integer autoRepairsUsedInCooldown = 0;
+    private Integer companyCareerMonths = 0;
 
     protected OwnedSecretary() {
     }
@@ -120,6 +121,18 @@ public class OwnedSecretary {
 
     public int getAutoRepairsUsedInCooldown() {
         return autoRepairsUsedInCooldown == null ? 0 : autoRepairsUsedInCooldown;
+    }
+
+    public int getCompanyCareerMonths() {
+        return companyCareerMonths == null ? 0 : companyCareerMonths;
+    }
+
+    public int getCompanyProficiencyLevel() {
+        return Math.min(5, 1 + getCompanyCareerMonths() / 6);
+    }
+
+    public void advanceCompanyCareerMonth() {
+        companyCareerMonths = Math.min(24, getCompanyCareerMonths() + 1);
     }
 
     public boolean canAutoRepair(int elapsedDays) {

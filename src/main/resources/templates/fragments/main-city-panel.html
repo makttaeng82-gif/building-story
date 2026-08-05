@@ -21,7 +21,6 @@
             </p>
         </div>
         <div class="quick-actions">
-            <button id="sideJobBtn" type="button" th:disabled="${player.paused}" th:text="${player.paused ? '일시정지' : '부업'}">부업</button>
             <form method="post" action="/resign" th:if="${player.employed}">
                 <button class="danger-button" type="submit" th:disabled="${player.paused || !player.canResign()}" th:text="${player.paused ? '일시정지' : (player.canResign() ? '퇴사' : '퇴사 ' + player.ddayText(player.daysUntilResignAvailable()))}">퇴사</button>
             </form>

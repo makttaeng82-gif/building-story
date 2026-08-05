@@ -378,7 +378,7 @@
         <dl class="stock-summary-primary">
             <div><dt>예수금</dt><dd id="stockRailSecuritiesCash" th:text="${@moneyText.format(player.securitiesCash)}">0원</dd></div>
             <div><dt>평가금액</dt><dd th:text="${stockHoldingSummary.totalValuationText()}">0원</dd></div>
-            <div><dt>평가손익</dt><dd th:class="${stockHoldingSummary.profitDirection()}" th:text="${stockHoldingSummary.totalProfitText()}">0원</dd></div>
+            <div><dt>평가손익</dt><dd th:class="${stockHoldingSummary.totalProfit() > 0 ? 'up' : (stockHoldingSummary.totalProfit() < 0 ? 'down' : 'flat')}" th:text="${stockHoldingSummary.totalProfitText()}">0원</dd></div>
         </dl>
         <details class="stock-summary-more">
             <summary><span>더보기</span></summary>

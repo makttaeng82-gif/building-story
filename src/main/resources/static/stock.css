@@ -1803,6 +1803,18 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     font-size: 12px;
 }
 
+.view-stocks .stock-holding-summary dd.up {
+    color: var(--stock-red);
+}
+
+.view-stocks .stock-holding-summary dd.down {
+    color: var(--stock-blue);
+}
+
+.view-stocks .stock-holding-summary dd.flat {
+    color: var(--stock-muted);
+}
+
 .view-stocks .stock-account-open {
     border-color: var(--stock-line);
     background: var(--stock-surface-2);

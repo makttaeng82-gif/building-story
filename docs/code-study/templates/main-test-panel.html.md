@@ -20,7 +20,7 @@
     <summary>테스트</summary>
     <form method="post" action="/test/cash">
     <!-- 해설: POST 폼이다. 버튼 클릭 시 서버 상태를 변경하는 요청을 보낸다. -->
-        <button type="submit">현금 3천만원 증가</button>
+        <button type="submit">현금 1조원 증가</button>
         <!-- 해설: 사용자가 클릭해 폼 제출이나 프론트 동작을 실행하는 버튼이다. -->
     </form>
     <form method="post" action="/test/chances" class="test-controls">

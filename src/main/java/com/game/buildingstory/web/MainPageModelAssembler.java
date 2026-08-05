@@ -16,9 +16,11 @@ public class MainPageModelAssembler {
      * 그래서 이 조립 전용 컴포넌트가 Model에 필요한 값을 한 곳에서 채운다.
      */
     private final GameService gameService;
+    private final CompanyPageModelAssembler companyPageModelAssembler;
 
-    public MainPageModelAssembler(GameService gameService) {
+    public MainPageModelAssembler(GameService gameService, CompanyPageModelAssembler companyPageModelAssembler) {
         this.gameService = gameService;
+        this.companyPageModelAssembler = companyPageModelAssembler;
     }
 
     public void addMainPageAttributes(
@@ -42,6 +44,27 @@ public class MainPageModelAssembler {
         model.addAttribute("totalMonthlyRent", gameService.totalMonthlyRent(player));
         model.addAttribute("ownedSecretaries", gameService.ownedSecretaries(player));
         model.addAttribute("assignedSecretary", gameService.assignedSecretary(player, player.getCurrentCity()).orElse(null));
+        var propertyManagers = gameService.propertyManagers(player);
+        var repairCountsByCity = gameService.repairRequestCountsByCity(player);
+        var recentPropertyManagerRepairCountsByCity = gameService.recentPropertyManagerRepairCountsByCity(player);
+        var propertyManagersByCity = propertyManagers.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        manager -> manager.getCity(),
+                        manager -> manager
+                ));
+        var propertyManager = gameService.propertyManager(player, player.getCurrentCity()).orElse(null);
+        model.addAttribute("propertyManager", propertyManager);
+        model.addAttribute("propertyManagers", propertyManagers);
+        model.addAttribute("propertyManagersByCity", propertyManagersByCity);
+        model.addAttribute("recentPropertyManagerRepairCountsByCity", recentPropertyManagerRepairCountsByCity);
+        model.addAttribute("activePropertyManagerCount", propertyManagers.stream().filter(manager -> manager.isActive()).count());
+        model.addAttribute("propertyManagerTotalSalaryDue", propertyManagers.stream()
+                .mapToLong(gameService::propertyManagerSalaryDue)
+                .sum());
+        model.addAttribute("propertyManagerMonthlySalary", gameService.propertyManagerMonthlySalary());
+        model.addAttribute("propertyManagerSalaryDue", propertyManager == null ? 0L : gameService.propertyManagerSalaryDue(propertyManager));
+        model.addAttribute("propertyManagerFeatureVisible", gameService.propertyManagerFeatureVisible(player));
+        model.addAttribute("propertyManagerHandoffReady", gameService.propertyManagerHandoffReady(player));
         model.addAttribute("secretarySpecs", gameService.secretarySpecs());
         model.addAttribute("secretaryTenantEvents", gameService.secretaryTenantEvents(player));
         model.addAttribute("secretaryOffer", null);
@@ -71,9 +94,12 @@ public class MainPageModelAssembler {
         } else {
             model.addAttribute("stockQuotes", List.of());
         }
+        if ("company".equals(viewMode)) {
+            companyPageModelAssembler.addCompanyPageAttributes(player, model);
+        }
         model.addAttribute("cities", gameService.cities());
         model.addAttribute("cityUnlocks", gameService.cityUnlocks(player));
-        model.addAttribute("repairCountsByCity", gameService.repairRequestCountsByCity(player));
+        model.addAttribute("repairCountsByCity", repairCountsByCity);
         model.addAttribute("loanPrincipal", loans.stream().mapToLong(Loan::getPrincipal).sum());
         model.addAttribute("loanMonthlyPayment", loans.stream().mapToLong(Loan::getMonthlyPayment).sum());
         model.addAttribute("loanRemainingRepayment", gameService.remainingLoanRepayment(player));

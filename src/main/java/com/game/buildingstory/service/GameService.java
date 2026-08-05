@@ -2,12 +2,15 @@ package com.game.buildingstory.service;
 
 import com.game.buildingstory.domain.AuctionEvent;
 import com.game.buildingstory.domain.BuildingOffer;
+import com.game.buildingstory.domain.EconomyBalanceRules;
 import com.game.buildingstory.domain.GameEvent;
 import com.game.buildingstory.domain.Loan;
 import com.game.buildingstory.domain.MonthlyRecord;
 import com.game.buildingstory.domain.OwnedBuilding;
+import com.game.buildingstory.domain.OwnedPropertyManager;
 import com.game.buildingstory.domain.OwnedSecretary;
 import com.game.buildingstory.domain.Player;
+import com.game.buildingstory.domain.RecordType;
 import com.game.buildingstory.domain.SecretaryTenantEvent;
 import com.game.buildingstory.domain.SecretaryTenantEventStatus;
 import com.game.buildingstory.domain.StockTradeHistory;
@@ -33,7 +36,6 @@ public class GameService {
      * 그래서 날짜 진행, 이벤트 처리, 구매/판매 같은 외부 진입점은 대부분 이 클래스에 모아두고,
      * 실제 세부 계산은 BuildingTradeService, SettlementService, StockService 같은 전용 서비스에 위임한다.
      */
-    private static final long SIDE_JOB_REWARD = 10_000L;
     private static final int RECORD_RETENTION_DAYS = 62;
     private final PlayerRepository playerRepository;
     private final OwnedBuildingRepository ownedBuildingRepository;
@@ -48,6 +50,7 @@ public class GameService {
     private final BuildingTradeService buildingTradeService;
     private final LoanService loanService;
     private final SecretaryOperationsService secretaryOperationsService;
+    private final PropertyManagementService propertyManagementService;
     private final SettlementService settlementService;
     private final EventFlowService eventFlowService;
     private final StockService stockService;
@@ -68,6 +71,7 @@ public class GameService {
             BuildingTradeService buildingTradeService,
             LoanService loanService,
             SecretaryOperationsService secretaryOperationsService,
+            PropertyManagementService propertyManagementService,
             SettlementService settlementService,
             EventFlowService eventFlowService,
             StockService stockService,
@@ -87,6 +91,7 @@ public class GameService {
         this.buildingTradeService = buildingTradeService;
         this.loanService = loanService;
         this.secretaryOperationsService = secretaryOperationsService;
+        this.propertyManagementService = propertyManagementService;
         this.settlementService = settlementService;
         this.eventFlowService = eventFlowService;
         this.stockService = stockService;
@@ -111,19 +116,6 @@ public class GameService {
             ownedBuildingRepository.save(new OwnedBuilding(player, starter.city(), starter.slot(), starter.typeName(), starter.name(), starter.marketPrice(), 0L, starter.monthlyRent(), starter.tradeCooldownDays()));
             buildingTradeService.refreshOffers(player);
         }
-    }
-
-    @Transactional
-    public String sideJob(long playerId) {
-        Player player = playerRepository.findById(playerId).orElseThrow();
-        if (player.isPaused()) {
-            return pausedActionMessage();
-        }
-        if (!player.canDoSideJobToday()) {
-            return "부업은 하루에 한 번만 가능";
-        }
-        player.addSideIncome(SIDE_JOB_REWARD);
-        return "부업 수익 10,000원 획득";
     }
 
     @Transactional
@@ -657,6 +649,40 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
+    public boolean isSecretaryAssignedToCompany(Player player, OwnedSecretary secretary) {
+        return secretaryOperationsService.isAssignedToCompany(player, secretary);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OwnedPropertyManager> propertyManager(Player player, String city) {
+        return propertyManagementService.manager(player, city);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OwnedPropertyManager> propertyManagers(Player player) {
+        return propertyManagementService.managers(player);
+    }
+
+    @Transactional(readOnly = true)
+    public long propertyManagerSalaryDue(OwnedPropertyManager manager) {
+        return propertyManagementService.salaryDue(manager);
+    }
+
+    public long propertyManagerMonthlySalary() {
+        return PropertyManagementService.MONTHLY_SALARY;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean propertyManagerFeatureVisible(Player player) {
+        return propertyManagementService.isFeatureVisible(player);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean propertyManagerHandoffReady(Player player) {
+        return propertyManagementService.isHandoffReady(player);
+    }
+
+    @Transactional(readOnly = true)
     public boolean canAssignSecretaryToCity(Player player, OwnedSecretary targetSecretary, String city) {
         return secretaryOperationsService.canAssignSecretaryToCity(player, targetSecretary, city);
     }
@@ -675,6 +701,11 @@ public class GameService {
         return ownedBuildingRepository.findByPlayerOrderById(player).stream()
                 .filter(OwnedBuilding::isRepairRequested)
                 .collect(Collectors.groupingBy(OwnedBuilding::getCity, Collectors.counting()));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> recentPropertyManagerRepairCountsByCity(Player player) {
+        return propertyManagementService.recentRepairCountsByCity(player);
     }
 
     @Transactional(readOnly = true)
@@ -724,6 +755,11 @@ public class GameService {
     }
 
     @Transactional
+    public String hirePropertyManager(long playerId, String city) {
+        return propertyManagementService.hire(playerId, city);
+    }
+
+    @Transactional
     public String assignSecretary(long playerId, long ownedSecretaryId, String city) {
         return secretaryOperationsService.assignSecretary(playerId, ownedSecretaryId, city);
     }
@@ -745,7 +781,7 @@ public class GameService {
 
     @Transactional
     public String changeCity(long playerId, String city) {
-        Player player = playerRepository.findById(playerId).orElseThrow();
+        Player player = playerRepository.findByIdForUpdate(playerId).orElseThrow();
         if (!buildingCatalog.cities().contains(city)) {
             return "존재하지 않는 도시";
         }
@@ -754,7 +790,41 @@ public class GameService {
         }
         player.changeCity(city);
         buildingTradeService.ensureOffers(player);
-        return city + " 이동 완료";
+        String supportNotice = grantGovernmentCityEntrySupport(player);
+        return city + " 이동 완료" + (supportNotice.isBlank() ? "" : " · " + supportNotice);
+    }
+
+    /**
+     * 도시 화면을 처음 열었을 때 해당 도시의 정착 지원금을 한 번만 지급한다.
+     * 시작 도시인 청주는 도시 이동 요청이 없으므로 화면 진입용 메서드가 별도로 필요하다.
+     */
+    @Transactional
+    public String enterCurrentCityScreen(long playerId) {
+        Player player = playerRepository.findByIdForUpdate(playerId).orElseThrow();
+        return grantGovernmentCityEntrySupport(player);
+    }
+
+    private String grantGovernmentCityEntrySupport(Player player) {
+        String city = player.getCurrentCity();
+        long amount = EconomyBalanceRules.governmentCityEntryGrant(city);
+        if (amount == 0L || !player.claimGovernmentCityGrant(city)) {
+            return "";
+        }
+        player.addCash(amount);
+        monthlyRecordRepository.save(new MonthlyRecord(
+                player,
+                RecordType.GOVERNMENT_SUPPORT,
+                "정부 정착지원금",
+                amount,
+                0,
+                null,
+                city + " 첫 진입 지원"
+        ));
+        monthlyRecordRepository.deleteByPlayerAndElapsedDaysLessThan(
+                player,
+                Math.max(1, player.getElapsedDays() - RECORD_RETENTION_DAYS + 1)
+        );
+        return city + " 정부지원금 " + String.format("%,d원", amount) + " 지급";
     }
 
     @Transactional

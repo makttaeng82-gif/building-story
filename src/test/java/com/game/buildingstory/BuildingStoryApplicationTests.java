@@ -24,6 +24,7 @@ import com.game.buildingstory.repo.StockMarketRegimeStateRepository;
 import com.game.buildingstory.repo.StockMarketIndexHistoryRepository;
 import com.game.buildingstory.repo.StockNewsArticleRepository;
 import com.game.buildingstory.repo.OwnedBuildingRepository;
+import com.game.buildingstory.repo.OwnedPropertyManagerRepository;
 import com.game.buildingstory.repo.OwnedSecretaryRepository;
 import com.game.buildingstory.repo.OwnedStockRepository;
 import com.game.buildingstory.repo.PlayerRepository;
@@ -110,6 +111,9 @@ class BuildingStoryApplicationTests {
 
 	@Autowired
 	private OwnedBuildingRepository ownedBuildingRepository;
+
+	@Autowired
+	private OwnedPropertyManagerRepository ownedPropertyManagerRepository;
 
 	@Autowired
 	private MonthlyRecordRepository monthlyRecordRepository;
@@ -200,6 +204,7 @@ class BuildingStoryApplicationTests {
 		loanRepository.deleteAll();
 		ownedBuildingRepository.deleteAll();
 		ownedSecretaryRepository.deleteAll();
+		ownedPropertyManagerRepository.deleteAll();
 		stockTradeHistoryRepository.deleteAll();
 		stockPriceHistoryRepository.deleteAll();
 		stockMarketIndexHistoryRepository.deleteAll();
@@ -276,6 +281,30 @@ class BuildingStoryApplicationTests {
 	}
 
 	@Test
+	void companyViewRendersDuringDevelopmentWithoutUnlockConditions() throws Exception {
+		Player player = playerRepository.save(new Player("company-render-test", "hash"));
+		gameService.completeStory(player.getId());
+		MockHttpSession session = new MockHttpSession();
+		session.setAttribute(SessionKeys.PLAYER_ID, player.getId());
+
+		String html = mockMvc.perform(get("/main").param("view", "company").session(session))
+				.andExpect(status().isOk())
+				.andReturn()
+				.getResponse()
+				.getContentAsString();
+
+		assertThat(html).contains(
+				"company.css?v=company-theme-v7",
+				"data-view-mode=\"company\"",
+				"data-company-theme-option=\"light\"",
+				"data-company-theme-option=\"dark\"",
+				"data-company-preparation",
+				"AI 기업 설립 준비",
+				"개발 중 조건 미적용");
+		assertThat(html).doesNotContain("data-company-dashboard");
+	}
+
+	@Test
 	void cityViewRendersSectionsBelowMarketAfterServiceTransactionCloses() throws Exception {
 		Player player = playerRepository.save(new Player("detached-city-render-test", "hash"));
 		gameService.completeStory(player.getId());
@@ -297,7 +326,7 @@ class BuildingStoryApplicationTests {
 				.getResponse()
 				.getContentAsString();
 
-		assertThat(html).contains("정부지원 40%", "(부대비용 ", "누적 기부액", "30만원당 평판 1", "순자산 30억원 · 평판 8,250 필요", "대출현황", "월 이자 합계", "대출 원금은 매월 줄지 않으며", "대출 담보 원룸", "두 번째 대출 담보", "세 번째 대출 담보", "원금 전액 상환", "사치품", "30만원당 평판 1.5", "구입 후 보유 비서에게 선물 가능");
+		assertThat(html).contains("(부대비용 ", "누적 기부액", "30만원당 평판 1", "순자산 30억원 · 평판 8,250 필요", "대출현황", "월 이자 합계", "대출 원금은 매월 줄지 않으며", "대출 담보 원룸", "두 번째 대출 담보", "세 번째 대출 담보", "원금 전액 상환", "사치품", "30만원당 평판 1.5", "구입 후 보유 비서에게 선물 가능");
 	}
 
 	@Test
@@ -315,11 +344,14 @@ class BuildingStoryApplicationTests {
 
 		assertThat(html).contains(
 				"대출 기본정보", "원금의 월 0.4%", "별도 조건 없이 24개월 갱신", "대출별로 독립 계산", "시세의 90%로 담보 건물 강제매각",
-				"부동산 기본정보", "시장가의 90%", "월세의 10%", "기본 입주확률 35%", "도시별 최초 1회 구매가격 40% 지원",
+				"부동산 기본정보", "시장가의 90%", "월세의 10%", "기본 입주확률 35%", "각 도시 화면에 처음 진입할 때 현금으로 1회 자동 지급",
 				"비서 기본정보와 목록", "영입 경로", "필요 평판", "초기 월급", "최대 월급", "숙련 효과", "호감도 효과",
 				"주식 기본정보와 용어", "종합지수", "경기국면", "β(베타)", "적정가치", "예상배당금", "평가손익",
 				"data-collapsible-key=\"info-loan\"", "data-collapsible-key=\"info-real-estate\"",
-				"data-collapsible-key=\"info-secretary\"", "data-collapsible-key=\"info-stock-guide\""
+				"data-collapsible-key=\"info-secretary\"", "data-collapsible-key=\"info-stock-guide\"",
+				"data-collapsible-key=\"info-company-guide\"", "비상장 기업가치", "개인 유상증자",
+				"href=\"/main?view=company\"", "기업 화면으로 이동", "설립과 최초 출시", "기업 화면 읽기",
+				"직원 채용과 성장", "기업 비서", "총괄비서", "연산 인프라와 장애", "법인 거래원장"
 		);
 	}
 
@@ -352,9 +384,9 @@ class BuildingStoryApplicationTests {
 	void qaCashChangePersistsWithoutCallerTransaction() {
 		Player player = playerRepository.save(new Player("qa-cash-test", "hash"));
 
-		assertThat(qaService.addTestCash(player.getId())).isEqualTo("테스트 현금 30,000,000원 지급");
+		assertThat(qaService.addTestCash(player.getId())).isEqualTo("테스트 현금 1조원 지급");
 
-		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(30_000_000L);
+		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash()).isEqualTo(1_000_000_000_000L);
 	}
 
 	@Test
@@ -672,7 +704,6 @@ class BuildingStoryApplicationTests {
 	@Transactional
 	void loanPurchaseUsesSixtyPercentLoanAndFortyPercentCash() {
 		Player player = playerRepository.save(new Player("loan-ratio-test", "hash"));
-		player.claimGovernmentPurchaseSupport("청주");
 		player.addCash(20_000_000L);
 		player.setReputationForTest(1_000);
 		BuildingOffer offer = buildingOfferRepository.save(new BuildingOffer(
@@ -695,92 +726,60 @@ class BuildingStoryApplicationTests {
 
 	@Test
 	@Transactional
-	void firstPaidPurchaseInSupportedCityReceivesGovernmentDiscountOnce() {
+	void firstCityScreenEntryReceivesGovernmentCashGrantOnce() {
 		Player player = playerRepository.save(new Player("government-support-test", "hash"));
-		player.addCash(20_000_000L);
-		BuildingOffer firstOffer = buildingOfferRepository.save(new BuildingOffer(
-				player,
-				"청주",
-				1,
-				"원룸",
-				"정부지원 테스트 원룸",
-				30_000_000L,
-				200_000L,
-				4,
-				ValuationStatus.FAIR
-		));
+		long cashBefore = player.getCash();
 
-		assertThat(firstOffer.isGovernmentSupportEligible()).isTrue();
-		assertThat(firstOffer.effectivePurchasePrice()).isEqualTo(18_000_000L);
-		assertThat(firstOffer.loanAmount()).isEqualTo(14_400_000L);
-		assertThat(firstOffer.cashForLoanPurchase()).isEqualTo(3_870_000L);
-		assertThat(gameService.buyOffer(player.getId(), firstOffer.getId(), true))
-				.isEqualTo("대출구매 완료 · 정부지원 40%");
-		assertThat(loanRepository.findByPlayer(player))
-				.singleElement()
-				.extracting(Loan::getPrincipal)
-				.isEqualTo(14_400_000L);
-		assertThat(ownedBuildingRepository.findByPlayerAndCityOrderById(player, "청주"))
-				.singleElement()
-				.extracting(OwnedBuilding::getGovernmentSupportAmount)
-				.isEqualTo(12_000_000L);
-
-		BuildingOffer laterOffer = new BuildingOffer(
-				player, "청주", 1, "원룸", "두 번째 원룸", 30_000_000L, 200_000L, 4, ValuationStatus.FAIR);
-		assertThat(laterOffer.isGovernmentSupportEligible()).isFalse();
-		assertThat(laterOffer.effectivePurchasePrice()).isEqualTo(30_000_000L);
+		assertThat(gameService.enterCurrentCityScreen(player.getId()))
+				.isEqualTo("청주 정부지원금 30,000,000원 지급");
+		assertThat(playerRepository.findById(player.getId()).orElseThrow().getCash())
+				.isEqualTo(cashBefore + 30_000_000L);
+		assertThat(gameService.enterCurrentCityScreen(player.getId())).isBlank();
 	}
 
 	@Test
-	void governmentSupportRatesExtendThroughIncheon() {
+	void governmentCashGrantAmountsCoverEveryCity() {
 		Player player = new Player("government-support-city-test", "hash");
 
-		assertThat(player.canUseGovernmentPurchaseSupport("청주")).isTrue();
-		assertThat(player.canUseGovernmentPurchaseSupport("세종")).isTrue();
-		assertThat(player.canUseGovernmentPurchaseSupport("대전")).isTrue();
-		assertThat(player.canUseGovernmentPurchaseSupport("부산")).isTrue();
-		assertThat(player.canUseGovernmentPurchaseSupport("인천")).isTrue();
-		assertThat(player.canUseGovernmentPurchaseSupport("서울")).isTrue();
-		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentPurchaseSupportPercent("청주")).isEqualTo(40);
-		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentPurchaseSupportPercent("부산")).isEqualTo(30);
-		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentPurchaseSupportPercent("인천")).isEqualTo(20);
-		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentPurchaseSupportPercent("서울")).isEqualTo(10);
-		assertThat(player.claimGovernmentPurchaseSupport("세종")).isTrue();
-		assertThat(player.claimGovernmentPurchaseSupport("세종")).isFalse();
+		assertThat(player.canClaimGovernmentCityGrant("청주")).isTrue();
+		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentCityEntryGrant("청주")).isEqualTo(30_000_000L);
+		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentCityEntryGrant("세종")).isEqualTo(150_000_000L);
+		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentCityEntryGrant("대전")).isEqualTo(400_000_000L);
+		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentCityEntryGrant("부산")).isEqualTo(1_000_000_000L);
+		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentCityEntryGrant("인천")).isEqualTo(2_500_000_000L);
+		assertThat(com.game.buildingstory.domain.EconomyBalanceRules.governmentCityEntryGrant("서울")).isEqualTo(10_000_000_000L);
+		assertThat(player.claimGovernmentCityGrant("세종")).isTrue();
+		assertThat(player.claimGovernmentCityGrant("세종")).isFalse();
 	}
 
 	@Test
-	void incheonFirstPurchaseReceivesTwentyPercentGovernmentSupport() {
+	void buildingPurchaseNoLongerAppliesGovernmentDiscount() {
 		Player player = new Player("incheon-support-test", "hash");
 		BuildingOffer offer = new BuildingOffer(
 				player, "인천", 1, "메디컬 빌딩", "지원 테스트 빌딩", 100_000_000L, 500_000L, 10, ValuationStatus.FAIR);
 
-		assertThat(offer.governmentSupportPercent()).isEqualTo(20);
-		assertThat(offer.effectivePurchasePrice()).isEqualTo(80_000_000L);
-		assertThat(offer.governmentSupportAmount()).isEqualTo(20_000_000L);
-		assertThat(offer.purchaseFee()).isEqualTo(1_200_000L);
-		assertThat(offer.loanAmount()).isEqualTo(64_000_000L);
-		assertThat(offer.cashForLoanPurchase()).isEqualTo(17_200_000L);
+		assertThat(offer.governmentSupportPercent()).isZero();
+		assertThat(offer.effectivePurchasePrice()).isEqualTo(100_000_000L);
+		assertThat(offer.governmentSupportAmount()).isZero();
+		assertThat(offer.purchaseFee()).isEqualTo(1_500_000L);
 	}
 
 	@Test
-	void governmentSupportIsRepaidWhenSupportedBuildingIsSoldWithinOneYear() {
+	void newlyPurchasedBuildingHasNoGovernmentSupportClawback() {
 		Player player = new Player("support-clawback-test", "hash");
 		BuildingOffer offer = new BuildingOffer(
 				player, "청주", 1, "원룸", "환수 테스트 원룸", 30_000_000L, 200_000L, 4, ValuationStatus.FAIR);
 		OwnedBuilding building = new OwnedBuilding(player, offer);
 
-		assertThat(building.getGovernmentSupportAmount()).isEqualTo(12_000_000L);
-		assertThat(building.governmentSupportClawback(player.getElapsedDays())).isEqualTo(12_000_000L);
-		assertThat(building.governmentSupportClawbackDaysLeft(player.getElapsedDays())).isEqualTo(365);
-		assertThat(building.governmentSupportClawback(player.getElapsedDays() + 365)).isZero();
+		assertThat(building.getGovernmentSupportAmount()).isZero();
+		assertThat(building.governmentSupportClawback(player.getElapsedDays())).isZero();
+		assertThat(building.governmentSupportClawbackDaysLeft(player.getElapsedDays())).isZero();
 	}
 
 	@Test
 	@Transactional
 	void loanPurchaseUsesPropertyCashFlowInsteadOfReputationLimit() {
 		Player player = playerRepository.save(new Player("loan-limit-test", "hash"));
-		player.claimGovernmentPurchaseSupport("청주");
 		player.addCash(20_000_000L);
 		BuildingOffer offer = buildingOfferRepository.save(new BuildingOffer(
 				player,
@@ -815,7 +814,7 @@ class BuildingStoryApplicationTests {
 				ValuationStatus.FAIR
 		));
 
-		assertThat(gameService.buyOffer(player.getId(), offer.getId(), false)).isEqualTo("현금구매 완료 · 정부지원 40%");
+		assertThat(gameService.buyOffer(player.getId(), offer.getId(), false)).isEqualTo("현금구매 완료");
 		gameService.ensureOffers(player);
 
 		BuildingOffer remainingOffer = buildingOfferRepository.findById(offer.getId()).orElseThrow();
@@ -1869,28 +1868,24 @@ class BuildingStoryApplicationTests {
 	}
 
 	@Test
-	void auctionPriceAppliesGovernmentSupportBeforePurchaseFee() {
+	void auctionPriceDoesNotApplyGovernmentPurchaseDiscount() {
 		Player player = new Player("auction-support-price-test", "hash");
 		AuctionEvent auction = new AuctionEvent(
 				player, "대전", 1, "다가구주택", "경매 다가구주택", 100_000_000L, 500_000L, 10);
 
-		assertThat(auction.effectiveBidPrice(88)).isEqualTo(52_800_000L);
-		assertThat(auction.totalPurchasePrice(88)).isEqualTo(53_592_000L);
-
-		player.claimGovernmentPurchaseSupport("대전");
 		assertThat(auction.effectiveBidPrice(88)).isEqualTo(88_000_000L);
 		assertThat(auction.totalPurchasePrice(88)).isEqualTo(89_320_000L);
 	}
 
 	@Test
-	void incheonAuctionUsesTwentyPercentGovernmentSupport() {
+	void incheonAuctionAlsoUsesFullBidPrice() {
 		Player player = new Player("incheon-auction-support-test", "hash");
 		AuctionEvent auction = new AuctionEvent(
 				player, "인천", 1, "메디컬 빌딩", "경매 메디컬 빌딩", 100_000_000L, 500_000L, 10);
 
-		assertThat(auction.governmentSupportPercent()).isEqualTo(20);
-		assertThat(auction.effectiveBidPrice(88)).isEqualTo(70_400_000L);
-		assertThat(auction.totalPurchasePrice(88)).isEqualTo(71_456_000L);
+		assertThat(auction.governmentSupportPercent()).isZero();
+		assertThat(auction.effectiveBidPrice(88)).isEqualTo(88_000_000L);
+		assertThat(auction.totalPurchasePrice(88)).isEqualTo(89_320_000L);
 	}
 
 	@Test
@@ -1898,7 +1893,6 @@ class BuildingStoryApplicationTests {
 	void auctionUsesRebalancedChanceAndOnePercentFailureDeposit() {
 		Player player = playerRepository.save(new Player("auction-balance-test", "hash"));
 		player.addCash(100_000_000L);
-		player.claimGovernmentPurchaseSupport("청주");
 		AuctionEvent auction = auctionEventRepository.save(new AuctionEvent(
 				player, "청주", 1, "원룸", "경매 균형 테스트", 30_000_000L, 200_000L, 4));
 

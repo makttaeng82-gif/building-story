@@ -32,6 +32,16 @@ public class QaController {
         return "redirect:/main";
     }
 
+    @PostMapping("/test/company/commercialization/skip")
+    public String skipCompanyCommercialization(HttpSession session, RedirectAttributes redirectAttributes) {
+        Long playerId = currentPlayerId(session);
+        if (playerId == null) {
+            return "redirect:/login";
+        }
+        redirectAttributes.addFlashAttribute("notice", qaService.skipCompanyCommercialization(playerId));
+        return "redirect:/main?view=company";
+    }
+
     @PostMapping("/test/chances")
     public String updateTestChances(
             @RequestParam int moveInChance,

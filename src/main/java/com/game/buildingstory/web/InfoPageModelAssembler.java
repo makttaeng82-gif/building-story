@@ -34,5 +34,8 @@ public class InfoPageModelAssembler {
         model.addAttribute("stockSpecs", gameService.stockSpecs());
         model.addAttribute("stockContentUnlocked", gameService.stockContentUnlocked(player));
         model.addAttribute("stockContentStatus", gameService.stockContentStatusText(player));
+        gameService.ensureCompanyUnlockSchedule(player);
+        model.addAttribute("companyContentUnlocked", gameService.companyContentUnlocked(player));
+        model.addAttribute("companyContentStatus", gameService.companyContentStatusText(player));
     }
 }

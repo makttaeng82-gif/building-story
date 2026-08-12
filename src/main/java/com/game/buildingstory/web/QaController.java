@@ -2,15 +2,17 @@ package com.game.buildingstory.web;
 
 import com.game.buildingstory.service.QaService;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
+@Profile("qa")
 public class QaController {
     /*
-     * 개발/테스트 편의를 위한 QA 엔드포인트다.
+     * qa 프로필에서만 등록되는 개발/테스트 편의용 엔드포인트다.
      *
      * 실제 게임 규칙을 우회해 현금, 평판, 이벤트 상태를 빠르게 조정한다.
      * 수동 테스트에서 특정 후반 컨텐츠를 확인하려면 정상 플레이로 오래 진행해야 하므로,
@@ -30,16 +32,6 @@ public class QaController {
         }
         redirectAttributes.addFlashAttribute("notice", qaService.addTestCash(playerId));
         return "redirect:/main";
-    }
-
-    @PostMapping("/test/company/commercialization/skip")
-    public String skipCompanyCommercialization(HttpSession session, RedirectAttributes redirectAttributes) {
-        Long playerId = currentPlayerId(session);
-        if (playerId == null) {
-            return "redirect:/login";
-        }
-        redirectAttributes.addFlashAttribute("notice", qaService.skipCompanyCommercialization(playerId));
-        return "redirect:/main?view=company";
     }
 
     @PostMapping("/test/chances")

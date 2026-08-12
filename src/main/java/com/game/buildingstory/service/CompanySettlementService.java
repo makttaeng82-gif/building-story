@@ -48,6 +48,7 @@ public class CompanySettlementService {
     private final CompanyOrganizationService companyOrganizationService;
     private final CompanyFinanceService companyFinanceService;
     private final CompanyGrowthService companyGrowthService;
+    private final CompanyIpoService companyIpoService;
 
     public CompanySettlementService(
             PlayerRepository playerRepository,
@@ -70,7 +71,8 @@ public class CompanySettlementService {
             CompanySecretaryService companySecretaryService,
             CompanyOrganizationService companyOrganizationService,
             CompanyFinanceService companyFinanceService,
-            CompanyGrowthService companyGrowthService
+            CompanyGrowthService companyGrowthService,
+            CompanyIpoService companyIpoService
     ) {
         this.playerRepository = playerRepository;
         this.companyRepository = companyRepository;
@@ -93,6 +95,7 @@ public class CompanySettlementService {
         this.companyOrganizationService = companyOrganizationService;
         this.companyFinanceService = companyFinanceService;
         this.companyGrowthService = companyGrowthService;
+        this.companyIpoService = companyIpoService;
     }
 
     @Transactional
@@ -243,6 +246,7 @@ public class CompanySettlementService {
         var organizationResult = companyOrganizationService.processSuccessfulMonth(
                 company, essentialMonthlyCost(company));
         companySecretaryService.processSuccessfulMonth(company);
+        String ipoNotice = companyIpoService.processSuccessfulMonth(company);
         newsService.recordMonthlyEvents(
                 company,
                 marketResult,
@@ -268,7 +272,8 @@ public class CompanySettlementService {
                 + (workforceResult.resignationWarnings() > 0 ? " · 핵심인재 퇴사 협상 " + workforceResult.resignationWarnings() + "건" : "")
                 + (organizationResult.upgraded() ? " · 조직관리 시스템 구축 완료" : "")
                 + (organizationResult.automaticHires() > 0 ? " · 자동채용 "
-                        + organizationResult.automaticHires() + "명 승인" : "");
+                        + organizationResult.automaticHires() + "명 승인" : "")
+                + (ipoNotice.isBlank() ? "" : " · " + ipoNotice);
     }
 
     @Transactional
@@ -510,7 +515,7 @@ public class CompanySettlementService {
     }
 
     private int gameYear(Player player) {
-        return Math.max(0, player.getElapsedDays() - 1) / 365 + 1;
+        return player.getYear();
     }
 
     private void failActiveWork(PlayerCompany company) {

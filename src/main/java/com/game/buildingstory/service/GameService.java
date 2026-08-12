@@ -54,6 +54,8 @@ public class GameService {
     private final SettlementService settlementService;
     private final EventFlowService eventFlowService;
     private final StockService stockService;
+    private final NpcIpoSubscriptionService npcIpoSubscriptionService;
+    private final CompanyAccessService companyAccessService;
     private final CityMarketIndexService cityMarketIndexService;
     private final DailyGameOrchestrator dailyGameOrchestrator;
 
@@ -75,6 +77,8 @@ public class GameService {
             SettlementService settlementService,
             EventFlowService eventFlowService,
             StockService stockService,
+            NpcIpoSubscriptionService npcIpoSubscriptionService,
+            CompanyAccessService companyAccessService,
             CityMarketIndexService cityMarketIndexService,
             DailyGameOrchestrator dailyGameOrchestrator
     ) {
@@ -95,6 +99,8 @@ public class GameService {
         this.settlementService = settlementService;
         this.eventFlowService = eventFlowService;
         this.stockService = stockService;
+        this.npcIpoSubscriptionService = npcIpoSubscriptionService;
+        this.companyAccessService = companyAccessService;
         this.cityMarketIndexService = cityMarketIndexService;
         this.dailyGameOrchestrator = dailyGameOrchestrator;
     }
@@ -486,6 +492,11 @@ public class GameService {
         return stockService.stocks();
     }
 
+    @Transactional(readOnly = true)
+    public List<StockSpec> stockSpecs(Player player) {
+        return stockService.stocks(player);
+    }
+
     @Transactional
     public void ensureStockMarketInitialized(Player player) {
         if (stockService.isUnlocked(player)) {
@@ -521,6 +532,28 @@ public class GameService {
     @Transactional(readOnly = true)
     public List<StockNewsArticleView> stockNewsArticles(Player player) {
         return stockService.newsArticles(player);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<NpcIpoSubscriptionView> activeNpcIpoSubscription(Player player) {
+        return npcIpoSubscriptionService.active(player);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<NpcIpoAllocationResultView> pendingNpcIpoResult(Player player) {
+        return npcIpoSubscriptionService.pendingResult(player);
+    }
+
+    @Transactional
+    public String subscribeNpcIpo(long playerId, String stockKey, long quantity) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return npcIpoSubscriptionService.subscribe(player, stockKey, quantity);
+    }
+
+    @Transactional
+    public boolean acknowledgeNpcIpoResult(long playerId, String stockKey) {
+        Player player = playerRepository.findById(playerId).orElseThrow();
+        return npcIpoSubscriptionService.acknowledgeResult(player, stockKey);
     }
 
     @Transactional
@@ -596,6 +629,21 @@ public class GameService {
     @Transactional(readOnly = true)
     public String stockContentStatusText(Player player) {
         return stockService.statusText(player);
+    }
+
+    @Transactional
+    public void ensureCompanyUnlockSchedule(Player player) {
+        companyAccessService.ensureUnlockSchedule(player);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean companyContentUnlocked(Player player) {
+        return companyAccessService.isUnlocked(player);
+    }
+
+    @Transactional(readOnly = true)
+    public String companyContentStatusText(Player player) {
+        return companyAccessService.statusText(player);
     }
 
     @Transactional(readOnly = true)
@@ -678,8 +726,13 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
-    public boolean propertyManagerHandoffReady(Player player) {
-        return propertyManagementService.isHandoffReady(player);
+    public boolean propertyManagerHandoffReady(Player player, String city) {
+        return propertyManagementService.isHandoffReady(player, city);
+    }
+
+    @Transactional(readOnly = true)
+    public String propertyManagerHandoffStatusText(Player player, String city) {
+        return propertyManagementService.handoffStatusText(player, city);
     }
 
     @Transactional(readOnly = true)

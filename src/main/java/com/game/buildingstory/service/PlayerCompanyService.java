@@ -22,8 +22,8 @@ import java.util.Optional;
 @Service
 public class PlayerCompanyService {
     public static final long MINIMUM_INVESTMENT = 150_000_000_000L;
-    public static final long RECOMMENDED_INVESTMENT = 300_000_000_000L;
-    public static final long AGGRESSIVE_INVESTMENT = 500_000_000_000L;
+    public static final long RECOMMENDED_INVESTMENT = 800_000_000_000L;
+    public static final long AGGRESSIVE_INVESTMENT = 1_200_000_000_000L;
     public static final long SECRETARY_TRAINING_COST = 300_000_000L;
     public static final long INITIAL_ISSUED_SHARES = 10_000_000L;
     public static final long ESTIMATED_MONTHLY_FIXED_COST = 11_960_000_000L;
@@ -37,6 +37,8 @@ public class PlayerCompanyService {
     private final StockCatalog stockCatalog;
     private final CompanyDepartmentRepository companyDepartmentRepository;
     private final CompanyCashLedgerService cashLedgerService;
+    private final CompanyAccessService companyAccessService;
+    private final CompanyFoundationEligibilityService foundationEligibilityService;
 
     public PlayerCompanyService(
             PlayerRepository playerRepository,
@@ -45,7 +47,9 @@ public class PlayerCompanyService {
             MonthlyRecordRepository monthlyRecordRepository,
             StockCatalog stockCatalog,
             CompanyDepartmentRepository companyDepartmentRepository,
-            CompanyCashLedgerService cashLedgerService
+            CompanyCashLedgerService cashLedgerService,
+            CompanyAccessService companyAccessService,
+            CompanyFoundationEligibilityService foundationEligibilityService
     ) {
         this.playerRepository = playerRepository;
         this.playerCompanyRepository = playerCompanyRepository;
@@ -54,6 +58,8 @@ public class PlayerCompanyService {
         this.stockCatalog = stockCatalog;
         this.companyDepartmentRepository = companyDepartmentRepository;
         this.cashLedgerService = cashLedgerService;
+        this.companyAccessService = companyAccessService;
+        this.foundationEligibilityService = foundationEligibilityService;
     }
 
     @Transactional(readOnly = true)
@@ -67,6 +73,13 @@ public class PlayerCompanyService {
         Optional<PlayerCompany> existingCompany = playerCompanyRepository.findByPlayer(player);
         if (existingCompany.isPresent()) {
             return "이미 설립된 기업이 있음";
+        }
+        if (!companyAccessService.isUnlocked(player)) {
+            return "AI 기업 설립 제안을 먼저 수락해야 합니다.";
+        }
+        String readinessError = foundationEligibilityService.failureMessage(player);
+        if (readinessError != null) {
+            return readinessError;
         }
         String companyName = normalizeName(requestedCompanyName);
         String serviceName = normalizeName(requestedServiceName);

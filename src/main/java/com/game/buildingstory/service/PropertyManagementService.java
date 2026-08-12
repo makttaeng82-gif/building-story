@@ -44,6 +44,7 @@ public class PropertyManagementService {
     private final MonthlyRecordRepository monthlyRecordRepository;
     private final BuildingCatalog buildingCatalog;
     private final ReputationCatalog reputationCatalog;
+    private final CompanyAccessService companyAccessService;
 
     public PropertyManagementService(
             PlayerRepository playerRepository,
@@ -52,7 +53,8 @@ public class PropertyManagementService {
             OwnedBuildingRepository ownedBuildingRepository,
             MonthlyRecordRepository monthlyRecordRepository,
             BuildingCatalog buildingCatalog,
-            ReputationCatalog reputationCatalog
+            ReputationCatalog reputationCatalog,
+            CompanyAccessService companyAccessService
     ) {
         this.playerRepository = playerRepository;
         this.propertyManagerRepository = propertyManagerRepository;
@@ -61,6 +63,7 @@ public class PropertyManagementService {
         this.monthlyRecordRepository = monthlyRecordRepository;
         this.buildingCatalog = buildingCatalog;
         this.reputationCatalog = reputationCatalog;
+        this.companyAccessService = companyAccessService;
     }
 
     public String hire(long playerId, String city) {
@@ -71,14 +74,14 @@ public class PropertyManagementService {
         if (!isFeatureVisible(player)) {
             return "서울 해금 후 관리직원을 채용할 수 있음";
         }
-        if (!isHandoffReady(player)) {
-            return "비서 6명 고용 후 부동산 관리를 인계할 수 있음";
-        }
         if (!buildingCatalog.cities().contains(city)) {
             return "존재하지 않는 도시";
         }
         if (propertyManagerRepository.findByPlayerAndCity(player, city).isPresent()) {
             return city + " 관리직원은 이미 채용됨";
+        }
+        if (!isHandoffReady(player, city)) {
+            return handoffStatusText(player, city);
         }
 
         var assignedSecretaries = ownedSecretaryRepository.findByPlayerAndAssignedCityOrderById(player, city);
@@ -99,9 +102,32 @@ public class PropertyManagementService {
     }
 
     @Transactional(readOnly = true)
-    public boolean isHandoffReady(Player player) {
-        return isFeatureVisible(player)
-                && ownedSecretaryRepository.findByPlayerOrderById(player).size() >= 6;
+    public boolean isHandoffReady(Player player, String city) {
+        if (!isFeatureVisible(player)
+                || ownedSecretaryRepository.findByPlayerOrderById(player).size() < 6
+                || !companyAccessService.isUnlocked(player)) {
+            return false;
+        }
+        return ownedSecretaryRepository.findByPlayerAndAssignedCityOrderById(player, city).stream()
+                .anyMatch(secretary -> secretary.getProficiency() >= 30 && secretary.getAffinity() >= 30);
+    }
+
+    @Transactional(readOnly = true)
+    public String handoffStatusText(Player player, String city) {
+        if (!isFeatureVisible(player)) {
+            return "서울 해금 후 관리직원을 채용할 수 있음";
+        }
+        if (ownedSecretaryRepository.findByPlayerOrderById(player).size() < 6) {
+            return "비서 6명 고용 후 부동산 관리를 인계할 수 있음";
+        }
+        if (!companyAccessService.isUnlocked(player)) {
+            return "기업 설립 제안을 수락한 뒤 부동산 관리를 인계할 수 있음";
+        }
+        return ownedSecretaryRepository.findByPlayerAndAssignedCityOrderById(player, city).stream()
+                .filter(secretary -> secretary.getProficiency() >= 30 && secretary.getAffinity() >= 30)
+                .findFirst()
+                .map(secretary -> "관리직원 인계 준비 완료")
+                .orElse(city + " 담당 비서의 숙련도와 호감도가 모두 30이어야 함");
     }
 
     @Transactional(readOnly = true)

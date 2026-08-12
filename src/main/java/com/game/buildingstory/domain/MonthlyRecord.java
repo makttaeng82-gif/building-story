@@ -76,6 +76,10 @@ public class MonthlyRecord {
         return elapsedDays;
     }
 
+    public String getDateText() {
+        return GameCalendar.dateText(elapsedDays);
+    }
+
     public RecordType getType() {
         return type;
     }

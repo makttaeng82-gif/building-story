@@ -15,7 +15,8 @@ public record StockMarketStatusView(
         String regimeText,
         String indexValueText,
         String indexChangeText,
-        String indexDirection
+        String indexDirection,
+        int indexConstituentCount
 ) {
     public boolean hasActiveNews() {
         return activeNewsText != null && !activeNewsText.isBlank();

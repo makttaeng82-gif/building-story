@@ -1272,6 +1272,232 @@
     opacity: 0.45;
 }
 
+.company-dividend-policy {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0;
+    padding: 10px;
+    border: 1px solid var(--company-line);
+    background: var(--company-surface-2);
+}
+
+.company-dividend-policy > header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.company-dividend-policy > header div {
+    display: grid;
+    gap: 2px;
+}
+
+.company-dividend-policy > header span {
+    color: var(--company-blue);
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.company-dividend-policy > header small,
+.company-dividend-policy .company-control-note {
+    color: var(--company-muted);
+    font-size: 9px;
+}
+
+.company-dividend-policy .company-control-note {
+    margin: 0;
+}
+
+.company-dividend-policy .company-control-note.is-unavailable {
+    color: var(--company-warning);
+}
+
+.company-ipo-panel {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--company-line);
+}
+
+.company-ipo-panel > header,
+.company-ipo-progress > div,
+.company-ipo-offers form > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.company-ipo-panel > header > div {
+    display: grid;
+    gap: 3px;
+}
+
+.company-ipo-panel > header span,
+.company-ipo-progress span {
+    color: var(--company-blue);
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.company-ipo-panel > header em {
+    padding: 4px 7px;
+    border: 1px solid var(--company-line);
+    border-radius: 4px;
+    color: var(--company-muted);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.company-ipo-panel > header em.good {
+    color: var(--company-green);
+}
+
+.company-ipo-panel > header em.warn {
+    color: var(--company-orange);
+}
+
+.company-ipo-progress {
+    display: grid;
+    gap: 6px;
+    padding: 9px;
+    background: var(--company-surface-2);
+}
+
+.company-ipo-progress progress {
+    width: 100%;
+    height: 5px;
+    accent-color: var(--company-blue);
+}
+
+.company-ipo-requirements {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--company-line-soft);
+    border-left: 1px solid var(--company-line-soft);
+}
+
+.company-ipo-requirements > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 8px;
+    min-width: 0;
+    padding: 7px 8px;
+    border-right: 1px solid var(--company-line-soft);
+    border-bottom: 1px solid var(--company-line-soft);
+}
+
+.company-ipo-requirements span,
+.company-ipo-requirements small,
+.company-ipo-cost {
+    color: var(--company-muted);
+    font-size: 9px;
+}
+
+.company-ipo-requirements strong {
+    color: var(--company-text);
+    font-size: 10px;
+    text-align: right;
+}
+
+.company-ipo-requirements small {
+    grid-column: 1 / -1;
+}
+
+.company-ipo-requirements .met strong {
+    color: var(--company-green);
+}
+
+.company-ipo-requirements .unmet strong {
+    color: var(--company-red);
+}
+
+.company-ipo-offers {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+}
+
+.company-ipo-offers form {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid var(--company-line);
+    background: var(--company-surface-2);
+}
+
+.company-ipo-offers form.recommended {
+    border-color: var(--company-blue);
+}
+
+.company-ipo-offers form header span {
+    color: var(--company-blue);
+    font-size: 8px;
+}
+
+.company-ipo-offers dl,
+.company-ipo-result {
+    grid-template-columns: 1fr;
+}
+
+.company-ipo-offers dl div,
+.company-ipo-result div {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-right: 0;
+}
+
+.company-ipo-offers button,
+.company-ipo-actions button,
+.company-ipo-stock-link {
+    min-height: 30px;
+    padding: 7px 9px;
+    border: 1px solid var(--company-blue);
+    border-radius: 4px;
+    background: var(--company-blue-soft);
+    color: var(--company-blue);
+    font-size: 10px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.company-ipo-offers button:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.company-ipo-cost {
+    margin: 0;
+}
+
+.company-ipo-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.company-ipo-actions form,
+.company-ipo-actions button {
+    width: 100%;
+}
+
+.company-ipo-actions button.secondary {
+    border-color: var(--company-line);
+    background: var(--company-surface-2);
+    color: var(--company-muted);
+}
+
+.company-ipo-stock-link {
+    display: block;
+    text-decoration: none;
+}
+
 .company-product-project > header div,
 .company-market-detail > header div,
 .company-incident-control > header div,
@@ -2532,4 +2758,95 @@ html[data-company-theme="light"] .view-company .company-information-row.unread {
         width: min(235px, 100%);
         height: 370px;
     }
+}
+.view-company .company-executive-company-profile {
+    display: grid;
+    gap: 10px;
+    margin: 12px 14px 0;
+    padding: 12px;
+    border: 1px solid var(--company-line);
+    background: var(--company-surface-soft);
+}
+
+.view-company .company-executive-company-profile > header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.view-company .company-executive-company-profile > header div {
+    display: grid;
+    gap: 2px;
+}
+
+.view-company .company-executive-company-profile > header span {
+    color: var(--company-blue);
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.view-company .company-executive-company-profile > header strong {
+    font-size: 13px;
+}
+
+.view-company .company-executive-company-profile > header em {
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.view-company .company-executive-company-profile > header em.good {
+    color: var(--company-green);
+}
+
+.view-company .company-executive-company-profile > header em.muted {
+    color: var(--company-muted);
+}
+
+.view-company .company-executive-company-profile dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+    border-top: 1px solid var(--company-line);
+}
+
+.view-company .company-executive-company-profile dl div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    min-width: 0;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--company-line);
+}
+
+.view-company .company-executive-company-profile dl div:nth-child(2n) {
+    padding-left: 10px;
+    border-left: 1px solid var(--company-line);
+}
+
+.view-company .company-executive-company-profile dt {
+    color: var(--company-muted);
+    font-size: 9px;
+}
+
+.view-company .company-executive-company-profile dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--company-text);
+    font-size: 10px;
+    font-weight: 800;
+    text-align: right;
+}
+
+.view-company .company-executive-company-profile > a {
+    display: grid;
+    place-items: center;
+    min-height: 32px;
+    border: 1px solid var(--company-blue);
+    color: var(--company-blue);
+    font-size: 10px;
+    font-weight: 800;
+    text-decoration: none;
 }

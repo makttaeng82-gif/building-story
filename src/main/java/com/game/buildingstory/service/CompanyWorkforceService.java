@@ -460,6 +460,24 @@ public class CompanyWorkforceService {
         }
     }
 
+    /** 명령 화면이 실제 예약과 같은 슬롯·가동률 조건으로 실행 가능 여부를 안내할 때 사용한다. */
+    @Transactional(readOnly = true)
+    public boolean canReserveMajorWork(
+            PlayerCompany company,
+            CompanyDepartmentType type,
+            int workload
+    ) {
+        if (workload <= 0 || company.getActiveMajorWorkCount() >= companyMajorWorkSlotLimit(company)) {
+            return false;
+        }
+        CompanyDepartment department = department(company, type);
+        DepartmentLoad load = departmentLoad(company, department);
+        int maximumAllocatedWorkload = Math.max(0,
+                (int) Math.floor(load.capacity() * 1.30) - load.baseWorkload());
+        return load.availableSlots() > 0
+                && department.getAllocatedMajorWorkload() + workload <= maximumAllocatedWorkload;
+    }
+
     @Transactional
     public void releaseMajorWork(PlayerCompany company, CompanyDepartmentType type, int workload) {
         department(company, type).releaseMajorWork(workload);

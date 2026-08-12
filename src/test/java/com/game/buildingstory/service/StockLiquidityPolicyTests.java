@@ -26,4 +26,12 @@ class StockLiquidityPolicyTests {
         assertThat(impact.averageBasisPoints()).isEqualTo(-267);
         assertThat(impact.finalBasisPoints()).isEqualTo(-800);
     }
+
+    @Test
+    void capacityUsesTradableSharesInsteadOfTotalIssuedShares() {
+        StockSpec stock = new StockCatalog().all().getFirst();
+
+        assertThat(policy.capacity(stock, 120_000_000L)).isEqualTo(600_000L);
+        assertThat(policy.capacity(stock)).isEqualTo(1_500_000L);
+    }
 }

@@ -363,16 +363,6 @@ public class PlayerCompany {
         return false;
     }
 
-    /** 개발 중 수동 검증에서 달력 4개월을 기다리지 않고 출시 검토 단계로 이동한다. */
-    public void completeCommercializationForTest() {
-        if (getTutorialStage() != CompanyTutorialStage.COMMERCIALIZATION_IN_PROGRESS) {
-            throw new IllegalStateException("상용화 개발 진행 단계가 아닙니다");
-        }
-        commercializationMonthsCompleted = 4;
-        commercializationFundingPaused = false;
-        tutorialStage = CompanyTutorialStage.LAUNCH_REVIEW;
-    }
-
     public void launchFirstProduct() {
         if (getTutorialStage() != CompanyTutorialStage.LAUNCH_REVIEW) {
             throw new IllegalStateException("출시 검토 단계가 아닙니다");

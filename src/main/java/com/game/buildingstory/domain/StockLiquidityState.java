@@ -53,6 +53,14 @@ public class StockLiquidityState {
         this.refreshedElapsedDays = elapsedDays;
     }
 
+    /** 규칙 변경으로 산출 한도가 달라져도 현재 5일 구간의 누적 주문은 보존한다. */
+    public void updateCapacity(long capacity) {
+        if (capacity <= 0) {
+            throw new IllegalArgumentException("유동성 수량은 1 이상이어야 합니다.");
+        }
+        this.capacity = Math.max(capacity, Math.abs(netPlayerBuyQuantity));
+    }
+
     public void applyNetBuyChange(long signedQuantity) {
         long next = Math.addExact(netPlayerBuyQuantity, signedQuantity);
         if (Math.abs(next) > capacity) {

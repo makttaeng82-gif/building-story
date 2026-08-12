@@ -391,7 +391,7 @@ html[data-stock-theme="light"] .view-stocks .topbar {
 }
 
 .view-stocks .stock-history-filter-tabs {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .view-stocks .stock-list-heading {
@@ -451,6 +451,7 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     border-radius: 0;
     background: transparent;
     color: var(--stock-text);
+    text-decoration: none;
 }
 
 .view-stocks .stock-company-button:hover,
@@ -469,6 +470,26 @@ html[data-stock-theme="light"] .view-stocks .topbar {
 
 .view-stocks .stock-list-name strong {
     font-size: 13px;
+}
+
+.view-stocks .stock-list-title,
+.view-stocks .stock-detail-company-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.view-stocks .stock-owner-company-badge {
+    flex: 0 0 auto;
+    padding: 2px 5px;
+    border: 1px solid var(--stock-blue);
+    border-radius: 3px;
+    background: var(--stock-blue-soft);
+    color: var(--stock-blue);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 800;
 }
 
 .view-stocks .stock-list-name small {
@@ -653,6 +674,17 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     stroke-width: 2;
 }
 
+.view-stocks .chart-hover-band {
+    fill: color-mix(in srgb, var(--stock-blue) 7%, transparent);
+    pointer-events: none;
+}
+
+.view-stocks .chart-candle-selected .candle-wick,
+.view-stocks .chart-candle-selected .candle-body {
+    filter: brightness(1.12);
+    stroke-width: 2;
+}
+
 .view-stocks .chart-fair-value-band {
     fill: color-mix(in srgb, var(--stock-blue) 10%, transparent);
     stroke: color-mix(in srgb, var(--stock-blue) 42%, transparent);
@@ -821,7 +853,16 @@ html[data-stock-theme="light"] .view-stocks .topbar {
 .view-stocks .chart-candle-new {
     transform-box: fill-box;
     transform-origin: center;
-    animation: stock-candle-enter 280ms ease-out both;
+    animation: stock-candle-enter 400ms ease-out both;
+}
+
+.view-stocks .chart-candles-shift .chart-candle:not(.chart-candle-new) {
+    transform-box: fill-box;
+    animation: stock-candle-shift 400ms ease-out both;
+}
+
+.view-stocks .chart-price-updated {
+    animation: stock-price-update 400ms ease-out both;
 }
 
 @keyframes stock-candle-enter {
@@ -835,20 +876,48 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     }
 }
 
+@keyframes stock-candle-shift {
+    from { transform: translateX(9px); }
+    to { transform: translateX(0); }
+}
+
+@keyframes stock-price-update {
+    50% {
+        filter: brightness(1.4);
+        font-size: 11px;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .view-stocks .chart-candle-new {
+    .view-stocks .chart-candle-new,
+    .view-stocks .chart-candles-shift .chart-candle,
+    .view-stocks .chart-price-updated {
         animation: none;
     }
 }
 
 .view-stocks .chart-event-marker {
     cursor: pointer;
+    text-decoration: none;
 }
 
 .view-stocks .chart-event-marker circle {
     fill: var(--stock-surface-2);
     stroke: var(--stock-blue);
     stroke-width: 1.5;
+}
+
+.view-stocks .chart-event-e circle {
+    stroke: var(--stock-red);
+}
+
+.view-stocks .chart-event-d circle {
+    stroke: #12b886;
+}
+
+.view-stocks .chart-event-multiple circle {
+    fill: var(--stock-surface);
+    stroke-width: 2;
 }
 
 .view-stocks .chart-event-marker text {
@@ -861,8 +930,8 @@ html[data-stock-theme="light"] .view-stocks .topbar {
 
 .view-stocks .stock-chart-inspector {
     display: grid;
-    grid-template-columns: 150px minmax(300px, 1fr) minmax(320px, 1.5fr) auto;
-    gap: 14px;
+    grid-template-columns: 120px minmax(250px, 0.9fr) minmax(220px, 1.4fr) minmax(96px, auto);
+    gap: 10px;
     align-items: center;
     min-height: 66px;
     border-top: 1px solid var(--stock-line);
@@ -915,6 +984,7 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     background: var(--stock-surface-2);
     color: var(--stock-text);
     font-size: 10px;
+    white-space: nowrap;
     box-shadow: none;
 }
 
@@ -1247,24 +1317,21 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 34px;
-}
-
-.view-stocks .stock-news-panel-head > div > span {
-    color: var(--stock-blue);
-    font-size: 9px;
-    font-weight: 800;
+    min-height: 24px;
 }
 
 .view-stocks .stock-news-panel-head h3 {
-    margin-top: 1px;
+    margin: 0;
     color: var(--stock-text);
     font-size: 16px;
 }
 
-.view-stocks .stock-news-panel-head > span {
+.view-stocks .stock-news-panel-actions > span {
     color: var(--stock-muted);
     font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .view-stocks .stock-news-filter-tabs {
@@ -1452,6 +1519,164 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     overflow: hidden;
 }
 
+.view-stocks .stock-news-panel-actions,
+.view-stocks .stock-ipo-dialog-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.view-stocks .stock-ipo-open {
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--stock-blue);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--stock-blue);
+    font-size: 10px;
+    font-weight: 800;
+    box-shadow: none;
+}
+
+.view-stocks .stock-ipo-dialog {
+    width: min(760px, calc(100vw - 28px));
+    max-height: calc(100dvh - 40px);
+    padding: 0;
+    border: 1px solid var(--stock-line);
+    border-radius: 8px;
+    background: var(--stock-surface);
+    color: var(--stock-text);
+    overflow-y: auto;
+}
+
+.view-stocks .stock-ipo-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(2px);
+}
+
+.view-stocks .stock-ipo-dialog-head,
+.view-stocks .stock-ipo-company-head,
+.view-stocks .stock-ipo-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--stock-line);
+}
+
+.view-stocks .stock-ipo-dialog-head span,
+.view-stocks .stock-ipo-company-head span {
+    color: var(--stock-blue);
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.view-stocks .stock-ipo-dialog-head h2,
+.view-stocks .stock-ipo-company-head h3 { margin: 3px 0 0; color: var(--stock-text); }
+.view-stocks .stock-ipo-company-head p { margin: 5px 0 0; color: var(--stock-muted); font-size: 11px; }
+.view-stocks .stock-ipo-company-head > div:last-child { flex: 0 0 auto; text-align: right; }
+.view-stocks .stock-ipo-company-head strong { display: block; margin-top: 4px; }
+.view-stocks .stock-ipo-dialog-actions > span { color: var(--stock-amber); }
+
+.view-stocks .stock-ipo-summary,
+.view-stocks .stock-ipo-financials,
+.view-stocks .stock-ipo-calculation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--stock-line);
+}
+
+.view-stocks .stock-ipo-summary div,
+.view-stocks .stock-ipo-calculation div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 34px;
+    padding: 8px;
+    border-bottom: 1px solid var(--stock-line-soft);
+}
+.view-stocks .stock-ipo-summary dt,
+.view-stocks .stock-ipo-calculation dt { color: var(--stock-subtle); font-size: 10px; }
+.view-stocks .stock-ipo-summary dd,
+.view-stocks .stock-ipo-calculation dd { margin: 0; font-size: 11px; font-weight: 800; text-align: right; }
+.view-stocks .stock-ipo-financials { grid-template-columns: repeat(3, 1fr); }
+.view-stocks .stock-ipo-financials div { padding: 6px 10px; border-right: 1px solid var(--stock-line-soft); }
+.view-stocks .stock-ipo-financials div:last-child { border-right: 0; }
+.view-stocks .stock-ipo-financials span { display: block; color: var(--stock-subtle); font-size: 9px; }
+.view-stocks .stock-ipo-financials strong { display: block; margin-top: 5px; }
+
+.view-stocks .stock-ipo-decision-data,
+.view-stocks .stock-ipo-quarter-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--stock-line);
+}
+
+.view-stocks .stock-ipo-decision-data header span,
+.view-stocks .stock-ipo-quarter-section header span {
+    color: var(--stock-blue);
+    font-size: 8px;
+    font-weight: 800;
+}
+
+.view-stocks .stock-ipo-decision-data header h3,
+.view-stocks .stock-ipo-quarter-section header h3 {
+    margin: 2px 0 10px;
+    font-size: 14px;
+}
+
+.view-stocks .stock-ipo-decision-data dl {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    margin: 0;
+    border-top: 1px solid var(--stock-line-soft);
+}
+
+.view-stocks .stock-ipo-decision-data dl div {
+    min-width: 0;
+    padding: 10px;
+    border-right: 1px solid var(--stock-line-soft);
+}
+
+.view-stocks .stock-ipo-decision-data dl div:last-child { border-right: 0; }
+.view-stocks .stock-ipo-decision-data dt { color: var(--stock-subtle); font-size: 9px; }
+.view-stocks .stock-ipo-decision-data dd { margin: 5px 0 0; font-size: 10px; font-weight: 800; }
+
+.view-stocks .stock-ipo-quarter-head,
+.view-stocks .stock-ipo-quarter-row {
+    display: grid;
+    grid-template-columns: 1fr repeat(4, minmax(0, 1fr));
+    align-items: center;
+    min-height: 32px;
+    border-bottom: 1px solid var(--stock-line-soft);
+    column-gap: 8px;
+}
+
+.view-stocks .stock-ipo-quarter-head { color: var(--stock-subtle); font-size: 8px; }
+.view-stocks .stock-ipo-quarter-row { font-size: 9px; }
+.view-stocks .stock-ipo-quarter-head span:not(:first-child),
+.view-stocks .stock-ipo-quarter-row span { text-align: right; }
+
+.view-stocks .stock-ipo-form,
+.view-stocks .stock-ipo-complete { padding: 18px 20px; }
+.view-stocks .stock-ipo-form label { display: grid; gap: 6px; color: var(--stock-subtle); font-size: 10px; }
+.view-stocks .stock-ipo-form input { min-height: 40px; }
+.view-stocks .stock-ipo-quick-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+.view-stocks .stock-ipo-quick-buttons button { min-height: 34px; background: var(--stock-surface-2); color: var(--stock-text); box-shadow: none; }
+.view-stocks .stock-ipo-form > p { color: var(--stock-muted); font-size: 10px; }
+.view-stocks .stock-ipo-form > button { width: 100%; min-height: 42px; }
+.view-stocks .stock-ipo-complete span { color: var(--stock-blue); font-size: 10px; font-weight: 800; }
+.view-stocks .stock-ipo-complete strong { display: block; margin-top: 8px; font-size: 16px; }
+.view-stocks .stock-ipo-complete p { color: var(--stock-muted); font-size: 11px; }
+.view-stocks .stock-ipo-result-title { padding: 18px 20px 8px; }
+.view-stocks .stock-ipo-result-title span { color: var(--stock-blue); font-size: 10px; font-weight: 800; }
+.view-stocks .stock-ipo-result-title h3 { margin: 5px 0 0; font-size: 22px; }
+.view-stocks .stock-ipo-result-note { margin: 0; padding: 16px 20px; color: var(--stock-muted); font-size: 11px; }
+.view-stocks .stock-ipo-dialog-footer { justify-content: flex-end; border-top: 1px solid var(--stock-line); border-bottom: 0; }
+.view-stocks .stock-ipo-dialog-footer button { min-width: 96px; background: var(--stock-surface-2); color: var(--stock-text); box-shadow: none; }
+
 .view-stocks .stock-news-dialog::backdrop {
     background: rgba(0, 0, 0, 0.72);
     backdrop-filter: blur(2px);
@@ -1600,6 +1825,14 @@ html[data-stock-theme="light"] .view-stocks .topbar {
 
 .view-stocks .stock-history-head h3 {
     color: var(--stock-text);
+}
+
+.view-stocks .stock-history-head h3 small {
+    margin-left: 5px;
+    color: var(--stock-subtle);
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 .view-stocks .stock-history-head select {
@@ -1863,6 +2096,18 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     text-align: right;
 }
 
+.view-stocks .stock-position-summary dd.up {
+    color: var(--stock-red);
+}
+
+.view-stocks .stock-position-summary dd.down {
+    color: var(--stock-blue);
+}
+
+.view-stocks .stock-position-summary dd.flat {
+    color: var(--stock-muted);
+}
+
 .view-stocks .stock-order-tabs {
     margin: 0 0 14px;
     border-color: var(--stock-line);
@@ -1976,6 +2221,81 @@ html[data-stock-theme="light"] .view-stocks .topbar {
     color: var(--stock-subtle);
     font-size: 10px;
     text-align: center;
+}
+
+.view-stocks .stock-owner-company-action {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 18px 0;
+    border-top: 1px solid var(--stock-line);
+}
+
+.view-stocks .stock-owner-company-action span {
+    color: var(--stock-blue);
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.view-stocks .stock-owner-company-action strong {
+    color: var(--stock-text);
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.view-stocks .stock-owner-company-action dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+    border-top: 1px solid var(--stock-line);
+}
+
+.view-stocks .stock-owner-company-action dl div {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--stock-line);
+}
+
+.view-stocks .stock-owner-company-action dl div:nth-child(2n) {
+    padding-left: 10px;
+    border-left: 1px solid var(--stock-line);
+}
+
+.view-stocks .stock-owner-company-action dt {
+    color: var(--stock-subtle);
+    font-size: 9px;
+}
+
+.view-stocks .stock-owner-company-action dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--stock-text);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.view-stocks .stock-owner-company-action p {
+    margin: 0;
+    color: var(--stock-muted);
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+.view-stocks .stock-owner-company-action a {
+    display: grid;
+    place-items: center;
+    min-height: 46px;
+    border: 1px solid var(--stock-blue);
+    border-radius: 5px;
+    background: var(--stock-blue);
+    color: white;
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: none;
 }
 
 .view-stocks .stock-account-dialog {
@@ -2180,6 +2500,29 @@ html[data-stock-theme="light"] .view-stocks .stock-account-pause-notice {
 
     .view-stocks .stock-news-panel {
         grid-row: 1;
+    }
+}
+
+/* 주문 패널까지 3열로 유지하면 차트와 지표가 눌리는 중간 화면에서는 주문 영역을 아래로 보낸다. */
+@media (max-width: 1450px) and (min-width: 1001px) {
+    .view-stocks .stock-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .view-stocks .stock-workspace {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .view-stocks .stock-record-panel {
+        grid-column: 1;
+        grid-row: 2;
+        min-height: 0;
+    }
+
+    .view-stocks .stock-bottom-grid {
+        grid-column: 1;
+        grid-row: 3;
     }
 }
 

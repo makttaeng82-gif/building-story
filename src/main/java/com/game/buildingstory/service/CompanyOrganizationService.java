@@ -47,11 +47,30 @@ public class CompanyOrganizationService {
         CompanyOrganizationSystem next = current.next();
         Requirement requirement = next == null ? new Requirement(false, "최종 단계") : requirement(company, next);
         String progress = upgradeProgress(company);
+        List<CompanyDepartment> departments = departmentRepository.findByCompanyOrderById(company);
+        int currentEmployees = workforceService.totalEmployees(company);
+        int employeeLimit = workforceService.organizationLimit(company);
+        int pendingHires = departments.stream().mapToInt(CompanyDepartment::getPendingHireCount).sum();
+        int approvedVacancies = departments.stream().mapToInt(department -> Math.max(0,
+                department.getApprovedHeadcount()
+                        - department.getGeneralEmployeeCount()
+                        - department.getPendingHireCount())).sum();
+        int monthlyHireLimit = current.monthlyHireLimit(workforceService.totalGeneralEmployees(company));
         return new CompanyOrganizationView(
                 current.getDisplayName(),
-                workforceService.organizationLimit(company) + "명",
-                current.monthlyHireLimit(workforceService.totalGeneralEmployees(company)) + "명",
+                employeeLimit + "명",
+                currentEmployees + "명",
+                Math.max(0, employeeLimit - currentEmployees - pendingHires) + "명",
+                monthlyHireLimit + "명",
+                approvedVacancies + "명",
+                pendingHires + "명",
                 Math.round((current.getCapacityMultiplier() - 1) * 100) + "%",
+                current == CompanyOrganizationSystem.MANUAL
+                        ? "조직관리 시스템 구축 후 사용 가능"
+                        : company.isAutomaticHiringEnabled() ? "사용 중" : "중지",
+                current == CompanyOrganizationSystem.MANUAL
+                        ? "월 최대 " + monthlyHireLimit + "명"
+                        : "일반인력 규모 비례 · 월 최대 " + monthlyHireLimit + "명",
                 company.isAutomaticHiringEnabled(),
                 current != CompanyOrganizationSystem.MANUAL,
                 company.getPendingOrganizationSystem() != null,

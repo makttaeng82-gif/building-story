@@ -34,6 +34,7 @@ class CompanyTutorialServiceTests {
     @Autowired private CompanyCoreEmployeeRepository employeeRepository;
     @Autowired private MonthlyRecordRepository monthlyRecordRepository;
     @Autowired private OwnedSecretaryRepository ownedSecretaryRepository;
+    @Autowired private CompanyFoundationTestSupport foundationTestSupport;
     @Autowired private CompanyCompetitorRepository competitorRepository;
 
     @BeforeEach
@@ -93,30 +94,13 @@ class CompanyTutorialServiceTests {
         assertThat(player.isPaused()).isFalse();
     }
 
-    @Test
-    void qaSkipMovesActiveCommercializationDirectlyToLaunchReviewWithoutCharging() {
-        Player player = establishedPlayer("tutorial-qa-skip");
-        companyTutorialService.confirmFoundingTeam(player.getId(),
-                List.of("dev-01", "dev-02", "dev-03", "sales-01", "ops-01", "ops-02"));
-        companyTutorialService.startCommercialization(player.getId());
-        var company = companyRepository.findByPlayer(player).orElseThrow();
-        long cashBeforeSkip = company.getCorporateCash();
-
-        String notice = companyTutorialService.skipCommercializationForTest(player.getId());
-
-        assertThat(notice).contains("건너뛰기 완료");
-        assertThat(company.getTutorialStage()).isEqualTo(CompanyTutorialStage.LAUNCH_REVIEW);
-        assertThat(company.getCommercializationMonthsCompleted()).isEqualTo(4);
-        assertThat(company.getCommercializationAccumulatedCost()).isZero();
-        assertThat(company.getCorporateCash()).isEqualTo(cashBeforeSkip);
-        assertThat(player.isPaused()).isTrue();
-    }
-
     private Player establishedPlayer(String username) {
         Player player = new Player(username, "hash");
         player.addCash(PlayerCompanyService.RECOMMENDED_INVESTMENT);
         player = playerRepository.save(player);
+        foundationTestSupport.prepare(player);
         playerCompanyService.establish(player.getId(), "테스트AI", "인공지능 플랫폼", PlayerCompanyService.MINIMUM_INVESTMENT);
+        foundationTestSupport.clearPreparationStaff(player);
         return player;
     }
 }

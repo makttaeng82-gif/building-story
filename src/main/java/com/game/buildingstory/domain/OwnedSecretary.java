@@ -131,6 +131,14 @@ public class OwnedSecretary {
         return Math.min(5, 1 + getCompanyCareerMonths() / 6);
     }
 
+    public int getNextCompanyProficiencyCareerMonths() {
+        return getCompanyProficiencyLevel() >= 5 ? 24 : getCompanyProficiencyLevel() * 6;
+    }
+
+    public int getCompanyProficiencyMonthsRemaining() {
+        return Math.max(0, getNextCompanyProficiencyCareerMonths() - getCompanyCareerMonths());
+    }
+
     public void advanceCompanyCareerMonth() {
         companyCareerMonths = Math.min(24, getCompanyCareerMonths() + 1);
     }

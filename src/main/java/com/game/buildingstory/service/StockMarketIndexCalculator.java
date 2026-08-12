@@ -24,6 +24,24 @@ public class StockMarketIndexCalculator {
         return Math.max(1L, Math.round(BASE_INDEX_BASIS_POINTS * weightedPriceRatio));
     }
 
+    /**
+     * 구성 종목이 바뀌는 날에도 직전 지수와 이어지도록 같은 구성의 전일·현재 평가값 비율만 반영한다.
+     * 신규 종목 자체의 편입 때문에 지수가 뛰지 않고, 편입 이후 가격 변화부터 지수에 반영된다.
+     */
+    public long chainLinked(
+            long previousIndex,
+            List<StockSpec> stocks,
+            Map<String, Long> previousPrices,
+            Map<String, Long> currentPrices
+    ) {
+        long previousRawIndex = calculate(stocks, previousPrices);
+        long currentRawIndex = calculate(stocks, currentPrices);
+        if (previousIndex <= 0 || previousRawIndex <= 0) {
+            return currentRawIndex;
+        }
+        return Math.max(1L, Math.round(previousIndex * currentRawIndex / (double) previousRawIndex));
+    }
+
     Map<String, Double> cappedWeights(List<StockSpec> stocks) {
         Map<String, Double> weights = new HashMap<>();
         Set<StockSpec> remaining = new LinkedHashSet<>(stocks);

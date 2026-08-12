@@ -38,6 +38,8 @@ public class CompanyQuarterlyReport {
     private Boolean dividendDecided;
     private Integer dividendRate;
     private Long dividendAmount;
+    private Integer publishedElapsedDay;
+    private Integer dividendDecidedElapsedDay;
 
     protected CompanyQuarterlyReport() {
     }
@@ -94,6 +96,7 @@ public class CompanyQuarterlyReport {
         this.dividendDecided = false;
         this.dividendRate = 0;
         this.dividendAmount = 0L;
+        this.publishedElapsedDay = company.getPlayer().getElapsedDays();
     }
 
     public Long getId() { return id; }
@@ -117,6 +120,10 @@ public class CompanyQuarterlyReport {
     public boolean isDividendDecided() { return Boolean.TRUE.equals(dividendDecided); }
     public int getDividendRate() { return dividendRate == null ? 0 : dividendRate; }
     public long getDividendAmount() { return dividendAmount == null ? 0 : dividendAmount; }
+    public int getPublishedElapsedDay() { return publishedElapsedDay == null ? 0 : publishedElapsedDay; }
+    public int getDividendDecidedElapsedDay() {
+        return dividendDecidedElapsedDay == null ? 0 : dividendDecidedElapsedDay;
+    }
 
     public void markRead() {
         unread = false;
@@ -129,5 +136,6 @@ public class CompanyQuarterlyReport {
         dividendRate = rate;
         dividendAmount = amount;
         dividendDecided = true;
+        dividendDecidedElapsedDay = company.getPlayer().getElapsedDays();
     }
 }

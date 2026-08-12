@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,15 +27,18 @@ public class StockCompanyNewsService {
     private final StockCompanyNewsCatalog catalog;
     private final StockNewsArticleRepository articleRepository;
     private final ListedCompanyFinancialService financialService;
+    private final StockUniverseService stockUniverseService;
 
     public StockCompanyNewsService(
             StockCompanyNewsCatalog catalog,
             StockNewsArticleRepository articleRepository,
-            ListedCompanyFinancialService financialService
+            ListedCompanyFinancialService financialService,
+            StockUniverseService stockUniverseService
     ) {
         this.catalog = catalog;
         this.articleRepository = articleRepository;
         this.financialService = financialService;
+        this.stockUniverseService = stockUniverseService;
     }
 
     /** 새 기업 사건도 현재 봉 계산 뒤 발행해 다음 5일봉부터 적용한다. */
@@ -67,7 +71,11 @@ public class StockCompanyNewsService {
 
     private void publishRandomArticle(Player player) {
         List<StockNewsArticle> recent = recentCompanyArticles(player);
+        Set<String> listedStockKeys = stockUniverseService.stocks(player).stream()
+                .map(StockSpec::key)
+                .collect(Collectors.toSet());
         List<StockCompanyNewsDefinition> candidates = catalog.all().stream()
+                .filter(definition -> listedStockKeys.contains(definition.stockKey()))
                 .filter(definition -> allowed(player, definition, recent))
                 .toList();
         if (candidates.isEmpty()) {

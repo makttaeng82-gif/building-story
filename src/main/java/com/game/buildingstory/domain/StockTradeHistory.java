@@ -116,4 +116,12 @@ public class StockTradeHistory {
     public int getDay() {
         return day;
     }
+
+    public int getElapsedDays() {
+        return elapsedDays;
+    }
+
+    public String getDateText() {
+        return GameCalendar.dateText(elapsedDays);
+    }
 }

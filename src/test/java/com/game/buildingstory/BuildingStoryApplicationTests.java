@@ -241,6 +241,7 @@ class BuildingStoryApplicationTests {
 				.getContentAsString();
 
 		assertThat(stockHtml).contains(
+				"1년 1월 1일",
 				"data-stock-market-overview", "상승 / 하락 / 보합", "시장이슈",
 				"stock-summary-more", "더보기", "data-market-buy-limit",
 				"기준 실적", "분기 매출", "3조원", "실적 발표 D-", "적정가", "예상배당금", "중립",
@@ -281,9 +282,12 @@ class BuildingStoryApplicationTests {
 	}
 
 	@Test
-	void companyViewRendersDuringDevelopmentWithoutUnlockConditions() throws Exception {
+	void companyViewRendersAfterCompanyContentUnlock() throws Exception {
 		Player player = playerRepository.save(new Player("company-render-test", "hash"));
 		gameService.completeStory(player.getId());
+		player = playerRepository.findById(player.getId()).orElseThrow();
+		player.unlockCompanyContent();
+		playerRepository.save(player);
 		MockHttpSession session = new MockHttpSession();
 		session.setAttribute(SessionKeys.PLAYER_ID, player.getId());
 
@@ -295,12 +299,12 @@ class BuildingStoryApplicationTests {
 
 		assertThat(html).contains(
 				"company.css?v=company-theme-v7",
+				"1년 1월 1일",
 				"data-view-mode=\"company\"",
 				"data-company-theme-option=\"light\"",
 				"data-company-theme-option=\"dark\"",
 				"data-company-preparation",
-				"AI 기업 설립 준비",
-				"개발 중 조건 미적용");
+				"AI 기업 설립 준비");
 		assertThat(html).doesNotContain("data-company-dashboard");
 	}
 
@@ -333,6 +337,9 @@ class BuildingStoryApplicationTests {
 	void infoViewShowsCurrentGameGuides() throws Exception {
 		Player player = playerRepository.save(new Player("loan-info-render-test", "hash"));
 		gameService.completeStory(player.getId());
+		player = playerRepository.findById(player.getId()).orElseThrow();
+		player.unlockCompanyContent();
+		playerRepository.save(player);
 		MockHttpSession session = new MockHttpSession();
 		session.setAttribute(SessionKeys.PLAYER_ID, player.getId());
 
@@ -343,15 +350,17 @@ class BuildingStoryApplicationTests {
 				.getContentAsString();
 
 		assertThat(html).contains(
+				"1년 1월 1일",
 				"대출 기본정보", "원금의 월 0.4%", "별도 조건 없이 24개월 갱신", "대출별로 독립 계산", "시세의 90%로 담보 건물 강제매각",
 				"부동산 기본정보", "시장가의 90%", "월세의 10%", "기본 입주확률 35%", "각 도시 화면에 처음 진입할 때 현금으로 1회 자동 지급",
 				"비서 기본정보와 목록", "영입 경로", "필요 평판", "초기 월급", "최대 월급", "숙련 효과", "호감도 효과",
 				"주식 기본정보와 용어", "종합지수", "경기국면", "β(베타)", "적정가치", "예상배당금", "평가손익",
 				"data-collapsible-key=\"info-loan\"", "data-collapsible-key=\"info-real-estate\"",
 				"data-collapsible-key=\"info-secretary\"", "data-collapsible-key=\"info-stock-guide\"",
-				"data-collapsible-key=\"info-company-guide\"", "비상장 기업가치", "개인 유상증자",
-				"href=\"/main?view=company\"", "기업 화면으로 이동", "설립과 최초 출시", "기업 화면 읽기",
-				"직원 채용과 성장", "기업 비서", "총괄비서", "연산 인프라와 장애", "법인 거래원장"
+				"data-collapsible-key=\"info-company-guide\"", "성장단계와 기업가치", "개인 유상증자",
+				"href=\"/main?view=company\"", "기업 화면으로 이동", "설립과 최초 출시", "기업 화면 읽기", "대표실·총괄",
+				"직원 채용과 성장", "기업 비서", "총괄비서", "연산 인프라와 장애", "법인 거래원장",
+				"기업공개(IPO)", "준비비 120억원", "15%, 25%, 35%", "신규 회사채 월 이자가 0.45%"
 		);
 	}
 
@@ -1058,15 +1067,19 @@ class BuildingStoryApplicationTests {
 					.filter(stock -> stock.key().equals("bytecore"))
 					.findFirst().orElseThrow().name());
 		});
+		assertThat(stockCompanyNewsService.activePriceEffectPercent(player, "bytecore")).isEqualTo(0.65);
+		assertThat(stockCompanyNewsService.activePriceEffectPercent(player, "neonsoft")).isZero();
 
 		for (int i = 0; i < 5; i++) {
 			player.advanceDay();
 		}
 		stockService.processPriceUpdates(player);
 
-		assertThat(stockPriceHistoryRepository
-				.findFirstByPlayerAndStockKeyOrderByElapsedDaysDescIdDesc(player, "bytecore").orElseThrow()
-				.getCompanyImpactBasisPoints()).isPositive();
+		assertThat(stockNewsArticleRepository.findTop20ByPlayerOrderByPublishedElapsedDaysDescIdDesc(player))
+				.filteredOn(article -> article.getEventKey().equals("bytecore-efficiency"))
+				.singleElement()
+				.extracting(article -> article.getRemainingPriceRefreshes())
+				.isEqualTo(2);
 		assertThat(stockPriceHistoryRepository
 				.findFirstByPlayerAndStockKeyOrderByElapsedDaysDescIdDesc(player, "neonsoft").orElseThrow()
 				.getCompanyImpactBasisPoints()).isZero();
@@ -1374,8 +1387,8 @@ class BuildingStoryApplicationTests {
 		player.addSecuritiesCash(1_000_000_000_000L);
 		stockService.ensureMarketInitialized(player);
 
-		assertThat(stockService.buyStock(player, "bytecore", 1_500_001L))
-				.isEqualTo("매수 유동성 부족 · 현재 체결 가능 1500000주");
+		assertThat(stockService.buyStock(player, "bytecore", 900_001L))
+				.isEqualTo("매수 유동성 부족 · 현재 체결 가능 900000주");
 		assertThat(ownedStockRepository.findByPlayerAndStockKey(player, "bytecore")).isEmpty();
 	}
 
@@ -1574,13 +1587,13 @@ class BuildingStoryApplicationTests {
 		player.addSecuritiesCash(1_000_000_000_000_000_000L);
 		stockService.ensureMarketInitialized(player);
 
-		for (int refresh = 0; refresh < 40; refresh++) {
-			assertThat(gameService.buyStock(player.getId(), "bytecore", 1_500_000L))
-					.isEqualTo("바이트코어 1500000주 매수");
-			if (refresh < 39) {
-				stockLiquidityService.refreshAll(player);
-			}
+		for (int refresh = 0; refresh < 66; refresh++) {
+			assertThat(gameService.buyStock(player.getId(), "bytecore", 900_000L))
+					.isEqualTo("바이트코어 900000주 매수");
+			stockLiquidityService.refreshAll(player);
 		}
+		assertThat(gameService.buyStock(player.getId(), "bytecore", 600_000L))
+				.isEqualTo("바이트코어 600000주 매수");
 		assertThat(gameService.buyStock(player.getId(), "bytecore", 1L))
 				.isEqualTo("일반시장 매집 한도 초과 · 최대 지분 20%");
 		assertThat(gameService.buyMaxStock(player.getId(), "bytecore"))

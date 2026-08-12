@@ -170,18 +170,6 @@ public class CompanyTutorialService {
         return company.getServiceName() + " 정식 출시 완료";
     }
 
-    @Transactional
-    public String skipCommercializationForTest(long playerId) {
-        Player player = playerRepository.findByIdForUpdate(playerId).orElseThrow();
-        PlayerCompany company = playerCompanyRepository.findByPlayer(player).orElseThrow();
-        if (company.getTutorialStage() != CompanyTutorialStage.COMMERCIALIZATION_IN_PROGRESS) {
-            return "건너뛸 수 있는 상용화 개발이 없음";
-        }
-        company.completeCommercializationForTest();
-        player.pause();
-        return "QA 상용화 개발 건너뛰기 완료 · 출시 검토 필요";
-    }
-
     @Transactional(readOnly = true)
     public long monthlyCommercializationCost(PlayerCompany company) {
         long corePayroll = employeeRepository.findByCompanyOrderById(company).stream()

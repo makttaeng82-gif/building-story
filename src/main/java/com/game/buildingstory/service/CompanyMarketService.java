@@ -110,8 +110,7 @@ public class CompanyMarketService {
         CompanyGrowthStage growthStage = company.getGrowthStage();
         double targetPro = 0.0;
         double targetMax = 0.0;
-        if (growthStage.isProPlanAvailable()
-                && company.getProductCompleteness() >= 40 && relativeTechnology >= 0.9) {
+        if (growthStage.isProPlanAvailable() && company.getProductCompleteness() >= 40) {
             targetPro = 0.10;
         }
         if (growthStage.isMaxPlanAvailable()

@@ -43,6 +43,7 @@ public class StockPriceHistory {
     private Integer idiosyncraticImpactBasisPoints;
     private Integer noiseImpactBasisPoints;
     private Integer pathImpactBasisPoints;
+    private Integer listingImpactBasisPoints;
 
     protected StockPriceHistory() {
     }
@@ -88,6 +89,7 @@ public class StockPriceHistory {
         this.idiosyncraticImpactBasisPoints = idiosyncraticImpactBasisPoints;
         this.noiseImpactBasisPoints = noiseImpactBasisPoints;
         this.pathImpactBasisPoints = pathImpactBasisPoints;
+        this.listingImpactBasisPoints = 0;
     }
 
     /**
@@ -122,6 +124,32 @@ public class StockPriceHistory {
         return history;
     }
 
+    /** 신규상장 첫 5일봉을 공모 수요 기여도와 함께 저장한다. */
+    public static StockPriceHistory listing(
+            Player player,
+            String stockKey,
+            long openPrice,
+            long highPrice,
+            long lowPrice,
+            long closePrice,
+            long volume,
+            int listingImpactBasisPoints,
+            int marketImpactBasisPoints,
+            int industryImpactBasisPoints,
+            int valuationImpactBasisPoints,
+            int idiosyncraticImpactBasisPoints,
+            int pathImpactBasisPoints
+    ) {
+        StockPriceHistory history = new StockPriceHistory(
+                player, stockKey, openPrice, highPrice, lowPrice, closePrice, volume,
+                marketImpactBasisPoints, industryImpactBasisPoints, 0, 0,
+                valuationImpactBasisPoints, 0, idiosyncraticImpactBasisPoints,
+                idiosyncraticImpactBasisPoints, pathImpactBasisPoints
+        );
+        history.listingImpactBasisPoints = listingImpactBasisPoints;
+        return history;
+    }
+
     public Long getId() {
         return id;
     }
@@ -144,6 +172,14 @@ public class StockPriceHistory {
 
     public int getElapsedDays() {
         return elapsedDays;
+    }
+
+    public String getDateText() {
+        return GameCalendar.dateText(elapsedDays);
+    }
+
+    public String getShortDateText() {
+        return GameCalendar.shortDateText(elapsedDays);
     }
 
     public long getOpenPrice() {
@@ -175,6 +211,7 @@ public class StockPriceHistory {
     public int getIdiosyncraticImpactBasisPoints() { return idiosyncraticImpactBasisPoints == null ? 0 : idiosyncraticImpactBasisPoints; }
     public int getNoiseImpactBasisPoints() { return noiseImpactBasisPoints == null ? 0 : noiseImpactBasisPoints; }
     public int getPathImpactBasisPoints() { return pathImpactBasisPoints == null ? 0 : pathImpactBasisPoints; }
+    public int getListingImpactBasisPoints() { return listingImpactBasisPoints == null ? 0 : listingImpactBasisPoints; }
 
     /** 체결 직후 현재 캔들의 종가와 고가·저가를 함께 보정한다. 갱신일은 바꾸지 않는다. */
     public void applyTradePrice(long tradedPrice) {

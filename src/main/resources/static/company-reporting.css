@@ -181,7 +181,7 @@
 }
 
 .news-columns {
-    grid-template-columns: 48px 52px minmax(190px, 1fr) 72px;
+    grid-template-columns: 90px 48px minmax(120px, 1fr) 64px;
 }
 
 .report-columns {
@@ -319,7 +319,7 @@
 }
 
 .company-command-dialog {
-    width: min(520px, calc(100vw - 40px));
+    width: min(620px, calc(100vw - 40px));
 }
 
 .company-command-dialog > article {
@@ -336,6 +336,45 @@
 
 .company-command-dialog > article p {
     line-height: 1.65;
+}
+
+.company-command-review {
+    min-width: 0;
+}
+
+.company-command-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 16px 0 0;
+    border-top: 1px solid var(--company-line);
+    border-left: 1px solid var(--company-line);
+}
+
+.company-command-summary > div {
+    min-width: 0;
+    padding: 10px 12px;
+    border-right: 1px solid var(--company-line);
+    border-bottom: 1px solid var(--company-line);
+}
+
+.company-command-summary dt {
+    margin-bottom: 5px;
+    color: var(--company-muted);
+    font-size: 11px;
+}
+
+.company-command-summary dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--company-text);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+@media (max-width: 600px) {
+    .company-command-summary {
+        grid-template-columns: 1fr;
+    }
 }
 
 .company-command-icon {

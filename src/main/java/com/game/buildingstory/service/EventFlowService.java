@@ -37,19 +37,22 @@ public class EventFlowService {
     private final MonthlyRecordRepository monthlyRecordRepository;
     private final ReputationCatalog reputationCatalog;
     private final SecretaryTenantEventService secretaryTenantEventService;
+    private final CompanyAccessService companyAccessService;
 
     public EventFlowService(
             PlayerRepository playerRepository,
             GameEventRepository gameEventRepository,
             MonthlyRecordRepository monthlyRecordRepository,
             ReputationCatalog reputationCatalog,
-            SecretaryTenantEventService secretaryTenantEventService
+            SecretaryTenantEventService secretaryTenantEventService,
+            CompanyAccessService companyAccessService
     ) {
         this.playerRepository = playerRepository;
         this.gameEventRepository = gameEventRepository;
         this.monthlyRecordRepository = monthlyRecordRepository;
         this.reputationCatalog = reputationCatalog;
         this.secretaryTenantEventService = secretaryTenantEventService;
+        this.companyAccessService = companyAccessService;
     }
 
     @Transactional(readOnly = true)
@@ -147,6 +150,10 @@ public class EventFlowService {
         }
         if (event.getEffectKey().startsWith(SecretaryTenantEventService.HIRE_EFFECT_PREFIX)) {
             secretaryTenantEventService.applyHireEvent(player, event.getEffectKey().substring(SecretaryTenantEventService.HIRE_EFFECT_PREFIX.length()));
+            return;
+        }
+        if (CompanyAccessService.FOUNDATION_UNLOCK_EFFECT.equals(event.getEffectKey())) {
+            companyAccessService.acceptFoundationProposal(player);
             return;
         }
         if (RESIGN_CONFIRM_EFFECT.equals(event.getEffectKey())) {

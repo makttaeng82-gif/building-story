@@ -140,6 +140,10 @@ public class AuctionService {
                     auction.getTradeCooldownDays(),
                     0L
             ));
+            if ("서울".equals(purchasedBuilding.getCity())
+                    && Integer.valueOf(4).equals(purchasedBuilding.getBuildingSlot())) {
+                player.scheduleCompanyUnlock(player.getElapsedDays() + CompanyAccessService.PROPOSAL_DELAY_DAYS);
+            }
             awardBuildingMilestone(player, purchasedBuilding);
             secretaryTenantEventService.tryActivateIntro(player, purchasedBuilding);
             saveRecord(player, RecordType.BUILDING_BUY, "경매 낙찰", -totalPurchasePrice, 0, auction.getName(), "시장가 " + rate + "% 입찰 · 부대비용 " + purchaseFee + "원");

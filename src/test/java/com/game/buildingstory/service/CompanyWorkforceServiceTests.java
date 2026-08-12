@@ -49,6 +49,7 @@ class CompanyWorkforceServiceTests {
     @Autowired private CompanyDepartmentService departmentService;
     @Autowired private CompanySecretaryService secretaryService;
     @Autowired private CompanyOrganizationService organizationService;
+    @Autowired private CompanyFoundationTestSupport foundationTestSupport;
 
     @BeforeEach
     void cleanDatabase() {
@@ -68,7 +69,9 @@ class CompanyWorkforceServiceTests {
         Player player = new Player("workforce-test", "hash");
         player.addCash(PlayerCompanyService.RECOMMENDED_INVESTMENT);
         player = playerRepository.save(player);
+        foundationTestSupport.prepare(player);
         companyService.establish(player.getId(), "조직테스트", "AI 플랫폼", PlayerCompanyService.MINIMUM_INVESTMENT);
+        foundationTestSupport.clearPreparationStaff(player);
         tutorialService.confirmFoundingTeam(player.getId(),
                 List.of("dev-01", "dev-02", "dev-03", "sales-01", "ops-01", "ops-02"));
         var company = companyRepository.findByPlayer(player).orElseThrow();
@@ -673,11 +676,15 @@ class CompanyWorkforceServiceTests {
         Player player = new Player(username, "hash");
         player.addCash(PlayerCompanyService.RECOMMENDED_INVESTMENT);
         player = playerRepository.save(player);
+        foundationTestSupport.prepare(player);
         companyService.establish(player.getId(), "조직테스트", "AI 플랫폼", PlayerCompanyService.MINIMUM_INVESTMENT);
+        foundationTestSupport.clearPreparationStaff(player);
         tutorialService.confirmFoundingTeam(player.getId(),
                 List.of("dev-01", "dev-02", "dev-03", "sales-01", "ops-01", "ops-02"));
         tutorialService.startCommercialization(player.getId());
-        tutorialService.skipCommercializationForTest(player.getId());
+        for (int month = 0; month < 4; month++) {
+            tutorialService.processMonthly(player);
+        }
         tutorialService.launch(player.getId());
         return playerRepository.findById(player.getId()).orElseThrow();
     }

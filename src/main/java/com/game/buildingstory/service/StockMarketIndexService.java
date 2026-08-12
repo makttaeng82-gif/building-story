@@ -16,19 +16,19 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class StockMarketIndexService {
-    private final StockCatalog stockCatalog;
     private final StockMarketIndexCalculator calculator;
+    private final StockMarketIndexConstituentService constituentService;
     private final StockPriceHistoryRepository priceHistoryRepository;
     private final StockMarketIndexHistoryRepository indexHistoryRepository;
 
     public StockMarketIndexService(
-            StockCatalog stockCatalog,
             StockMarketIndexCalculator calculator,
+            StockMarketIndexConstituentService constituentService,
             StockPriceHistoryRepository priceHistoryRepository,
             StockMarketIndexHistoryRepository indexHistoryRepository
     ) {
-        this.stockCatalog = stockCatalog;
         this.calculator = calculator;
+        this.constituentService = constituentService;
         this.priceHistoryRepository = priceHistoryRepository;
         this.indexHistoryRepository = indexHistoryRepository;
     }
@@ -50,13 +50,22 @@ public class StockMarketIndexService {
     @Transactional(readOnly = true)
     public IndexSnapshot current(Player player) {
         return indexHistoryRepository.findFirstByPlayerOrderByElapsedDaysDescIdDesc(player)
-                .map(row -> new IndexSnapshot(row.getIndexBasisPoints(), row.getChangeBasisPoints()))
-                .orElse(new IndexSnapshot(StockMarketIndexCalculator.BASE_INDEX_BASIS_POINTS, 0));
+                .map(row -> new IndexSnapshot(
+                        row.getIndexBasisPoints(), row.getChangeBasisPoints(),
+                        constituentService.currentAt(player, row.getElapsedDays()).size()))
+                .orElse(new IndexSnapshot(
+                        StockMarketIndexCalculator.BASE_INDEX_BASIS_POINTS, 0, constituentService.current(player).size()));
     }
 
     private StockMarketIndexHistory saveCurrent(Player player, StockMarketIndexHistory previous) {
         StockPriceHistory latestPrice = latestPrice(player);
-        long currentIndex = calculator.calculate(stockCatalog.all(), latestPrices(player));
+        List<StockSpec> constituents = constituentService.currentAt(player, latestPrice.getElapsedDays());
+        Map<String, Long> currentPrices = pricesAt(player, latestPrice.getElapsedDays());
+        long currentIndex = priceHistoryRepository.findPreviousElapsedDays(player, latestPrice.getElapsedDays())
+                .filter(ignored -> previous != null)
+                .map(previousDay -> calculator.chainLinked(
+                        previous.getIndexBasisPoints(), constituents, pricesAt(player, previousDay), currentPrices))
+                .orElseGet(() -> calculator.calculate(constituents, currentPrices));
         int changeBasisPoints = previous == null ? 0 : changeBasisPoints(previous.getIndexBasisPoints(), currentIndex);
         return indexHistoryRepository.save(new StockMarketIndexHistory(
                 player,
@@ -68,10 +77,9 @@ public class StockMarketIndexService {
         ));
     }
 
-    private Map<String, Long> latestPrices(Player player) {
-        int latestPriceDay = latestPriceDay(player);
+    private Map<String, Long> pricesAt(Player player, int elapsedDay) {
         return priceHistoryRepository.findByPlayerAndElapsedDaysInOrderByElapsedDaysDescIdDesc(
-                        player, List.of(latestPriceDay)).stream()
+                        player, List.of(elapsedDay)).stream()
                 .collect(Collectors.toMap(
                         StockPriceHistory::getStockKey,
                         StockPriceHistory::getClosePrice,
@@ -95,6 +103,6 @@ public class StockMarketIndexService {
         return (int) Math.round((current - previous) * 10_000.0 / previous);
     }
 
-    public record IndexSnapshot(long indexBasisPoints, int changeBasisPoints) {
+    public record IndexSnapshot(long indexBasisPoints, int changeBasisPoints, int constituentCount) {
     }
 }

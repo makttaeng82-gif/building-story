@@ -44,7 +44,7 @@ public class StockNewsFeedService {
         String scopeText = switch (category) {
             case MARKET -> "종합시장";
             case INDUSTRY -> article.getIndustry() + " 업종";
-            case COMPANY -> article.getCompanyName();
+            case COMPANY, IPO -> article.getCompanyName();
         };
         return new StockNewsArticleView(
                 article.getId(),

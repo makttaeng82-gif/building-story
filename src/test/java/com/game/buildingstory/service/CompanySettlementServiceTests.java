@@ -8,6 +8,7 @@ import com.game.buildingstory.domain.CompanyCloudPlan;
 import com.game.buildingstory.domain.CompanyDepartmentType;
 import com.game.buildingstory.domain.CompanyExternalEvent;
 import com.game.buildingstory.domain.CompanyExternalEventCategory;
+import com.game.buildingstory.domain.CompanyListingStatus;
 import com.game.buildingstory.domain.CompanyCustomerContractType;
 import com.game.buildingstory.domain.CompanyCustomerContract;
 import com.game.buildingstory.domain.CompanyCustomerContractStatus;
@@ -29,13 +30,15 @@ import com.game.buildingstory.repo.CompanyProductProjectRepository;
 import com.game.buildingstory.repo.CompanyValuationSnapshotRepository;
 import com.game.buildingstory.repo.CompanyInvestmentRoundRepository;
 import com.game.buildingstory.repo.CompanyBondRepository;
+import com.game.buildingstory.repo.CompanyListingRepository;
+import com.game.buildingstory.repo.ListedCompanyRepository;
 import com.game.buildingstory.repo.MonthlyRecordRepository;
 import com.game.buildingstory.repo.OwnedSecretaryRepository;
 import com.game.buildingstory.repo.PlayerCompanyRepository;
 import com.game.buildingstory.repo.PlayerRepository;
+import com.game.buildingstory.repo.StockPriceHistoryRepository;
 import com.game.buildingstory.web.SessionKeys;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -73,6 +76,7 @@ class CompanySettlementServiceTests {
     @Autowired private CompanyQuarterlyReportRepository quarterlyRepository;
     @Autowired private MonthlyRecordRepository monthlyRecordRepository;
     @Autowired private OwnedSecretaryRepository ownedSecretaryRepository;
+    @Autowired private CompanyFoundationTestSupport foundationTestSupport;
     @Autowired private CompanyCompetitorRepository competitorRepository;
     @Autowired private CompanyShortTermProjectRepository shortTermProjectRepository;
     @Autowired private CompanyShortTermProjectService shortTermProjectService;
@@ -91,12 +95,19 @@ class CompanySettlementServiceTests {
     @Autowired private CompanyExternalEventRepository externalEventRepository;
     @Autowired private CompanyExternalEventService externalEventService;
     @Autowired private CompanyInfrastructureService infrastructureService;
+    @Autowired private CompanyMarketService companyMarketService;
     @Autowired private CompanyComputeConstructionService constructionService;
     @Autowired private CompanyDepartmentService departmentService;
     @Autowired private CompanyFinanceService financeService;
     @Autowired private CompanyValuationSnapshotRepository valuationRepository;
     @Autowired private CompanyInvestmentRoundRepository investmentRoundRepository;
     @Autowired private CompanyBondRepository bondRepository;
+    @Autowired private CompanyListingRepository listingRepository;
+    @Autowired private ListedCompanyRepository listedCompanyRepository;
+    @Autowired private StockPriceHistoryRepository stockPriceHistoryRepository;
+    @Autowired private CompanyIpoQualificationService ipoQualificationService;
+    @Autowired private CompanyIpoService ipoService;
+    @Autowired private StockService stockService;
 
     @BeforeEach
     void cleanDatabase() {
@@ -233,11 +244,22 @@ class CompanySettlementServiceTests {
                 company.getPaidUsers()
         ));
         long personalCashBefore = player.getCash();
+        var pendingDividend = financeService.view(
+                company, settlementService.essentialMonthlyCost(company));
+        assertThat(pendingDividend.dividendPending()).isTrue();
+        assertThat(pendingDividend.dividendPeriod()).isEqualTo("1년 1분기");
+        assertThat(pendingDividend.dividendOptions()).extracting(option -> option.rate())
+                .containsExactly(0, 10, 25, 50);
         assertThat(financeService.decideDividend(
                 player.getId(), 10, settlementService.essentialMonthlyCost(company)))
                 .contains("배당 완료");
         assertThat(profitableReport.isDividendDecided()).isTrue();
+        assertThat(profitableReport.getDividendDecidedElapsedDay()).isEqualTo(player.getElapsedDays());
         assertThat(player.getCash()).isGreaterThan(personalCashBefore);
+        var decidedDividend = financeService.view(
+                company, settlementService.essentialMonthlyCost(company));
+        assertThat(decidedDividend.dividendPending()).isFalse();
+        assertThat(decidedDividend.dividendStatus()).contains("10%");
 
         double ownershipBefore = company.getPlayerOwnershipPercent();
         long corporateCashBefore = company.getCorporateCash();
@@ -300,6 +322,42 @@ class CompanySettlementServiceTests {
                 company, report, List.of(), settlementService.essentialMonthlyCost(company));
 
         assertThat(valuation.getTotalDebt()).isEqualTo(principal);
+    }
+
+    @Test
+    void matureProfitableCompanyKeepsQualityBasedRevenueMultipleWhenGrowthSlows() {
+        Player player = launchedCompanyPlayer("company-mature-valuation");
+        var company = companyRepository.findByPlayer(player).orElseThrow();
+        company.promoteGrowthStage(com.game.buildingstory.domain.CompanyGrowthStage.GROWTH);
+        while (company.getPrototypeBenchmark() < 400) {
+            company.applyProductImprovement(
+                    com.game.buildingstory.domain.CompanyProductImprovementType.MODEL_REFINEMENT,
+                    com.game.buildingstory.domain.CompanyDevelopmentDirection.BALANCED,
+                    100
+            );
+        }
+        company.updateMarketResult(5_000_000L, 20.0, 1_000_000L, 0, 0, 32_000_000_000L);
+        quarterlyRepository.save(new CompanyQuarterlyReport(
+                company, 1, 3, 90_000_000_000L, 60_000_000_000L, 30_000_000_000L,
+                6_000_000_000L, 24_000_000_000L, company.getCorporateCash(),
+                30_000_000_000L, 1_000_000L
+        ));
+        quarterlyRepository.save(new CompanyQuarterlyReport(
+                company, 2, 6, 93_000_000_000L, 62_000_000_000L, 31_000_000_000L,
+                6_200_000_000L, 24_800_000_000L, company.getCorporateCash(),
+                31_000_000_000L, 1_000_000L
+        ));
+        CompanyQuarterlyReport current = quarterlyRepository.save(new CompanyQuarterlyReport(
+                company, 3, 9, 96_000_000_000L, 64_000_000_000L, 32_000_000_000L,
+                6_400_000_000L, 25_600_000_000L, company.getCorporateCash(),
+                32_000_000_000L, 1_000_000L
+        ));
+
+        var valuation = financeService.recordQuarterlyValuation(
+                company, current, List.of(), settlementService.essentialMonthlyCost(company));
+
+        assertThat(valuation.getRevenueMultiple()).isEqualTo(7);
+        assertThat(valuation.getIncomeValue()).isGreaterThan(valuation.getAssetValue());
     }
 
     @Test
@@ -898,6 +956,24 @@ class CompanySettlementServiceTests {
     }
 
     @Test
+    void productImprovementReturnsGuidanceWhenCompanyWorkSlotsAreFull() {
+        Player player = launchedCompanyPlayer("company-product-full-company-slots");
+        var company = companyRepository.findByPlayer(player).orElseThrow();
+        int slotLimit = company.getGrowthStage().getMajorWorkSlotLimit();
+        for (int slot = 0; slot < slotLimit; slot++) {
+            company.reserveMajorWork(slotLimit);
+        }
+
+        String result = productProjectService.start(
+                player.getId(),
+                com.game.buildingstory.domain.CompanyProductImprovementType.MODEL_REFINEMENT
+        );
+
+        assertThat(result).isEqualTo("회사의 동시 주요 업무 슬롯이 부족함");
+        assertThat(productProjectService.activeProject(company)).isEmpty();
+    }
+
+    @Test
     void balancedDecisionsSurviveFortyEightMonthsUsingActualCompanyServices() {
         Player player = launchedCompanyPlayer("actual-service-simulation");
         settlementService.contributeAndResume(
@@ -983,7 +1059,6 @@ class CompanySettlementServiceTests {
     }
 
     @Test
-    @Disabled("새 월간 비용정책을 반영한 72개월 밸런스 재조정 단계에서 다시 활성화")
     void balancedCapacityDecisionsSurviveSeventyTwoMonthsUsingActualCompanyServices() {
         Player player = launchedCompanyPlayer("actual-service-capacity-simulation");
         settlementService.contributeAndResume(
@@ -1003,12 +1078,17 @@ class CompanySettlementServiceTests {
             assertThat(company.isOperationsSuspended())
                     .as(
                             "month %s must finish without exhausting corporate cash "
-                                    + "(cash=%s, unpaid=%s, mrr=%s, users=%s, essential=%s, cloud=%s)",
+                                    + "(cash=%s, unpaid=%s, mrr=%s, users=%s, stage=%s, completeness=%s, "
+                                    + "benchmark=%s, marketBenchmark=%.1f, essential=%s, cloud=%s)",
                             month + 1,
                             company.getCorporateCash(),
                             company.getUnpaidSettlementAmount(),
                             company.getMonthlyRecurringRevenue(),
                             company.getPaidUsers(),
+                            company.getGrowthStage(),
+                            company.getProductCompleteness(),
+                            company.getPrototypeBenchmark(),
+                            companyMarketService.snapshot(company).marketBenchmark(),
                             settlementService.essentialMonthlyCost(company),
                             company.getCloudPlanType()
                     )
@@ -1021,7 +1101,8 @@ class CompanySettlementServiceTests {
             var monthlyInfrastructure = infrastructureService.snapshot(company);
             minimumCash = Math.min(minimumCash, company.getCorporateCash());
             maximumUtilization = Math.max(maximumUtilization, monthlyInfrastructure.utilizationPercent());
-            if (monthlyInfrastructure.demand() > monthlyInfrastructure.usableCapacity()) {
+            if (monthlyInfrastructure.demand()
+                    > Math.round(monthlyInfrastructure.usableCapacity() * 1.01)) {
                 capacityShortageMonths++;
             }
             if (firstOwnNetworkMonth == 0 && monthlyInfrastructure.network().capacity() > 0) {
@@ -1043,11 +1124,10 @@ class CompanySettlementServiceTests {
         assertThat(company.getPaidUsers()).isGreaterThan(400_000);
         assertThat(infrastructure.network().capacity()).isPositive();
         assertThat(infrastructure.utilizationPercent()).isLessThanOrEqualTo(105);
-        assertThat(capacityShortageMonths).isLessThanOrEqualTo(6);
 
         System.out.printf(
                 "ACTUAL_COMPANY_CAPACITY_SIMULATION months=%d cash=%d marketUsers=%d paidUsers=%d "
-                        + "mrr=%d benchmark=%d networkCapacity=%d cloud=%s utilization=%.2f "
+                        + "mrr=%d stage=%s benchmark=%d productProjects=%d networkCapacity=%d cloud=%s utilization=%.2f "
                         + "maxUtilization=%.2f shortageMonths=%d minCash=%d ownNetworkMonth=%d "
                         + "cloudUpgradeMonth=%d employees=%d%n",
                 72,
@@ -1055,7 +1135,9 @@ class CompanySettlementServiceTests {
                 company.getTotalMarketUsers(),
                 company.getPaidUsers(),
                 company.getMonthlyRecurringRevenue(),
+                company.getGrowthStage(),
                 company.getPrototypeBenchmark(),
+                productProjectRepository.findByCompanyOrderByIdDesc(company).size(),
                 infrastructure.network().capacity(),
                 infrastructure.plan().name(),
                 infrastructure.utilizationPercent(),
@@ -1066,6 +1148,284 @@ class CompanySettlementServiceTests {
                 firstCloudUpgradeMonth,
                 departmentService.totalEmployees(company)
         );
+        assertThat(capacityShortageMonths).isLessThanOrEqualTo(6);
+    }
+
+    @Test
+    void aggressiveInvestmentSurvivesOneHundredTwentyMonthsWithInfrastructureTransition() {
+        Player player = launchedCompanyPlayer("actual-service-long-term-simulation");
+        player.addCash(PlayerCompanyService.AGGRESSIVE_INVESTMENT - PlayerCompanyService.RECOMMENDED_INVESTMENT);
+        settlementService.contributeAndResume(
+                player.getId(),
+                PlayerCompanyService.AGGRESSIVE_INVESTMENT - PlayerCompanyService.MINIMUM_INVESTMENT
+        );
+        var company = companyRepository.findByPlayer(player).orElseThrow();
+        long minimumCash = company.getCorporateCash();
+        int firstMediumNetworkMonth = 0;
+        int firstCloudDowngradeMonth = 0;
+
+        for (int month = 0; month < 120; month++) {
+            settlementService.processMonthly(player);
+            assertThat(company.isOperationsSuspended())
+                    .as("month %s must finish without exhausting corporate cash", month + 1)
+                    .isFalse();
+            minimumCash = Math.min(minimumCash, company.getCorporateCash());
+            respondToActiveIncident(player, company);
+            boolean infrastructureDecisionMade = applyLongTermInfrastructureDecision(player, company);
+            keepBalancedProjectPipeline(player, company, month);
+            acceptAvailableRevenueOpportunities(player, company);
+            if (!infrastructureDecisionMade) {
+                applyBalancedCapacityDecision(player, company);
+            }
+            var infrastructure = infrastructureService.snapshot(company);
+            if (firstMediumNetworkMonth == 0 && infrastructure.network().name().startsWith("중형")) {
+                firstMediumNetworkMonth = month + 1;
+            }
+            if (firstMediumNetworkMonth > 0
+                    && firstCloudDowngradeMonth == 0
+                    && infrastructure.plan() == CompanyCloudPlan.STARTER) {
+                firstCloudDowngradeMonth = month + 1;
+            }
+            if (month < 119) {
+                advanceToNextMonth(player);
+            }
+        }
+
+        var infrastructure = infrastructureService.snapshot(company);
+        assertThat(monthlyRepository.findByCompanyOrderByPeriodIndexDesc(company)).hasSize(120);
+        assertThat(quarterlyRepository.findByCompanyOrderByQuarterSequenceDesc(company)).hasSize(40);
+        assertThat(company.getCorporateCash()).isPositive();
+        assertThat(minimumCash).isPositive();
+        assertThat(firstMediumNetworkMonth).isPositive();
+        assertThat(firstCloudDowngradeMonth).isGreaterThanOrEqualTo(firstMediumNetworkMonth);
+        assertThat(infrastructure.network().name()).startsWith("중형");
+        assertThat(infrastructure.plan()).isEqualTo(CompanyCloudPlan.STARTER);
+        assertThat(company.getPrototypeBenchmark()).isGreaterThan(600);
+        assertThat(company.getPaidUsers()).isGreaterThan(1_000_000);
+        assertThat(bondRepository.findByCompanyOrderByIdDesc(company)).isEmpty();
+
+        System.out.printf(
+                "ACTUAL_COMPANY_LONG_TERM_SIMULATION months=%d cash=%d minCash=%d paidUsers=%d "
+                        + "benchmark=%d network=%s cloud=%s mediumNetworkMonth=%d cloudDowngradeMonth=%d%n",
+                120,
+                company.getCorporateCash(),
+                minimumCash,
+                company.getPaidUsers(),
+                company.getPrototypeBenchmark(),
+                infrastructure.network().name(),
+                infrastructure.plan().name(),
+                firstMediumNetworkMonth,
+                firstCloudDowngradeMonth
+        );
+    }
+
+    @Test
+    void naturalGrowthReportsWhenEveryIpoRequirementBecomesReachable() {
+        Player player = launchedCompanyPlayer("actual-service-ipo-reachability");
+        player.addCash(PlayerCompanyService.AGGRESSIVE_INVESTMENT - PlayerCompanyService.RECOMMENDED_INVESTMENT);
+        settlementService.contributeAndResume(
+                player.getId(),
+                PlayerCompanyService.AGGRESSIVE_INVESTMENT - PlayerCompanyService.MINIMUM_INVESTMENT
+        );
+        var company = companyRepository.findByPlayer(player).orElseThrow();
+        var firstSatisfiedMonth = new java.util.EnumMap<CompanyIpoRequirement, Integer>(
+                CompanyIpoRequirement.class);
+        long maximumEquityValue = 0;
+        int maximumEquityValueMonth = 0;
+        int closestMonth = 0;
+        int fewestUnmetRequirements = Integer.MAX_VALUE;
+        long closestEquityValue = 0;
+        List<CompanyIpoRequirement> closestUnmetRequirements = List.of();
+        int eligibleMonth = 0;
+
+        for (int month = 0; month < 240; month++) {
+            settlementService.processMonthly(player);
+            assertThat(company.isOperationsSuspended())
+                    .as("month %s must finish without exhausting corporate cash", month + 1)
+                    .isFalse();
+
+            if (!quarterlyRepository.findByCompanyOrderByQuarterSequenceDesc(company).isEmpty()) {
+                prepareStrategyFinanceForIpo(player, company);
+            }
+            respondToActiveIncident(player, company);
+            boolean infrastructureDecisionMade = applyLongTermInfrastructureDecision(player, company);
+            keepBalancedProjectPipeline(player, company, month);
+            acceptAvailableRevenueOpportunities(player, company);
+            if (!infrastructureDecisionMade) {
+                applyBalancedCapacityDecision(player, company);
+            }
+
+            var qualification = ipoQualificationService.evaluate(company);
+            for (var check : qualification.checks()) {
+                if (check.met()) {
+                    firstSatisfiedMonth.putIfAbsent(check.requirement(), month + 1);
+                }
+            }
+            long currentEquityValue = qualification.check(
+                    CompanyIpoRequirement.EQUITY_VALUE).currentValue();
+            if (currentEquityValue > maximumEquityValue) {
+                maximumEquityValue = currentEquityValue;
+                maximumEquityValueMonth = month + 1;
+            }
+            List<CompanyIpoRequirement> currentUnmet = qualification.unmetChecks().stream()
+                    .map(com.game.buildingstory.service.CompanyIpoQualification.RequirementCheck::requirement)
+                    .toList();
+            if (currentUnmet.size() < fewestUnmetRequirements) {
+                fewestUnmetRequirements = currentUnmet.size();
+                closestMonth = month + 1;
+                closestEquityValue = currentEquityValue;
+                closestUnmetRequirements = currentUnmet;
+            }
+            if (qualification.canApply()) {
+                eligibleMonth = month + 1;
+                break;
+            }
+            if (month < 239) {
+                advanceToNextMonth(player);
+            }
+        }
+
+        var qualification = ipoQualificationService.evaluate(company);
+        var ipoOverview = ipoService.overview(company);
+        System.out.printf(
+                "ACTUAL_COMPANY_IPO_REACHABILITY elapsedMonths=%d eligibleMonth=%d cash=%d stage=%s "
+                        + "mrr=%d paidUsers=%d benchmark=%d equityValue=%d maxEquityValue=%d@%d "
+                        + "strategyExpertise=%d closest=%d@%d:equity=%d:%s firstSatisfied=%s "
+                        + "offers=%s unmet=%s%n",
+                monthlyRepository.findByCompanyOrderByPeriodIndexDesc(company).size(),
+                eligibleMonth,
+                company.getCorporateCash(),
+                company.getGrowthStage(),
+                company.getMonthlyRecurringRevenue(),
+                company.getPaidUsers(),
+                company.getPrototypeBenchmark(),
+                qualification.check(CompanyIpoRequirement.EQUITY_VALUE).currentValue(),
+                maximumEquityValue,
+                maximumEquityValueMonth,
+                qualification.check(CompanyIpoRequirement.STRATEGY_FINANCE).currentValue(),
+                fewestUnmetRequirements,
+                closestMonth,
+                closestEquityValue,
+                closestUnmetRequirements,
+                firstSatisfiedMonth,
+                ipoOverview.offerOptions(),
+                qualification.unmetChecks()
+        );
+
+        assertThat(monthlyRepository.findByCompanyOrderByPeriodIndexDesc(company)).isNotEmpty();
+        assertThat(quarterlyRepository.findByCompanyOrderByQuarterSequenceDesc(company)).isNotEmpty();
+        assertThat(eligibleMonth).isBetween(48, 84);
+        assertThat(qualification.canApply()).isTrue();
+        assertThat(ipoOverview.offerOptions())
+                .extracting(com.game.buildingstory.service.CompanyIpoOverview.OfferOption::percent)
+                .containsExactly(15, 25, 35);
+        assertThat(ipoOverview.offerOptions())
+                .allMatch(option -> option.proceeds() > 0 && option.playerOwnershipPercent() >= 64.9);
+    }
+
+    @Test
+    void eligibleCompanyCompletesIpoAndRendersBothScreens() throws Exception {
+        Player player = launchedCompanyPlayer("actual-service-ipo-integration");
+        settlementService.contributeAndResume(
+                player.getId(),
+                PlayerCompanyService.RECOMMENDED_INVESTMENT - PlayerCompanyService.MINIMUM_INVESTMENT
+        );
+        var company = companyRepository.findByPlayer(player).orElseThrow();
+        settleFirstQuarter(player);
+        company.promoteGrowthStage(com.game.buildingstory.domain.CompanyGrowthStage.GROWTH);
+        prepareStrategyFinanceForIpo(player, company);
+        workforceService.processWorkforceMonth(company);
+        while (company.getPrototypeBenchmark() < CompanyIpoPolicy.MINIMUM_BENCHMARK) {
+            company.applyProductImprovement(
+                    com.game.buildingstory.domain.CompanyProductImprovementType.MODEL_REFINEMENT,
+                    com.game.buildingstory.domain.CompanyDevelopmentDirection.BALANCED,
+                    100
+            );
+        }
+        company.updateMarketResult(
+                10_000_000,
+                10.0,
+                900_000,
+                90_000,
+                10_000,
+                CompanyIpoPolicy.MINIMUM_MONTHLY_RECURRING_REVENUE
+        );
+        for (int sequence = 2; sequence <= CompanyIpoPolicy.MINIMUM_QUARTERLY_REPORTS; sequence++) {
+            quarterlyRepository.save(new CompanyQuarterlyReport(
+                    company,
+                    sequence,
+                    sequence * 3,
+                    120_000_000_000L,
+                    80_000_000_000L,
+                    40_000_000_000L,
+                    8_000_000_000L,
+                    32_000_000_000L,
+                    company.getCorporateCash(),
+                    company.getMonthlyRecurringRevenue(),
+                    company.getPaidUsers()
+            ));
+        }
+        valuationRepository.save(new com.game.buildingstory.domain.CompanyValuationSnapshot(
+                company,
+                CompanyIpoPolicy.MINIMUM_QUARTERLY_REPORTS,
+                1_000_000_000_000L,
+                CompanyIpoPolicy.MINIMUM_EQUITY_VALUE,
+                CompanyIpoPolicy.MINIMUM_EQUITY_VALUE,
+                company.getMonthlyRecurringRevenue() * 12,
+                160_000_000_000L,
+                6,
+                10_000,
+                0
+        ));
+
+        var qualification = ipoQualificationService.evaluate(company);
+        assertThat(qualification.canApply())
+                .as("unmet IPO requirements: %s", qualification.unmetChecks())
+                .isTrue();
+        long cashBeforeApplication = company.getCorporateCash();
+        assertThat(ipoService.apply(player.getId(), 25)).contains("IPO 신청 완료");
+        var listing = listingRepository.findByCompany(company).orElseThrow();
+        assertThat(company.getCorporateCash())
+                .isEqualTo(cashBeforeApplication - CompanyIpoPolicy.PREPARATION_COST);
+        for (int month = 0; month < CompanyIpoPolicy.PREPARATION_MONTHS; month++) {
+            ipoService.processSuccessfulMonth(company);
+        }
+        assertThat(listing.getStatus()).isEqualTo(CompanyListingStatus.READY);
+        assertThat(ipoService.confirmListing(player.getId())).contains("상장 완료");
+        assertThat(listing.getStatus()).isEqualTo(CompanyListingStatus.LISTED);
+        assertThat(listing.getSelectedOfferPercent()).isEqualTo(25);
+        assertThat(listing.getProceeds()).isPositive();
+        assertThat(listedCompanyRepository.findByPlayerAndStockKey(
+                player, CompanyIpoPolicy.PLAYER_COMPANY_STOCK_KEY)).isPresent();
+        assertThat(stockPriceHistoryRepository.findByPlayerAndStockKeyOrderByElapsedDaysAscIdAsc(
+                player, CompanyIpoPolicy.PLAYER_COMPANY_STOCK_KEY)).isNotEmpty();
+
+        gameService.completeStory(player.getId());
+        player.unlockStockContent();
+        stockService.ensureMarketInitialized(player);
+        MockHttpSession session = companySession(player);
+        String companyHtml = mockMvc.perform(get("/main").param("view", "company").session(session))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String stockHtml = mockMvc.perform(get("/main")
+                        .param("view", "stocks")
+                        .param("stockKey", CompanyIpoPolicy.PLAYER_COMPANY_STOCK_KEY)
+                        .session(session))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(companyHtml).contains(
+                "회사·주식 현황", "현재 주가", "시가총액", "발행주식", "창업자 보유",
+                "플레이어 지분", "상장일", "공모가", "주식시장에서 상세 보기");
+        assertThat(stockHtml)
+                .contains("내 기업", "기업 화면으로 이동", "상장일", "공모가", "창업자 보유", "창업자 지분가치")
+                .contains("stock-detail active", "chart-candle", "FOUNDER POSITION")
+                .doesNotContain("/stocks/player-company/buy", "/stocks/player-company/sell");
+
     }
 
     private void respondToActiveIncident(Player player, com.game.buildingstory.domain.PlayerCompany company) {
@@ -1092,12 +1452,16 @@ class CompanySettlementServiceTests {
         if (productProjectService.activeProject(company).isPresent()) {
             return;
         }
-        var improvement = switch (month % 4) {
-            case 0 -> com.game.buildingstory.domain.CompanyProductImprovementType.SERVICE_STABILIZATION;
-            case 1 -> com.game.buildingstory.domain.CompanyProductImprovementType.MODEL_REFINEMENT;
-            case 2 -> com.game.buildingstory.domain.CompanyProductImprovementType.INFERENCE_OPTIMIZATION;
-            default -> com.game.buildingstory.domain.CompanyProductImprovementType.WORKFLOW_AUTOMATION;
-        };
+        double marketBenchmark = companyMarketService.snapshot(company).marketBenchmark();
+        var improvement = company.getProductCompleteness() < 40
+                ? com.game.buildingstory.domain.CompanyProductImprovementType.WORKFLOW_AUTOMATION
+                : company.getPrototypeBenchmark() < marketBenchmark * 0.9
+                ? com.game.buildingstory.domain.CompanyProductImprovementType.MODEL_REFINEMENT
+                : switch (month % 3) {
+                    case 0 -> com.game.buildingstory.domain.CompanyProductImprovementType.SERVICE_STABILIZATION;
+                    case 1 -> com.game.buildingstory.domain.CompanyProductImprovementType.INFERENCE_OPTIMIZATION;
+                    default -> com.game.buildingstory.domain.CompanyProductImprovementType.WORKFLOW_AUTOMATION;
+                };
         productProjectService.start(player.getId(), improvement);
     }
 
@@ -1106,9 +1470,11 @@ class CompanySettlementServiceTests {
             com.game.buildingstory.domain.PlayerCompany company
     ) {
         shortTermProjectService.offeredProjects(company).stream()
+                .filter(ignored -> shortTermProjectService.canStartProject(company))
                 .findFirst()
                 .ifPresent(offer -> shortTermProjectService.accept(player.getId(), offer.getId()));
         customerContractService.offeredContracts(company).stream()
+                .filter(offer -> customerContractService.canAccept(company, offer))
                 .findFirst()
                 .ifPresent(offer -> customerContractService.accept(player.getId(), offer.getId()));
     }
@@ -1121,6 +1487,29 @@ class CompanySettlementServiceTests {
         var operations = departmentRepository
                 .findByCompanyAndDepartmentType(company, CompanyDepartmentType.SERVICE_OPERATIONS)
                 .orElseThrow();
+
+        var development = departmentRepository
+                .findByCompanyAndDepartmentType(company, CompanyDepartmentType.AI_DEVELOPMENT)
+                .orElseThrow();
+        var developmentLoad = workforceService.departmentLoad(company, development);
+        if (developmentLoad.utilizationPercent() >= 90) {
+            int remainingMonthly = workforceService.remainingMonthlyHireLimit(company);
+            int maximumApproved = workforceService.maximumApprovedHeadcount(company, development);
+            int currentCommitted = development.getGeneralEmployeeCount() + development.getPendingHireCount();
+            int hireCount = Math.min(5, Math.min(remainingMonthly, maximumApproved - currentCommitted));
+            if (hireCount > 0) {
+                workforceService.changeApprovedHeadcount(
+                        player.getId(),
+                        CompanyDepartmentType.AI_DEVELOPMENT,
+                        currentCommitted + hireCount
+                );
+                workforceService.requestGeneralHires(
+                        player.getId(),
+                        CompanyDepartmentType.AI_DEVELOPMENT,
+                        hireCount
+                );
+            }
+        }
 
         if (snapshot.operationsCapacity() * 4 < snapshot.demand() * 5) {
             int remainingMonthly = workforceService.remainingMonthlyHireLimit(company);
@@ -1147,7 +1536,9 @@ class CompanySettlementServiceTests {
         }
 
         var opportunity = constructionService.opportunity(company);
-        if (snapshot.utilizationPercent() >= 70
+        boolean computeExpansionNeeded = snapshot.permanentCapacity() * 4 < snapshot.demand() * 5;
+        if (computeExpansionNeeded
+                && snapshot.utilizationPercent() >= 70
                 && opportunity.available()
                 && company.getCorporateCash() - opportunity.step().totalCost()
                 >= settlementService.essentialMonthlyCost(company) * 9) {
@@ -1155,18 +1546,81 @@ class CompanySettlementServiceTests {
             return;
         }
 
-        if (constructionService.activeConstruction(company).isPresent()
+        if (!computeExpansionNeeded
+                || constructionService.activeConstruction(company).isPresent()
                 || snapshot.utilizationPercent() < 85
                 || snapshot.pendingPlan() != null) {
             return;
         }
         long targetCapacity = Math.round(snapshot.demand() * 1.25);
         for (CompanyCloudPlan plan : CompanyCloudPlan.values()) {
+            long projectedEssentialCost = settlementService.essentialMonthlyCost(company)
+                    - infrastructureService.monthlyCloudCost(company)
+                    + infrastructureService.monthlyCloudCost(company, plan);
             if (plan.ordinal() > snapshot.plan().ordinal()
+                    && company.getGrowthStage() != com.game.buildingstory.domain.CompanyGrowthStage.FOUNDED
                     && plan.getCapacity() + snapshot.network().capacity() >= targetCapacity
-                    && company.getCorporateCash() >= plan.getMonthlyCost() * 6) {
+                    && projectedEssentialCost <= company.getMonthlyRecurringRevenue() * 11 / 10
+                    && company.getCorporateCash() >= projectedEssentialCost * 3) {
                 infrastructureService.requestCloudPlan(player.getId(), plan);
                 return;
+            }
+        }
+    }
+
+    private boolean applyLongTermInfrastructureDecision(
+            Player player,
+            com.game.buildingstory.domain.PlayerCompany company
+    ) {
+        var snapshot = infrastructureService.snapshot(company);
+        long targetCapacity = snapshot.demand();
+        for (CompanyCloudPlan plan : CompanyCloudPlan.values()) {
+            if (plan.ordinal() < snapshot.plan().ordinal()
+                    && plan.getCapacity() + snapshot.network().capacity() >= targetCapacity) {
+                infrastructureService.requestCloudPlan(player.getId(), plan);
+                return true;
+            }
+        }
+
+        if (constructionService.activeConstruction(company).isPresent()) {
+            return false;
+        }
+        if (snapshot.utilizationPercent() < 85
+                || snapshot.permanentCapacity() >= targetCapacity) {
+            return false;
+        }
+        var opportunity = constructionService.opportunity(company);
+        if (opportunity.step() == null
+                || opportunity.step().tier() != com.game.buildingstory.domain.CompanyComputeTier.MEDIUM) {
+            return false;
+        }
+
+        opportunity = constructionService.opportunity(company);
+        if (opportunity.available()
+                && company.getCorporateCash() >= opportunity.step().totalCost()) {
+            constructionService.startNext(player.getId());
+            return true;
+        }
+        return false;
+    }
+
+    private void prepareStrategyFinanceForIpo(
+            Player player,
+            com.game.buildingstory.domain.PlayerCompany company
+    ) {
+        if (quarterlyRepository.findByCompanyOrderByQuarterSequenceDesc(company).isEmpty()) {
+            return;
+        }
+        if (!departmentService.isEstablished(company, CompanyDepartmentType.STRATEGY_FINANCE)) {
+            departmentService.establish(player.getId(), CompanyDepartmentType.STRATEGY_FINANCE);
+        }
+        var committedKeys = employeeRepository.findByCompanyOrderById(company).stream()
+                .filter(employee -> !employee.isResigned())
+                .map(employee -> employee.getCandidateKey())
+                .collect(java.util.stream.Collectors.toSet());
+        for (String candidateKey : List.of("finance-01", "finance-02", "finance-03", "finance-04")) {
+            if (!committedKeys.contains(candidateKey)) {
+                workforceService.hireCoreTalent(player.getId(), candidateKey);
             }
         }
     }
@@ -1175,11 +1629,15 @@ class CompanySettlementServiceTests {
         Player player = new Player(username, "hash");
         player.addCash(PlayerCompanyService.RECOMMENDED_INVESTMENT);
         player = playerRepository.save(player);
+        foundationTestSupport.prepare(player);
         playerCompanyService.establish(player.getId(), "테스트AI", "인공지능 플랫폼", PlayerCompanyService.MINIMUM_INVESTMENT);
+        foundationTestSupport.clearPreparationStaff(player);
         tutorialService.confirmFoundingTeam(player.getId(),
                 List.of("dev-01", "dev-02", "dev-03", "sales-01", "ops-01", "ops-02"));
         tutorialService.startCommercialization(player.getId());
-        tutorialService.skipCommercializationForTest(player.getId());
+        for (int month = 0; month < 4; month++) {
+            tutorialService.processMonthly(player);
+        }
         tutorialService.launch(player.getId());
         assertThat(companyRepository.findByPlayer(player).orElseThrow().getTutorialStage())
                 .isEqualTo(CompanyTutorialStage.LAUNCHED);

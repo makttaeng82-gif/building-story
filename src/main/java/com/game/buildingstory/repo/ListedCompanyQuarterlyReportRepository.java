@@ -16,4 +16,10 @@ public interface ListedCompanyQuarterlyReportRepository extends JpaRepository<Li
     List<ListedCompanyQuarterlyReport> findTop4ByListedCompanyOrderByFiscalPeriodIndexDesc(ListedCompany listedCompany);
 
     Optional<ListedCompanyQuarterlyReport> findFirstByListedCompanyOrderByFiscalPeriodIndexDesc(ListedCompany listedCompany);
+
+    long countByListedCompanyAndBaselineHistoryFalseAndPublishedElapsedDayBetween(
+            ListedCompany listedCompany,
+            int firstPublishedElapsedDay,
+            int lastPublishedElapsedDay
+    );
 }

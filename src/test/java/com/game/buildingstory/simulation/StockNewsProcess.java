@@ -2,6 +2,7 @@ package com.game.buildingstory.simulation;
 
 import com.game.buildingstory.service.StockCompanyNewsCatalog;
 import com.game.buildingstory.service.StockCompanyNewsDefinition;
+import com.game.buildingstory.service.StockCatalog;
 import com.game.buildingstory.service.StockIndustryNewsCatalog;
 import com.game.buildingstory.service.StockIndustryNewsDefinition;
 import com.game.buildingstory.service.StockMarketNewsCatalog;
@@ -44,7 +45,7 @@ final class StockNewsProcess {
         this.marketDefinitions = new StockMarketNewsCatalog().all().stream()
                 .filter(StockMarketNewsDefinition::randomPublication).toList();
         this.industryDefinitions = new StockIndustryNewsCatalog().all();
-        this.companyDefinitions = new StockCompanyNewsCatalog().all();
+        this.companyDefinitions = new StockCompanyNewsCatalog(new StockCatalog()).all();
         for (Category category : Category.values()) {
             recentDirections.put(category, new ArrayDeque<>());
         }

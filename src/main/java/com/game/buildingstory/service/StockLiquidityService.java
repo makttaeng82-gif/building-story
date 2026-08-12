@@ -6,6 +6,7 @@ import com.game.buildingstory.domain.StockLiquidityState;
 import com.game.buildingstory.domain.StockPriceHistory;
 import com.game.buildingstory.repo.StockLiquidityStateRepository;
 import com.game.buildingstory.repo.StockPriceHistoryRepository;
+import com.game.buildingstory.repo.ListedCompanyRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,28 +16,36 @@ import java.math.BigInteger;
 @Service
 @Transactional
 public class StockLiquidityService {
-    private final StockCatalog stockCatalog;
+    private final StockUniverseService stockUniverseService;
     private final StockLiquidityPolicy policy;
     private final StockLiquidityStateRepository stateRepository;
     private final StockPriceHistoryRepository priceRepository;
+    private final ListedCompanyRepository listedCompanyRepository;
 
     public StockLiquidityService(
-            StockCatalog stockCatalog,
+            StockUniverseService stockUniverseService,
             StockLiquidityPolicy policy,
             StockLiquidityStateRepository stateRepository,
-            StockPriceHistoryRepository priceRepository
+            StockPriceHistoryRepository priceRepository,
+            ListedCompanyRepository listedCompanyRepository
     ) {
-        this.stockCatalog = stockCatalog;
+        this.stockUniverseService = stockUniverseService;
         this.policy = policy;
         this.stateRepository = stateRepository;
         this.priceRepository = priceRepository;
+        this.listedCompanyRepository = listedCompanyRepository;
     }
 
     public void ensureInitialized(Player player) {
-        for (StockSpec stock : stockCatalog.all()) {
-            stateRepository.findByPlayerAndStockKey(player, stock.key()).orElseGet(() -> stateRepository.save(
-                    new StockLiquidityState(player, stock.key(), policy.capacity(stock), currentPrice(player, stock))
-            ));
+        for (StockSpec stock : stockUniverseService.stocks(player)) {
+            long currentCapacity = capacity(player, stock);
+            stateRepository.findByPlayerAndStockKey(player, stock.key())
+                    .ifPresentOrElse(
+                            state -> state.updateCapacity(currentCapacity),
+                            () -> stateRepository.save(new StockLiquidityState(
+                                    player, stock.key(), currentCapacity, currentPrice(player, stock)
+                            ))
+                    );
         }
     }
 
@@ -44,16 +53,16 @@ public class StockLiquidityService {
     public void refreshAll(Player player) {
         ensureInitialized(player);
         for (StockLiquidityState state : stateRepository.findByPlayer(player)) {
-            StockSpec stock = stockCatalog.find(state.getStockKey()).orElseThrow();
-            state.refresh(policy.capacity(stock), currentPrice(player, stock), player.getElapsedDays());
+            StockSpec stock = stockUniverseService.find(player, state.getStockKey()).orElseThrow();
+            state.refresh(capacity(player, stock), currentPrice(player, stock), player.getElapsedDays());
         }
     }
 
     /** 배당락처럼 5일 갱신 밖에서 기준가격이 바뀐 경우 해당 종목의 주문 누적 상태를 재기준화한다. */
     public void rebase(Player player, String stockKey) {
-        StockSpec stock = stockCatalog.find(stockKey).orElseThrow();
+        StockSpec stock = stockUniverseService.find(player, stockKey).orElseThrow();
         StockLiquidityState state = requireState(player, stockKey);
-        state.refresh(policy.capacity(stock), currentPrice(player, stock), player.getElapsedDays());
+        state.refresh(capacity(player, stock), currentPrice(player, stock), player.getElapsedDays());
     }
 
     public long availableBuyQuantity(Player player, ListedCompany company) {
@@ -88,11 +97,18 @@ public class StockLiquidityService {
 
     private StockLiquidityState requireState(Player player, String stockKey) {
         return stateRepository.findByPlayerAndStockKey(player, stockKey).orElseGet(() -> {
-            StockSpec stock = stockCatalog.find(stockKey).orElseThrow();
+            StockSpec stock = stockUniverseService.find(player, stockKey).orElseThrow();
             return stateRepository.save(new StockLiquidityState(
-                    player, stockKey, policy.capacity(stock), currentPrice(player, stock)
+                    player, stockKey, capacity(player, stock), currentPrice(player, stock)
             ));
         });
+    }
+
+    private long capacity(Player player, StockSpec stock) {
+        long tradableShares = listedCompanyRepository.findByPlayerAndStockKey(player, stock.key())
+                .map(company -> Math.max(1L, company.getIssuedShares() - company.getFounderShares()))
+                .orElse(stock.issuedShares());
+        return policy.capacity(stock, tradableShares);
     }
 
     private long currentPrice(Player player, StockSpec stock) {

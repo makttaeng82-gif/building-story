@@ -86,6 +86,10 @@ public class CompanyShortTermProjectService {
         if (company.getActiveMajorWorkCount() >= workforceService.companyMajorWorkSlotLimit(company)) {
             return "회사 주요 업무 슬롯이 부족함";
         }
+        if (workforceService.departmentLoad(company, CompanyDepartmentType.SALES_MARKETING)
+                .availableSlots() <= 0) {
+            return "영업마케팅팀 주요 업무 슬롯이 부족함";
+        }
 
         int assignedWork = availableMonthlyWork(company);
         if (assignedWork <= 0) {
@@ -263,6 +267,8 @@ public class CompanyShortTermProjectService {
         return !company.isOperationsSuspended()
                 && activeBusiness(company).isEmpty()
                 && company.getActiveMajorWorkCount() < workforceService.companyMajorWorkSlotLimit(company)
+                && workforceService.departmentLoad(company, CompanyDepartmentType.SALES_MARKETING)
+                .availableSlots() > 0
                 && availableMonthlyWork(company) > 0;
     }
 

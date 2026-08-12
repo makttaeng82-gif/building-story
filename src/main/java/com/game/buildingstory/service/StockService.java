@@ -3,12 +3,12 @@ package com.game.buildingstory.service;
 import com.game.buildingstory.domain.GameEvent;
 import com.game.buildingstory.domain.GameEventStatus;
 import com.game.buildingstory.domain.ListedCompany;
-import com.game.buildingstory.domain.ListedCompanyValuationSnapshot;
 import com.game.buildingstory.domain.OwnedStock;
 import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.StockPriceHistory;
 import com.game.buildingstory.domain.StockTradeHistory;
 import com.game.buildingstory.repo.GameEventRepository;
+import com.game.buildingstory.repo.CompanyListingRepository;
 import com.game.buildingstory.repo.LoanRepository;
 import com.game.buildingstory.repo.OwnedBuildingRepository;
 import com.game.buildingstory.repo.OwnedStockRepository;
@@ -53,10 +53,11 @@ public class StockService {
 
     private final Random random = new Random();
     private final StockCatalog stockCatalog;
+    private final StockUniverseService stockUniverseService;
     private final StockCompanyOverviewCatalog stockCompanyOverviewCatalog;
     private final ListedCompanyService listedCompanyService;
     private final ListedCompanyFinancialService listedCompanyFinancialService;
-    private final ListedCompanyValuationService listedCompanyValuationService;
+    private final StockFinancialDataService stockFinancialDataService;
     private final StockMarketRegimeService stockMarketRegimeService;
     private final StockMarketIndexService stockMarketIndexService;
     private final StockPriceModel stockPriceModel;
@@ -73,13 +74,15 @@ public class StockService {
     private final OwnedBuildingRepository ownedBuildingRepository;
     private final LoanRepository loanRepository;
     private final CityMarketIndexService cityMarketIndexService;
+    private final CompanyListingRepository companyListingRepository;
 
     public StockService(
             StockCatalog stockCatalog,
+            StockUniverseService stockUniverseService,
             StockCompanyOverviewCatalog stockCompanyOverviewCatalog,
             ListedCompanyService listedCompanyService,
             ListedCompanyFinancialService listedCompanyFinancialService,
-            ListedCompanyValuationService listedCompanyValuationService,
+            StockFinancialDataService stockFinancialDataService,
             StockMarketRegimeService stockMarketRegimeService,
             StockMarketIndexService stockMarketIndexService,
             StockPriceModel stockPriceModel,
@@ -95,13 +98,15 @@ public class StockService {
             StockTradeHistoryRepository stockTradeHistoryRepository,
             OwnedBuildingRepository ownedBuildingRepository,
             LoanRepository loanRepository,
-            CityMarketIndexService cityMarketIndexService
+            CityMarketIndexService cityMarketIndexService,
+            CompanyListingRepository companyListingRepository
     ) {
         this.stockCatalog = stockCatalog;
+        this.stockUniverseService = stockUniverseService;
         this.stockCompanyOverviewCatalog = stockCompanyOverviewCatalog;
         this.listedCompanyService = listedCompanyService;
         this.listedCompanyFinancialService = listedCompanyFinancialService;
-        this.listedCompanyValuationService = listedCompanyValuationService;
+        this.stockFinancialDataService = stockFinancialDataService;
         this.stockMarketRegimeService = stockMarketRegimeService;
         this.stockMarketIndexService = stockMarketIndexService;
         this.stockPriceModel = stockPriceModel;
@@ -118,11 +123,17 @@ public class StockService {
         this.ownedBuildingRepository = ownedBuildingRepository;
         this.loanRepository = loanRepository;
         this.cityMarketIndexService = cityMarketIndexService;
+        this.companyListingRepository = companyListingRepository;
     }
 
     @Transactional(readOnly = true)
     public List<StockSpec> stocks() {
-        return stockCatalog.all();
+        return stockCatalog.initial();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockSpec> stocks(Player player) {
+        return stockUniverseService.stocks(player);
     }
 
     public void ensureUnlockSchedule(Player player) {
@@ -166,9 +177,7 @@ public class StockService {
             return;
         }
         ensureMarketInitialized(player);
-        int lastUpdateDay = stockPriceHistoryRepository.findFirstByPlayerOrderByElapsedDaysDescIdDesc(player)
-                .map(StockPriceHistory::getElapsedDays)
-                .orElse(player.getElapsedDays());
+        int lastUpdateDay = lastMarketUpdateDay(player);
         if (player.getElapsedDays() - lastUpdateDay < UPDATE_INTERVAL_DAYS) {
             return;
         }
@@ -176,7 +185,8 @@ public class StockService {
         double marketEffectPercent = marketPulse.effectPercent()
                 + stockMarketNewsService.activePriceEffectPercent(player);
         Map<String, ListedCompany> companies = listedCompanyService.companiesByStockKey(player);
-        stockCatalog.all().forEach(stock -> appendNextHistory(player, stock, companies.get(stock.key()), marketEffectPercent));
+        stockUniverseService.stocks(player).forEach(
+                stock -> appendNextHistory(player, stock, companies.get(stock.key()), marketEffectPercent));
         stockLiquidityService.refreshAll(player);
         stockMarketIndexService.recordCurrent(player);
         stockMarketRegimeService.recordQuarterExposure(player);
@@ -188,9 +198,7 @@ public class StockService {
 
     @Transactional(readOnly = true)
     public StockMarketStatusView marketStatus(Player player) {
-        int lastUpdateDay = stockPriceHistoryRepository.findFirstByPlayerOrderByElapsedDaysDescIdDesc(player)
-                .map(StockPriceHistory::getElapsedDays)
-                .orElse(player.getElapsedDays());
+        int lastUpdateDay = lastMarketUpdateDay(player);
         int daysSinceUpdate = Math.max(0, player.getElapsedDays() - lastUpdateDay);
         int daysUntilNextUpdate = Math.max(0, UPDATE_INTERVAL_DAYS - daysSinceUpdate);
         int progressPercent = Math.min(100, daysSinceUpdate * 100 / UPDATE_INTERVAL_DAYS);
@@ -208,7 +216,8 @@ public class StockService {
                 stockMarketRegimeService.currentRegime(player).label(),
                 indexValueText(index.indexBasisPoints()),
                 signedPercent(index.changeBasisPoints() / 100.0),
-                changeDirection(index.changeBasisPoints())
+                changeDirection(index.changeBasisPoints()),
+                index.constituentCount()
         );
     }
 
@@ -217,7 +226,7 @@ public class StockService {
         listedCompanyService.ensureCompaniesInitialized(player);
         listedCompanyFinancialService.ensureBaselineHistory(player);
         stockMarketRegimeService.ensureInitialized(player);
-        stockCatalog.all().forEach(stock -> {
+        stockUniverseService.stocks(player).forEach(stock -> {
             if (!stockPriceHistoryRepository.existsByPlayerAndStockKey(player, stock.key())) {
                 stockPriceHistoryRepository.save(new StockPriceHistory(
                         player,
@@ -240,7 +249,7 @@ public class StockService {
         Map<String, OwnedStock> ownedStocks = ownedStockRepository.findByPlayer(player).stream()
                 .collect(Collectors.toMap(OwnedStock::getStockKey, Function.identity()));
         Map<String, ListedCompany> companies = listedCompanyService.companiesByStockKey(player);
-        return stockCatalog.all().stream()
+        return stockUniverseService.stocks(player).stream()
                 .map(stock -> quote(player, stock, ownedStocks.get(stock.key()), companies.get(stock.key())))
                 .toList();
     }
@@ -260,7 +269,7 @@ public class StockService {
                 .findByPlayerAndElapsedDaysInOrderByElapsedDaysDescIdDesc(player, quoteDays)
                 .stream()
                 .collect(Collectors.groupingBy(StockPriceHistory::getStockKey));
-        return stockCatalog.all().stream()
+        return stockUniverseService.stocks(player).stream()
                 .map(stock -> listQuote(
                         player,
                         stock,
@@ -273,7 +282,8 @@ public class StockService {
 
     @Transactional(readOnly = true)
     public StockQuoteView selectedStockQuote(Player player, String stockKey) {
-        StockSpec stock = stockCatalog.find(stockKey).orElseGet(() -> stockCatalog.all().get(0));
+        StockSpec stock = stockUniverseService.find(player, stockKey)
+                .orElseGet(() -> stockUniverseService.stocks(player).get(0));
         OwnedStock ownedStock = ownedStockRepository.findByPlayerAndStockKey(player, stock.key()).orElse(null);
         ListedCompany company = listedCompanyService.companiesByStockKey(player).get(stock.key());
         return quote(player, stock, ownedStock, company);
@@ -366,6 +376,9 @@ public class StockService {
         if (player.isPaused()) {
             return "일시정지 중에는 주식을 거래할 수 없습니다.";
         }
+        if (stockUniverseService.isPlayerCompany(stockKey)) {
+            return "자기 회사 주식은 현재 거래할 수 없습니다.";
+        }
         ensureMarketInitialized(player);
         StockSpec stock = stockCatalog.find(stockKey).orElseThrow();
         if (safeMultiply(currentPrice(player, stock), quantity) == null) {
@@ -423,6 +436,9 @@ public class StockService {
         if (player.isPaused()) {
             return "일시정지 중에는 주식을 거래할 수 없습니다.";
         }
+        if (stockUniverseService.isPlayerCompany(stockKey)) {
+            return "자기 회사 주식은 현재 거래할 수 없습니다.";
+        }
         ensureMarketInitialized(player);
         StockSpec stock = stockCatalog.find(stockKey).orElseThrow();
         long ownedQuantity = ownedStockRepository.findByPlayerAndStockKey(player, stockKey)
@@ -455,6 +471,9 @@ public class StockService {
         }
         if (player.isPaused()) {
             return "일시정지 중에는 주식을 거래할 수 없습니다.";
+        }
+        if (stockUniverseService.isPlayerCompany(stockKey)) {
+            return "자기 회사 주식은 현재 거래할 수 없습니다.";
         }
         ensureMarketInitialized(player);
         StockSpec stock = stockCatalog.find(stockKey).orElseThrow();
@@ -532,22 +551,24 @@ public class StockService {
                         stock.basePrice(),
                         initialVolume(stock)
                 )));
+        // 신규상장 첫 봉을 같은 시장 갱신일에 만든 경우 두 번째 봉을 중복 생성하지 않는다.
+        if (latest.getElapsedDays() >= player.getElapsedDays()) {
+            return;
+        }
         double industryPercent = stockIndustryNewsService.activePriceEffectPercent(player, stock.industry())
                 * stock.industryBeta();
         double companyPercent = stockCompanyNewsService.activePriceEffectPercent(player, stock.key());
         double trendPercent = trendEffectPercent(player, stock);
-        long fairValue = listedCompanyValuationService.latest(company)
-                .map(com.game.buildingstory.domain.ListedCompanyValuationSnapshot::getFairValueBase)
-                .orElse(0L);
-        int earningsSurpriseBasisPoints = company.consumePendingEarningsImpactBasisPoints();
+        StockFinancialDataService.PriceSignal signal =
+                stockFinancialDataService.consumePriceSignal(player, stock, company);
         StockPriceModel.Result result = stockPriceModel.calculate(new StockPriceModel.Input(
                 latest.getClosePrice(),
-                fairValue,
+                signal.fairValue(),
                 marketEffectPercent * stock.beta(),
                 industryPercent,
                 companyPercent,
                 trendPercent,
-                earningsSurpriseBasisPoints,
+                signal.earningsImpactBasisPoints(),
                 stock.idiosyncraticVolatilityPercent(),
                 stock.riskType()
         ), random);
@@ -564,6 +585,15 @@ public class StockService {
                 result.noiseImpactBasisPoints(),
                 result.pathImpactBasisPoints()
         ));
+    }
+
+    /** 동적 신규상장 캔들이 전체 시장의 공통 5일 갱신 기준일을 바꾸지 않도록 고정 종목을 기준으로 삼는다. */
+    private int lastMarketUpdateDay(Player player) {
+        String referenceStockKey = stockCatalog.all().getFirst().key();
+        return stockPriceHistoryRepository
+                .findFirstByPlayerAndStockKeyOrderByElapsedDaysDescIdDesc(player, referenceStockKey)
+                .map(StockPriceHistory::getElapsedDays)
+                .orElse(player.getElapsedDays());
     }
 
     private double trendEffectPercent(Player player, StockSpec stock) {
@@ -597,46 +627,39 @@ public class StockService {
         long previousPrice = latestRows.size() > 1 ? latestRows.get(1).getClosePrice() : current.getClosePrice();
         long currentPrice = current.getClosePrice();
         StockListQuoteView listQuote = listQuote(player, stock, ownedStock, company, latestRows);
-        var latestReport = company == null
-                ? java.util.Optional.<com.game.buildingstory.domain.ListedCompanyQuarterlyReport>empty()
-                : listedCompanyFinancialService.latestReport(company);
-        var latestValuation = company == null
-                ? java.util.Optional.<ListedCompanyValuationSnapshot>empty()
-                : listedCompanyValuationService.latest(company);
-        boolean hasQuarterlyReport = latestReport.isPresent();
-        long displayedRevenue = latestReport.map(com.game.buildingstory.domain.ListedCompanyQuarterlyReport::getRevenue)
-                .orElse(company == null ? 0 : company.getExpectedRevenue());
-        long displayedNetIncome = latestReport.map(com.game.buildingstory.domain.ListedCompanyQuarterlyReport::getNetIncome)
-                .orElse(company == null ? 0 : company.getExpectedNetIncome());
-        String financialPeriodText = latestReport
-                .map(report -> report.isBaselineHistory()
-                        ? "기준 실적"
-                        : report.getFiscalYear() + "년 " + report.getFiscalQuarter() + "분기 확정")
-                .orElse("첫 분기 전망");
-        String operatingProfitText = latestReport
-                .map(report -> financialMoneyText(report.getOperatingProfit()))
-                .orElse("공시 전");
-        String earningsSurpriseText = latestReport
-                .map(report -> signedPercent(report.getEarningsSurpriseBasisPoints() / 100.0))
-                .orElse("기준 전망");
-        String earningsSurpriseDirection = latestReport
-                .map(report -> changeDirection(report.getEarningsSurpriseBasisPoints()))
-                .orElse("flat");
-        String dividendPerShareText = latestReport
-                .filter(report -> !report.isBaselineHistory())
-                .map(report -> report.getDividendPerShare() <= 0
+        StockFinancialSnapshot financial = stockFinancialDataService.snapshot(player, stock, company);
+        boolean hasQuarterlyReport = financial.hasReport();
+        long displayedRevenue = financial.revenue();
+        long displayedNetIncome = financial.netIncome();
+        String financialPeriodText = financial.periodText();
+        String operatingProfitText = hasQuarterlyReport
+                ? financialMoneyText(financial.operatingProfit())
+                : "공시 전";
+        String earningsSurpriseText = hasQuarterlyReport
+                ? signedPercent(financial.performanceBasisPoints() / 100.0)
+                : "기준 전망";
+        String earningsSurpriseDirection = hasQuarterlyReport
+                ? changeDirection(financial.performanceBasisPoints())
+                : "flat";
+        String dividendPerShareText = !hasQuarterlyReport
+                ? "지급 전"
+                : financial.dividendPerShare() <= 0
                         ? "무배당"
-                        : stockPriceText(report.getDividendPerShare()))
-                .orElse("지급 전");
-        int earningsDday = company == null ? 0 : Math.max(0, company.getNextEarningsElapsedDay() - player.getElapsedDays());
-        String fairValueRangeText = latestValuation
-                .map(value -> stockPriceText(value.getFairValueLower()) + " - " + stockPriceText(value.getFairValueUpper()))
-                .orElse("산정 전");
-        String valuationStatusText = latestValuation.map(value -> {
-            if (currentPrice < value.getFairValueLower()) return "저평가";
-            if (currentPrice > value.getFairValueUpper()) return "고평가";
-            return "적정";
-        }).orElse("산정 전");
+                        : stockPriceText(financial.dividendPerShare());
+        int earningsDday = Math.max(0, financial.nextEarningsElapsedDay() - player.getElapsedDays());
+        String fairValueRangeText = financial.fairValueBase() <= 0
+                ? "산정 전"
+                : stockPriceText(financial.fairValueLower()) + " - " + stockPriceText(financial.fairValueUpper());
+        String valuationStatusText;
+        if (financial.fairValueBase() <= 0) {
+            valuationStatusText = "산정 전";
+        } else if (currentPrice < financial.fairValueLower()) {
+            valuationStatusText = "저평가";
+        } else if (currentPrice > financial.fairValueUpper()) {
+            valuationStatusText = "고평가";
+        } else {
+            valuationStatusText = "적정";
+        }
         String valuationDirection = "저평가".equals(valuationStatusText) ? "up"
                 : "고평가".equals(valuationStatusText) ? "down" : "flat";
         List<StockPriceHistory> defaultHistory = history.subList(
@@ -644,17 +667,37 @@ public class StockService {
                 history.size()
         );
         ChartScale scale = chartScale(defaultHistory, currentPrice);
-        StockCompanyDetailView companyDetail = companyDetail(stock, company, currentPrice, latestValuation);
-        long availableBuyQuantity = company == null ? 0 : Math.min(
+        StockCompanyDetailView companyDetail = companyDetail(player, stock, currentPrice, financial);
+        boolean playerCompanyStock = stockUniverseService.isPlayerCompany(stock.key());
+        long availableBuyQuantity = company == null || playerCompanyStock ? 0 : Math.min(
                 listQuote.remainingMarketBuyQuantity(),
                 stockLiquidityService.availableBuyQuantity(player, company)
         );
-        long availableSellQuantity = Math.min(
+        long availableSellQuantity = playerCompanyStock ? 0 : Math.min(
                 listQuote.quantity(),
                 stockLiquidityService.availableSellQuantity(player, stock.key())
         );
-        long maxAffordableBuyQuantity = maxAffordableQuantity(player, stock.key(), availableBuyQuantity);
-        ExpectedDividend expectedDividend = expectedDividend(company, listQuote.quantity());
+        long maxAffordableBuyQuantity = playerCompanyStock
+                ? 0
+                : maxAffordableQuantity(player, stock.key(), availableBuyQuantity);
+        long displayedPlayerShares = playerCompanyStock && company != null
+                ? company.getFounderShares()
+                : listQuote.quantity();
+        String displayedOwnership = playerCompanyStock && company != null
+                ? ownershipPercentText(company.getFounderShares(), company.getIssuedShares())
+                : listQuote.ownershipPercentText();
+        ExpectedDividend expectedDividend = expectedDividend(
+                financial, stock.issuedShares(), displayedPlayerShares);
+        var listing = playerCompanyStock
+                ? companyListingRepository.findByCompany_Player(player).orElse(null)
+                : null;
+        StockPriceHistory listingCandle = playerCompanyStock && !history.isEmpty() ? history.getFirst() : null;
+        String listingDateText = listingCandle == null ? "-" : listingCandle.getDateText();
+        String offerPriceText = listing == null ? "-" : stockPriceText(listing.getOfferPrice());
+        String founderSharesText = company == null ? "-" : stockQuantityText(company.getFounderShares()) + "주";
+        String founderMarketValueText = company == null
+                ? "-"
+                : financialMoneyText(Math.multiplyExact(currentPrice, company.getFounderShares()));
         return new StockQuoteView(
                 stock,
                 currentPrice,
@@ -675,14 +718,16 @@ public class StockService {
                 listQuote.valuationText(),
                 listQuote.marketCapText(),
                 fairValueRangeText,
-                latestValuation.map(ListedCompanyValuationSnapshot::getFairValueLower).orElse(0L),
-                latestValuation.map(ListedCompanyValuationSnapshot::getFairValueUpper).orElse(0L),
+                financial.fairValueLower(),
+                financial.fairValueUpper(),
                 valuationStatusText,
                 valuationDirection,
-                listQuote.ownershipPercentText(),
+                displayedOwnership,
                 stockPriceText(expectedDividend.total()),
                 expectedDividend.perShare() <= 0 ? "무배당 예상" : stockPriceText(expectedDividend.perShare()),
-                company == null ? "산정 전" : String.format(Locale.ROOT, "%.1f%%", company.getDividendPayoutBasisPoints() / 100.0),
+                financial.hasReport()
+                        ? String.format(Locale.ROOT, "%.1f%%", financial.dividendPayoutBasisPoints() / 100.0)
+                        : "산정 전",
                 listQuote.remainingMarketBuyQuantity(),
                 availableBuyQuantity,
                 availableSellQuantity,
@@ -703,41 +748,41 @@ public class StockService {
                 stockPriceText(scale.maxPrice()),
                 String.format(Locale.ROOT, "%.1f", priceY(currentPrice, scale)),
                 stockPriceText(currentPrice),
-                companyDetail
+                companyDetail,
+                listingDateText,
+                offerPriceText,
+                founderSharesText,
+                founderMarketValueText
         );
     }
 
     private StockCompanyDetailView companyDetail(
+            Player player,
             StockSpec stock,
-            ListedCompany company,
             long currentPrice,
-            java.util.Optional<ListedCompanyValuationSnapshot> valuation
+            StockFinancialSnapshot financial
     ) {
-        StockCompanyOverview overview = stockCompanyOverviewCatalog.require(stock.key());
-        List<StockQuarterSummaryView> recentQuarters = company == null
-                ? List.of()
-                : listedCompanyFinancialService.recentReports(company).stream()
-                .map(report -> new StockQuarterSummaryView(
-                        report.isBaselineHistory()
-                                ? "기준 " + report.getFiscalQuarter() + "분기"
-                                : report.getFiscalYear() + "년 " + report.getFiscalQuarter() + "분기",
-                        financialMoneyText(report.getRevenue()),
-                        financialMoneyText(report.getOperatingProfit()),
-                        financialMoneyText(report.getNetIncome()),
-                        signedPercent(report.getEarningsSurpriseBasisPoints() / 100.0),
-                        changeDirection(report.getEarningsSurpriseBasisPoints())
+        StockCompanyOverview overview = companyOverview(player, stock);
+        List<StockQuarterSummaryView> recentQuarters = financial.recentQuarters().stream()
+                .map(quarter -> new StockQuarterSummaryView(
+                        quarter.periodText(),
+                        financialMoneyText(quarter.revenue()),
+                        financialMoneyText(quarter.operatingProfit()),
+                        financialMoneyText(quarter.netIncome()),
+                        signedPercent(quarter.performanceBasisPoints() / 100.0),
+                        changeDirection(quarter.performanceBasisPoints())
                 ))
                 .toList();
 
-        long cash = company == null ? 0 : company.getCash();
-        long debt = company == null ? 0 : company.getDebt();
-        long netAssets = company == null ? 0 : company.getNetAssets();
+        long cash = financial.cash();
+        long debt = financial.debt();
+        long netAssets = financial.netAssets();
         double debtRatio = netAssets <= 0 ? 0.0 : debt * 100.0 / netAssets;
         String financialHealth = financialHealth(netAssets, debtRatio);
         String financialHealthDirection = "안정".equals(financialHealth) ? "up"
                 : "보통".equals(financialHealth) ? "flat" : "down";
-        long earningsPerShare = valuation.map(ListedCompanyValuationSnapshot::getEarningsPerShare).orElse(0L);
-        long bookValuePerShare = valuation.map(ListedCompanyValuationSnapshot::getBookValuePerShare).orElse(0L);
+        long earningsPerShare = financial.earningsPerShare();
+        long bookValuePerShare = financial.bookValuePerShare();
 
         return new StockCompanyDetailView(
                 overview.chiefExecutive(),
@@ -758,6 +803,21 @@ public class StockService {
                 ratioText(currentPrice, earningsPerShare),
                 ratioText(currentPrice, bookValuePerShare),
                 recentQuarters
+        );
+    }
+
+    private StockCompanyOverview companyOverview(Player player, StockSpec stock) {
+        if (!stockUniverseService.isPlayerCompany(stock.key())) {
+            return stockCompanyOverviewCatalog.require(stock.key());
+        }
+        return new StockCompanyOverview(
+                stock.key(),
+                "플레이어",
+                "플레이어 설립기업",
+                "서울",
+                "AI 플랫폼 구독·기업계약",
+                "기술 경쟁·연산비·서비스 장애",
+                "매우 높음"
         );
     }
 
@@ -838,17 +898,21 @@ public class StockService {
         return (long) Math.ceil(grossAmount * TRADE_FEE_RATE);
     }
 
-    private ExpectedDividend expectedDividend(ListedCompany company, long quantity) {
-        if (company == null || company.getExpectedNetIncome() <= 0) {
+    private ExpectedDividend expectedDividend(
+            StockFinancialSnapshot financial,
+            long issuedShares,
+            long quantity
+    ) {
+        if (financial.netIncome() <= 0 || financial.dividendPayoutBasisPoints() <= 0 || issuedShares <= 0) {
             return new ExpectedDividend(0, 0);
         }
-        long desiredDividend = BigInteger.valueOf(company.getExpectedNetIncome())
-                .multiply(BigInteger.valueOf(company.getDividendPayoutBasisPoints()))
+        long desiredDividend = BigInteger.valueOf(financial.netIncome())
+                .multiply(BigInteger.valueOf(financial.dividendPayoutBasisPoints()))
                 .divide(BigInteger.valueOf(10_000))
                 .longValueExact();
         long dividendPerShare = Math.min(
-                desiredDividend / company.getIssuedShares(),
-                company.getCash() / company.getIssuedShares()
+                desiredDividend / issuedShares,
+                financial.cash() / issuedShares
         );
         return new ExpectedDividend(dividendPerShare, Math.multiplyExact(dividendPerShare, quantity));
     }
@@ -950,7 +1014,7 @@ public class StockService {
                     Math.min(openY, closeY),
                     Math.max(2, Math.abs(openY - closeY)),
                     row.getClosePrice() >= row.getOpenPrice(),
-                    row.getMonth() + "/" + row.getDay(),
+                    row.getShortDateText(),
                     visible,
                     row.getElapsedDays(),
                     row.getOpenPrice(),
@@ -979,7 +1043,10 @@ public class StockService {
                 + row.getTrendImpactBasisPoints()
                 + row.getIdiosyncraticImpactBasisPoints()
                 + row.getNoiseImpactBasisPoints();
-        return "시장 " + signedPercent(row.getMarketImpactBasisPoints() / 100.0)
+        String listing = row.getListingImpactBasisPoints() == 0
+                ? ""
+                : "공모 " + signedPercent(row.getListingImpactBasisPoints() / 100.0) + " · ";
+        return listing + "시장 " + signedPercent(row.getMarketImpactBasisPoints() / 100.0)
                 + " · 업종 " + signedPercent(row.getIndustryImpactBasisPoints() / 100.0)
                 + " · 실적 " + signedPercent(row.getEarningsImpactBasisPoints() / 100.0)
                 + " · 가치 " + signedPercent(row.getValuationImpactBasisPoints() / 100.0)

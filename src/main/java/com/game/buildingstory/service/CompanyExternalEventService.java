@@ -77,19 +77,22 @@ public class CompanyExternalEventService {
     private final CompanyCompetitorRepository competitorRepository;
     private final CompanyDepartmentRepository departmentRepository;
     private final CompanyWorkforceService workforceService;
+    private final PlayerCompanyStockNewsBridgeService stockNewsBridgeService;
 
     public CompanyExternalEventService(
             CompanyExternalEventRepository eventRepository,
             CompanyNewsArticleRepository newsRepository,
             CompanyCompetitorRepository competitorRepository,
             CompanyDepartmentRepository departmentRepository,
-            CompanyWorkforceService workforceService
+            CompanyWorkforceService workforceService,
+            PlayerCompanyStockNewsBridgeService stockNewsBridgeService
     ) {
         this.eventRepository = eventRepository;
         this.newsRepository = newsRepository;
         this.competitorRepository = competitorRepository;
         this.departmentRepository = departmentRepository;
         this.workforceService = workforceService;
+        this.stockNewsBridgeService = stockNewsBridgeService;
     }
 
     @Transactional
@@ -219,7 +222,7 @@ public class CompanyExternalEventService {
                 " 기업별 대응에 따라 실적 차이가 벌어질 수 있다.",
                 " 현재 사업계획의 비용과 수요 가정을 다시 확인할 필요가 있다."
         };
-        newsRepository.save(new CompanyNewsArticle(
+        CompanyNewsArticle article = newsRepository.save(new CompanyNewsArticle(
                 company,
                 event.getEventKey(),
                 newsCategory(spec.category()),
@@ -229,6 +232,12 @@ public class CompanyExternalEventService {
                 source(spec.category()),
                 event.getStartMarketMonth()
         ));
+        stockNewsBridgeService.publish(
+                article,
+                positiveImpact(spec.key()) ? StockNewsDirection.POSITIVE : StockNewsDirection.NEGATIVE,
+                stockPriceImpact(spec.category()),
+                1
+        );
     }
 
     String analyzedImpactText(PlayerCompany company, String key) {
@@ -315,6 +324,16 @@ public class CompanyExternalEventService {
             case INFRASTRUCTURE -> "인프라리포트";
             case REGULATION -> "정책브리핑";
             case ENTERPRISE_DEMAND -> "기업수요조사";
+        };
+    }
+
+    private int stockPriceImpact(CompanyExternalEventCategory category) {
+        return switch (category) {
+            case AI_MARKET -> 60;
+            case COMPETITOR -> 70;
+            case INFRASTRUCTURE -> 60;
+            case REGULATION -> 70;
+            case ENTERPRISE_DEMAND -> 70;
         };
     }
 

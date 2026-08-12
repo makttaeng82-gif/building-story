@@ -13,7 +13,7 @@ package com.game.buildingstory.domain;
 public enum CompanyGrowthStage {
     FOUNDED("설립기업", 0, 0, 2, 2, 35, 15, 8, 1.00,
             CompanyCustomerContractType.TRIAL, false, false, "초기 기업 운영"),
-    GROWTH("성장기업", 100_000_000_000L, 2_000_000L, 5, 3, 22, 10, 12, 1.15,
+    GROWTH("성장기업", 15_000_000_000L, 750_000L, 5, 3, 22, 10, 12, 1.15,
             CompanyCustomerContractType.NORMAL, true, false,
             "프로 요금제 · 일반계약 · 업무 슬롯 3개 · 성장기업 인재"),
     LARGE("대기업", 1_000_000_000_000L, 15_000_000L, 10, 4, 15, 8, 20, 1.35,

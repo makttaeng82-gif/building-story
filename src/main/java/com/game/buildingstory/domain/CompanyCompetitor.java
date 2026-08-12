@@ -79,6 +79,7 @@ public class CompanyCompetitor {
     /** 경쟁사는 분기마다 유형에 맞는 집계 지표만 성장시킨다. */
     public void advanceQuarter() {
         double benchmarkRate;
+        int benchmarkTarget;
         int completenessGrowth;
         int stabilityGrowth;
         int securityGrowth;
@@ -87,6 +88,7 @@ public class CompanyCompetitor {
         switch (competitorKey) {
             case "frontier" -> {
                 benchmarkRate = 0.08;
+                benchmarkTarget = 2_600;
                 completenessGrowth = 1;
                 stabilityGrowth = 1;
                 securityGrowth = 1;
@@ -95,6 +97,7 @@ public class CompanyCompetitor {
             }
             case "popular" -> {
                 benchmarkRate = 0.05;
+                benchmarkTarget = 2_200;
                 completenessGrowth = 3;
                 stabilityGrowth = 1;
                 securityGrowth = 1;
@@ -103,6 +106,7 @@ public class CompanyCompetitor {
             }
             default -> {
                 benchmarkRate = 0.06;
+                benchmarkTarget = 2_400;
                 completenessGrowth = 1;
                 stabilityGrowth = 3;
                 securityGrowth = 4;
@@ -110,8 +114,11 @@ public class CompanyCompetitor {
                 marketingGrowth = 2;
             }
         }
-        double slowdown = benchmark > 2_500 ? 0.4 : benchmark > 1_800 ? 0.7 : 1.0;
-        benchmark += Math.max(1, (int) Math.round(benchmark * benchmarkRate * slowdown));
+        if (benchmark < benchmarkTarget) {
+            double remainingRatio = (benchmarkTarget - benchmark) / (double) benchmarkTarget;
+            int growth = Math.max(1, (int) Math.round(benchmark * benchmarkRate * remainingRatio));
+            benchmark = Math.min(benchmarkTarget, benchmark + growth);
+        }
         completeness = Math.min(100, completeness + completenessGrowth);
         stability = Math.min(100, stability + stabilityGrowth);
         security = Math.min(100, security + securityGrowth);

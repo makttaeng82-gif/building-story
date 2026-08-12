@@ -33,4 +33,16 @@ class StockMarketIndexCalculatorTests {
 
         assertThat(calculator.calculate(catalog.all(), raisedPrices)).isEqualTo(110_000L);
     }
+
+    @Test
+    void addingAConstituentWithoutAPriceChangeDoesNotMoveTheLinkedIndex() {
+        StockSpec newListing = catalog.all().get(15);
+        var constituents = new java.util.ArrayList<>(catalog.initial());
+        constituents.add(newListing);
+        Map<String, Long> unchangedPrices = constituents.stream()
+                .collect(java.util.stream.Collectors.toMap(StockSpec::key, StockSpec::basePrice));
+
+        assertThat(calculator.chainLinked(123_456L, constituents, unchangedPrices, unchangedPrices))
+                .isEqualTo(123_456L);
+    }
 }

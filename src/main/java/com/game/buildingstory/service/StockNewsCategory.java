@@ -4,7 +4,8 @@ package com.game.buildingstory.service;
 public enum StockNewsCategory {
     MARKET("market", "시장"),
     INDUSTRY("industry", "업종"),
-    COMPANY("company", "기업");
+    COMPANY("company", "기업"),
+    IPO("ipo", "IPO");
 
     private final String cssClass;
     private final String label;

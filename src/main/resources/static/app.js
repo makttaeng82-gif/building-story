@@ -385,6 +385,7 @@ function setupStockChart() {
     const indexLine = chart.querySelector(".chart-index-line");
     const shortAverageLine = chart.querySelector(".chart-average-short");
     const longAverageLine = chart.querySelector(".chart-average-long");
+    const hoverBand = chart.querySelector(".chart-hover-band");
     const gridLayer = chart.querySelector(".chart-grid-layer");
     const axisLayer = chart.querySelector(".chart-axis-layer");
     const dateAxisLayer = chart.querySelector(".chart-date-axis-layer");
@@ -414,6 +415,8 @@ function setupStockChart() {
     const enabled = new Set(["events"]);
     let visiblePoints = [];
     let currentScale = { min: 0, max: 1 };
+    let visibleSpacing = 0;
+    let selectedCandle = null;
 
     try {
         const savedPeriod = window.localStorage.getItem(STOCK_CHART_PERIOD_KEY);
@@ -611,6 +614,20 @@ function setupStockChart() {
         newsItem?.click();
     }
 
+    function selectCandle(point) {
+        selectedCandle?.element.classList.remove("chart-candle-selected");
+        selectedCandle = point || null;
+        selectedCandle?.element.classList.add("chart-candle-selected");
+        if (!hoverBand || !point) {
+            setSvgHidden(hoverBand, true);
+            return;
+        }
+        const width = Math.max(10, Math.min(34, visibleSpacing * 0.86));
+        hoverBand.setAttribute("x", (point.x - width / 2).toFixed(1));
+        hoverBand.setAttribute("width", width.toFixed(1));
+        setSvgHidden(hoverBand, false);
+    }
+
     function drawEvents() {
         eventLayer.replaceChildren();
         if (!enabled.has("events")) return;
@@ -620,27 +637,35 @@ function setupStockChart() {
             if (point.newsCount > 0) eventCodes.push("N");
             if (point.earnings) eventCodes.push("E");
             if (point.dividend) eventCodes.push("D");
-            eventCodes.forEach((code, index) => {
-                const marker = document.createElementNS(namespace, "g");
-                marker.classList.add("chart-event-marker");
-                marker.setAttribute("transform", `translate(${point.x + (index - (eventCodes.length - 1) / 2) * 14},${Math.max(16, point.highY - 13)})`);
-                const circle = document.createElementNS(namespace, "circle");
-                circle.setAttribute("r", "6");
-                const text = document.createElementNS(namespace, "text");
-                text.setAttribute("y", "3");
-                text.textContent = code;
-                const title = document.createElementNS(namespace, "title");
-                title.textContent = code === "N" ? point.newsTitle || "뉴스"
-                        : code === "E" ? "분기 실적 발표" : "배당 지급";
-                marker.append(title, circle, text);
-                marker.addEventListener("mouseenter", () => updateInspector(point));
-                marker.addEventListener("click", (event) => {
-                    event.stopPropagation();
-                    updateInspector(point);
-                    if (code === "N") openLinkedNews(point.newsId);
-                });
-                eventLayer.append(marker);
+            if (eventCodes.length === 0) return;
+            const primaryCode = eventCodes[0];
+            const marker = document.createElementNS(namespace, "g");
+            marker.classList.add("chart-event-marker", `chart-event-${primaryCode.toLowerCase()}`);
+            if (eventCodes.length > 1) marker.classList.add("chart-event-multiple");
+            marker.setAttribute("transform", `translate(${point.x},${Math.max(16, point.highY - 13)})`);
+            const circle = document.createElementNS(namespace, "circle");
+            circle.setAttribute("r", eventCodes.length > 1 ? "7" : "6");
+            const text = document.createElementNS(namespace, "text");
+            text.setAttribute("y", "3");
+            text.textContent = eventCodes.length > 1 ? `${primaryCode}·${eventCodes.length}` : primaryCode;
+            const title = document.createElementNS(namespace, "title");
+            const descriptions = [];
+            if (point.newsCount > 0) descriptions.push(point.newsTitle || `뉴스 ${point.newsCount}건`);
+            if (point.earnings) descriptions.push("분기 실적 발표");
+            if (point.dividend) descriptions.push("배당 지급");
+            title.textContent = descriptions.join(" · ");
+            marker.append(title, circle, text);
+            marker.addEventListener("mouseenter", () => {
+                selectCandle(point);
+                updateInspector(point);
             });
+            marker.addEventListener("click", (event) => {
+                event.stopPropagation();
+                selectCandle(point);
+                updateInspector(point);
+                if (point.newsCount > 0) openLinkedNews(point.newsId);
+            });
+            eventLayer.append(marker);
         });
     }
 
@@ -733,14 +758,14 @@ function setupStockChart() {
         const { min, max } = currentScale;
         averageValues(selection.calculationPoints, 5);
         averageValues(selection.calculationPoints, 20);
-        const spacing = visiblePoints.length <= 1 ? 0 : 630 / (visiblePoints.length - 1);
-        const candleWidth = Math.max(2, Math.min(8, spacing * 0.55));
+        visibleSpacing = visiblePoints.length <= 1 ? 0 : 630 / (visiblePoints.length - 1);
+        const candleWidth = Math.max(2, Math.min(8, visibleSpacing * 0.55));
         const visibleElements = new Set(visiblePoints.map((point) => point.element));
         points.forEach((point) => point.element.classList.toggle("chart-candle-hidden", !visibleElements.has(point.element)));
         visiblePoints.forEach((point, index) => {
             point.element.classList.toggle("candle-up", point.close >= point.open);
             point.element.classList.toggle("candle-down", point.close < point.open);
-            point.x = 36 + spacing * index;
+            point.x = 36 + visibleSpacing * index;
             point.highY = chartY(point.high, min, max);
             const lowY = chartY(point.low, min, max);
             const openY = chartY(point.open, min, max);
@@ -829,8 +854,14 @@ function setupStockChart() {
             const saved = JSON.parse(window.sessionStorage.getItem(STOCK_CHART_LATEST_CANDLE_KEY) || "{}");
             const previousDay = Number(saved[stockKey]);
             if (previousDay > 0 && latest.elapsedDays > previousDay) {
+                chart.classList.add("chart-candles-shift");
                 latest.element.classList.add("chart-candle-new");
-                window.setTimeout(() => latest.element.classList.remove("chart-candle-new"), 320);
+                currentPriceLabel.classList.add("chart-price-updated");
+                window.setTimeout(() => {
+                    chart.classList.remove("chart-candles-shift");
+                    latest.element.classList.remove("chart-candle-new");
+                    currentPriceLabel.classList.remove("chart-price-updated");
+                }, 440);
             }
             saved[stockKey] = latest.elapsedDays;
             window.sessionStorage.setItem(STOCK_CHART_LATEST_CANDLE_KEY, JSON.stringify(saved));
@@ -865,6 +896,7 @@ function setupStockChart() {
         const pointerY = Math.max(24, Math.min(244, (event.clientY - bounds.top) * 300 / Math.max(1, bounds.height)));
         const nearest = visiblePoints.reduce((best, point) =>
             Math.abs(point.x - chartX) < Math.abs(best.x - chartX) ? point : best, visiblePoints[0]);
+        selectCandle(nearest);
         updateInspector(nearest);
         setSvgHidden(crosshairX, false);
         setSvgHidden(crosshairY, false);
@@ -883,6 +915,7 @@ function setupStockChart() {
         crosshairDate.textContent = nearest.date;
     });
     chart.addEventListener("mouseleave", () => {
+        selectCandle(null);
         setSvgHidden(crosshairX, true);
         setSvgHidden(crosshairY, true);
         setSvgHidden(crosshairPriceBackground, true);
@@ -938,6 +971,78 @@ function setupStockAccountDialog() {
 }
 
 setupStockAccountDialog();
+
+function setupStockIpoDialog() {
+    const dialog = document.querySelector("[data-stock-ipo-dialog]");
+    const openButton = document.querySelector("[data-stock-ipo-open]");
+    if (!dialog || !openButton) {
+        return;
+    }
+    const closeButtons = dialog.querySelectorAll("[data-stock-ipo-close]");
+    const quantityInput = dialog.querySelector("[data-stock-ipo-quantity]");
+    const offerPrice = Number(dialog.dataset.offerPrice) || 0;
+    const allocationPercent = Number(dialog.dataset.allocationPercent) || 0;
+    const fee = Number(dialog.dataset.subscriptionFee) || 0;
+    const maximum = Number(quantityInput?.max) || 0;
+
+    const updatePreview = () => {
+        if (!quantityInput) return;
+        const quantity = Math.max(1, Math.min(maximum, Number(quantityInput.value) || 1));
+        quantityInput.value = String(quantity);
+        const allocated = Math.max(1, Math.floor(quantity * allocationPercent / 100));
+        const reserved = quantity * offerPrice + fee;
+        const refund = (quantity - allocated) * offerPrice;
+        dialog.querySelector("[data-stock-ipo-reserved]").textContent = formatStockAmount(reserved, "원");
+        dialog.querySelector("[data-stock-ipo-allocation]").textContent = `${allocated.toLocaleString("ko-KR")}주`;
+        dialog.querySelector("[data-stock-ipo-refund]").textContent = formatStockAmount(refund, "원");
+    };
+
+    openButton.addEventListener("click", () => {
+        dialog.showModal();
+        updatePreview();
+        syncGamePauseState();
+    });
+    closeButtons.forEach((button) => button.addEventListener("click", () => dialog.close()));
+    dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", syncGamePauseState);
+    quantityInput?.addEventListener("input", updatePreview);
+    dialog.querySelectorAll("[data-stock-ipo-percent]").forEach((button) => {
+        button.addEventListener("click", () => {
+            quantityInput.value = String(Math.max(1, Math.floor(maximum * Number(button.dataset.stockIpoPercent) / 100)));
+            updatePreview();
+        });
+    });
+}
+
+setupStockIpoDialog();
+
+function setupStockIpoResultDialog() {
+    const dialog = document.querySelector("[data-stock-ipo-result-dialog]");
+    if (!dialog) {
+        return;
+    }
+    let acknowledged = false;
+    const closeResult = () => {
+        if (!acknowledged && dialog.dataset.resultReadUrl) {
+            acknowledged = true;
+            fetch(dialog.dataset.resultReadUrl, { method: "POST" }).catch(() => {});
+        }
+        dialog.close();
+    };
+    dialog.querySelectorAll("[data-stock-ipo-result-close]").forEach((button) => {
+        button.addEventListener("click", closeResult);
+    });
+    dialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeResult();
+    });
+    dialog.showModal();
+    syncGamePauseState();
+}
+
+setupStockIpoResultDialog();
 
 function setupStockNewsPanel() {
     const panel = document.querySelector("[data-stock-news-panel]");
@@ -1492,6 +1597,8 @@ function shouldKeepGamePaused() {
         || !!document.querySelector(".gift-select-popover:not([hidden])")
         || !!document.querySelector("[data-stock-account-dialog][open]")
         || !!document.querySelector("[data-stock-news-dialog][open]")
+        || !!document.querySelector("[data-stock-ipo-dialog][open]")
+        || !!document.querySelector("[data-stock-ipo-result-dialog][open]")
         || !!document.querySelector("[data-company-news-dialog][open]")
         || !!document.querySelector("[data-company-report-dialog][open]")
         || !!document.querySelector("[data-company-command-dialog][open]");
@@ -1946,10 +2053,50 @@ function setupCompanyCommandConfirmation() {
     const confirmedForms = new WeakSet();
     const title = dialog.querySelector("[data-company-command-title]");
     const messageText = dialog.querySelector("[data-company-command-message]");
+    const commandName = dialog.querySelector("[data-company-command-name]");
+    const periodText = dialog.querySelector("[data-company-command-period]");
+    const costText = dialog.querySelector("[data-company-command-cost]");
+    const monthlyCostText = dialog.querySelector("[data-company-command-monthly-cost]");
+    const departmentsText = dialog.querySelector("[data-company-command-departments]");
+    const riskText = dialog.querySelector("[data-company-command-risk]");
     const confirmButton = dialog.querySelector("[data-company-command-confirm]");
     const cancelButtons = dialog.querySelectorAll("[data-company-command-cancel]");
     let pendingForm = null;
     let pendingSubmitter = null;
+
+    const normalizedText = (value) => (value || "").replace(/\s+/g, " ").trim();
+    const matchingSummary = (source, pattern, fallback) => {
+        const match = source.match(pattern);
+        return match ? normalizedText(match[0]) : fallback;
+    };
+    const commandContext = (form) => {
+        const container = form.closest("li, article, section") || form.parentElement;
+        return normalizedText(container ? container.textContent : "");
+    };
+    const renderCommandSummary = (form, submitter, message) => {
+        const context = commandContext(form);
+        const departmentNames = ["AI개발팀", "영업마케팅팀", "서비스운영팀", "인사조직팀", "전략재무팀"]
+            .filter((name) => context.includes(name));
+        commandName.textContent = normalizedText(submitter?.textContent) || "기업 명령";
+        periodText.textContent = form.dataset.companyPeriod
+            || matchingSummary(context, /(?:기간|기한)[^·|]{0,20}\d+개월|\d+개월(?:간| 동안)?/, "별도 표기 없음");
+        const budgetDevelopment = form.closest("[data-company-budget-policy]")
+            ?.querySelector("[data-company-development-cost-preview]")?.textContent;
+        const budgetMarketing = form.closest("[data-company-budget-policy]")
+            ?.querySelector("[data-company-marketing-cost-preview]")?.textContent;
+        const selectedCloudPlan = form.matches('[action="/companies/infrastructure/cloud-plan"]')
+            ? form.querySelector('select[name="plan"] option:checked')?.textContent : "";
+        costText.textContent = form.dataset.companyCost
+            || matchingSummary(context, /(?:착공금|계약금|수행비용|교육비|보너스|원금|비용)[^·|]{0,30}[0-9,]+(?:(?:조|억|만)[0-9,]*)*원/, "별도 표기 없음");
+        monthlyCostText.textContent = form.dataset.companyMonthlyCost
+            || (budgetDevelopment && budgetMarketing
+                ? `개발비 ${normalizedText(budgetDevelopment)} · 마케팅비 ${normalizedText(budgetMarketing)}`
+                : normalizedText(selectedCloudPlan))
+            || matchingSummary(context, /(?:월 비용|월 운영비|월 이자|월 이용료|월급|연봉)[^·|]{0,30}[0-9,]+(?:(?:조|억|만)[0-9,]*)*원/, "별도 표기 없음");
+        departmentsText.textContent = form.dataset.companyDepartments
+            || (departmentNames.length ? departmentNames.join(" · ") : "별도 표기 없음");
+        riskText.textContent = form.dataset.companyRisk || message;
+    };
 
     const closeDialog = () => {
         pendingForm = null;
@@ -2009,6 +2156,7 @@ function setupCompanyCommandConfirmation() {
                 ? "서비스 장애 대응을 확정합니까?"
                 : "기업 명령을 실행합니까?";
             messageText.textContent = message;
+            renderCommandSummary(form, pendingSubmitter, message);
             dialog.showModal();
             syncGamePauseState();
             confirmButton.focus();

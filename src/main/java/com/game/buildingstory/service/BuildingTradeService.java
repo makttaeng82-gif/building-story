@@ -120,6 +120,7 @@ public class BuildingTradeService {
             return "현금 부족";
         }
         OwnedBuilding purchasedBuilding = ownedBuildingRepository.save(new OwnedBuilding(player, offer));
+        scheduleCompanyProposalIfFinalSeoulBuilding(player, purchasedBuilding);
         if (loanPurchase) {
             loanRepository.save(new Loan(player, purchasedBuilding, loanAmount));
         }
@@ -136,6 +137,12 @@ public class BuildingTradeService {
         startPurchaseCooldown(player, offer);
         secretaryTenantEventService.tryActivateIntro(player, purchasedBuilding);
         return loanPurchase ? "대출구매 완료" : "현금구매 완료";
+    }
+
+    private void scheduleCompanyProposalIfFinalSeoulBuilding(Player player, OwnedBuilding building) {
+        if ("서울".equals(building.getCity()) && Integer.valueOf(4).equals(building.getBuildingSlot())) {
+            player.scheduleCompanyUnlock(player.getElapsedDays() + CompanyAccessService.PROPOSAL_DELAY_DAYS);
+        }
     }
 
     public String sellBuilding(long playerId, long buildingId) {

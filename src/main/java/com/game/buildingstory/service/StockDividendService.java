@@ -42,7 +42,11 @@ public class StockDividendService {
         StockSpec stock = stockCatalog.find(company.getStockKey()).orElseThrow();
         StockPriceHistory latestPrice = priceHistoryRepository
                 .findFirstByPlayerAndStockKeyOrderByElapsedDaysDescIdDesc(player, company.getStockKey())
-                .orElseThrow();
+                .orElse(null);
+        // 상장 전 후보 기업도 재무 결산은 수행하지만 아직 거래가격과 개인 보유주식은 존재하지 않는다.
+        if (latestPrice == null) {
+            return 0;
+        }
         latestPrice.applyDividendExDate(dividendPerShare);
         stockLiquidityService.rebase(player, company.getStockKey());
 

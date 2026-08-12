@@ -57,6 +57,10 @@ public record StockQuoteView(
         String maxPriceText,
         String currentPriceY,
         String currentChartPriceText,
-        StockCompanyDetailView companyDetail
+        StockCompanyDetailView companyDetail,
+        String listingDateText,
+        String offerPriceText,
+        String founderSharesText,
+        String founderMarketValueText
 ) {
 }

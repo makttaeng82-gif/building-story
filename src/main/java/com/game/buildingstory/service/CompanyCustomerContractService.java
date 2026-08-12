@@ -63,6 +63,7 @@ public class CompanyCustomerContractService {
     private final CompanyWorkforceService workforceService;
     private final CompanyGrowthService growthService;
     private final CompanyExternalEventService externalEventService;
+    private final CompanyListingBenefitService listingBenefitService;
 
     public CompanyCustomerContractService(
             PlayerRepository playerRepository,
@@ -73,7 +74,8 @@ public class CompanyCustomerContractService {
             CompanyMonthlySettlementRepository settlementRepository,
             CompanyWorkforceService workforceService,
             CompanyGrowthService growthService,
-            CompanyExternalEventService externalEventService
+            CompanyExternalEventService externalEventService,
+            CompanyListingBenefitService listingBenefitService
     ) {
         this.playerRepository = playerRepository;
         this.companyRepository = companyRepository;
@@ -84,6 +86,7 @@ public class CompanyCustomerContractService {
         this.workforceService = workforceService;
         this.growthService = growthService;
         this.externalEventService = externalEventService;
+        this.listingBenefitService = listingBenefitService;
     }
 
     @Transactional
@@ -107,6 +110,12 @@ public class CompanyCustomerContractService {
         }
         if (company.getActiveMajorWorkCount() + 2 > workforceService.companyMajorWorkSlotLimit(company)) {
             return "회사 주요 업무 슬롯 2개가 필요함";
+        }
+        if (workforceService.departmentLoad(company, CompanyDepartmentType.AI_DEVELOPMENT)
+                .availableSlots() <= 0
+                || workforceService.departmentLoad(company, CompanyDepartmentType.SERVICE_OPERATIONS)
+                .availableSlots() <= 0) {
+            return "AI개발팀과 서비스운영팀의 주요 업무 슬롯이 필요함";
         }
 
         int developmentWork = availableMonthlyWork(
@@ -360,6 +369,10 @@ public class CompanyCustomerContractService {
                 && meetsRequirements(company, contract)
                 && activeContractCount(company) < contractLimit(company)
                 && company.getActiveMajorWorkCount() + 2 <= workforceService.companyMajorWorkSlotLimit(company)
+                && workforceService.departmentLoad(company, CompanyDepartmentType.AI_DEVELOPMENT)
+                .availableSlots() > 0
+                && workforceService.departmentLoad(company, CompanyDepartmentType.SERVICE_OPERATIONS)
+                .availableSlots() > 0
                 && availableMonthlyWork(
                         company, CompanyDepartmentType.AI_DEVELOPMENT,
                         requiredMonthlyAssignment(
@@ -421,6 +434,7 @@ public class CompanyCustomerContractService {
         int totalWork = contractType.getTotalWork();
         int developmentWork = totalWork * 70 / 100;
         int operationsWork = totalWork - developmentWork;
+        ContractRequirements requirements = contractRequirements(company, contractType);
         contractRepository.save(new CompanyCustomerContract(
                 company,
                 item.key(),
@@ -428,9 +442,9 @@ public class CompanyCustomerContractService {
                 item.projectName(),
                 contractType,
                 company.getMarketMonthsProcessed(),
-                requiredBenchmark(company, contractType),
-                requiredStability(company, contractType),
-                requiredSecurity(company, contractType),
+                requirements.benchmark(),
+                requirements.stability(),
+                requirements.security(),
                 developmentWork,
                 operationsWork,
                 constructionFee,
@@ -541,6 +555,18 @@ public class CompanyCustomerContractService {
         return Math.min(100, base + externalEventService.contractSecurityRequirementBonus(company));
     }
 
+    ContractRequirements contractRequirements(
+            PlayerCompany company,
+            CompanyCustomerContractType type
+    ) {
+        var reduction = listingBenefitService.contractRequirementReduction(company, type);
+        return new ContractRequirements(
+                Math.max(1, requiredBenchmark(company, type) - reduction.benchmark()),
+                Math.max(1, requiredStability(company, type) - reduction.stability()),
+                Math.max(1, requiredSecurity(company, type) - reduction.security())
+        );
+    }
+
     private boolean slaViolation(
             PlayerCompany company,
             CompanyCustomerContract contract,
@@ -594,6 +620,9 @@ public class CompanyCustomerContractService {
     }
 
     private record ContractCatalogItem(String key, String clientName, String projectName) {
+    }
+
+    record ContractRequirements(int benchmark, int stability, int security) {
     }
 
     public record MonthlyFinancials(long revenue, long cost) {

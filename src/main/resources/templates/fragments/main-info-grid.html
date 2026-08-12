@@ -46,7 +46,7 @@
         </div>
         <ul class="event-list record-list" th:if="${!records.isEmpty()}">
             <li th:each="record : ${records}">
-                <b th:text="${record.month} + '월 ' + ${record.day} + '일'">1월 1일</b>
+                <b th:text="${record.dateText}">1년 1월 1일</b>
                 <span th:text="${record.title}">기록</span>
                 <span th:if="${record.buildingName != null}" th:text="' · ' + ${record.buildingName}">건물</span>
                 <span th:if="${record.amount != null}"
@@ -172,7 +172,6 @@
         </details>
     </section>
 
-    <article th:replace="~{fragments/main-test-panel :: testPanel}"></article>
 </section>
 </body>
 </html>

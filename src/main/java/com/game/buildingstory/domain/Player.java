@@ -94,6 +94,10 @@ public class Player {
     private Integer stockUnlockAvailableDay;
     private Boolean stockContentUnlocked = false;
     private Boolean stockUnlockNoticeShown = false;
+    // 서울 최종 건물 구매일을 기준으로 기업 설립 제안 시점과 수락 여부를 보존한다.
+    private Integer companyUnlockAvailableDay;
+    private Boolean companyContentUnlocked = false;
+    private Boolean companyUnlockNoticeShown = false;
     // 주식 업종 뉴스 이벤트 예약/활성 상태다. activeStockNewsRefreshesLeft는 앞으로 몇 번의 주가 갱신에 효과가 남았는지다.
     private Integer stockNewsScheduleMonth;
     private Integer stockNewsScheduleCycle;
@@ -265,6 +269,14 @@ public class Player {
         return elapsedDays == null ? 1 : elapsedDays;
     }
 
+    public int getYear() {
+        return GameCalendar.year(getElapsedDays());
+    }
+
+    public String getCurrentDateText() {
+        return GameCalendar.dateText(getElapsedDays());
+    }
+
     public int getNextOfferRefreshDay() {
         return nextOfferRefreshDay == null ? getElapsedDays() + 5 : nextOfferRefreshDay;
     }
@@ -431,16 +443,7 @@ public class Player {
     }
 
     public String dateTextAfterDays(int days) {
-        int targetMonth = month;
-        int targetDay = day + Math.max(0, days);
-        while (targetDay > daysInMonth(targetMonth)) {
-            targetDay -= daysInMonth(targetMonth);
-            targetMonth++;
-            if (targetMonth > 12) {
-                targetMonth = 1;
-            }
-        }
-        return targetMonth + "월 " + targetDay + "일";
+        return GameCalendar.dateText(getElapsedDays() + Math.max(0, days));
     }
 
     public String ddayText(int days) {
@@ -588,6 +591,10 @@ public class Player {
         return stockUnlockAvailableDay != null;
     }
 
+    public int getStockUnlockAvailableDay() {
+        return stockUnlockAvailableDay == null ? getElapsedDays() : stockUnlockAvailableDay;
+    }
+
     public boolean isStockContentUnlocked() {
         return Boolean.TRUE.equals(stockContentUnlocked);
     }
@@ -608,6 +615,44 @@ public class Player {
 
     public void markStockUnlockNoticeShown() {
         stockUnlockNoticeShown = true;
+    }
+
+    public void scheduleCompanyUnlock(int availableDay) {
+        if (companyUnlockAvailableDay == null) {
+            companyUnlockAvailableDay = Math.max(getElapsedDays(), availableDay);
+        }
+    }
+
+    public boolean hasCompanyUnlockSchedule() {
+        return companyUnlockAvailableDay != null;
+    }
+
+    public int companyUnlockDaysLeft() {
+        return companyUnlockAvailableDay == null
+                ? 0
+                : Math.max(0, companyUnlockAvailableDay - getElapsedDays());
+    }
+
+    public boolean isCompanyContentUnlocked() {
+        return Boolean.TRUE.equals(companyContentUnlocked);
+    }
+
+    public boolean isCompanyUnlockNoticeShown() {
+        return Boolean.TRUE.equals(companyUnlockNoticeShown);
+    }
+
+    public boolean isCompanyUnlockDue() {
+        return !isCompanyContentUnlocked()
+                && companyUnlockAvailableDay != null
+                && getElapsedDays() >= companyUnlockAvailableDay;
+    }
+
+    public void unlockCompanyContent() {
+        companyContentUnlocked = true;
+    }
+
+    public void markCompanyUnlockNoticeShown() {
+        companyUnlockNoticeShown = true;
     }
 
     public boolean hasStockNewsScheduleForCurrentMonth() {

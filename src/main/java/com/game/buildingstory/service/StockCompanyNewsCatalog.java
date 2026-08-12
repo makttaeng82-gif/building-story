@@ -16,7 +16,7 @@ import static com.game.buildingstory.service.StockNewsDirection.POSITIVE;
 public class StockCompanyNewsCatalog {
     private final List<StockCompanyNewsDefinition> definitions;
 
-    public StockCompanyNewsCatalog() {
+    public StockCompanyNewsCatalog(StockCatalog stockCatalog) {
         List<CompanyProfile> profiles = List.of(
                 profile("bytecore", "바이트코어", "IT",
                         "데이터센터용 칩 장기 공급계약 협의", "해외 데이터센터 운영사와 기업용 반도체 공급 조건을 협의 중인 것으로 알려졌다.",
@@ -96,6 +96,9 @@ public class StockCompanyNewsCatalog {
         );
         List<StockCompanyNewsDefinition> built = new ArrayList<>();
         profiles.forEach(profile -> built.addAll(events(profile)));
+        stockCatalog.all().stream()
+                .filter(spec -> profiles.stream().noneMatch(profile -> profile.stockKey().equals(spec.key())))
+                .forEach(spec -> built.addAll(genericEvents(spec)));
         this.definitions = List.copyOf(built);
     }
 
@@ -124,6 +127,39 @@ public class StockCompanyNewsCatalog {
                 event(profile, "compliance", "규제품질", NEGATIVE, RUMOR, "업계 제보", 85, 2, 60,
                         new StockCompanyFinancialEffect(-200, 50, -40, 0), supplemental.complianceTitle(), supplemental.complianceLead(),
                         "사실로 확인되면 판매 차질과 점검·보상비용이 다음 분기 실적에 반영될 수 있다.")
+        );
+    }
+
+    /** 신규 상장 후보도 상장 후 기존 기업과 같은 밀도의 고유 사건을 받게 한다. */
+    private List<StockCompanyNewsDefinition> genericEvents(StockSpec spec) {
+        CompanyProfile profile = profile(
+                spec.key(), spec.name(), spec.industry(),
+                "대형 공급 계약 협상", spec.description() + "의 신규 공급 계약 협상이 진행 중인 것으로 알려졌다.",
+                "운영 공정 효율 개선", "자동화와 공정 정비를 통해 기존 운영비 절감 성과를 확인했다고 공시했다.",
+                "핵심 제품 품질 점검설", "일부 핵심 제품의 품질과 납기 일정을 재점검하고 있다는 관측이 나왔다.",
+                "신규 투자 자금 조달 검토", "성장 설비와 연구개발 투자를 위한 차입 확대 가능성이 제기됐다."
+        );
+        return List.of(
+                event(profile, "growth", "수주", POSITIVE, OUTLOOK, "업계 관계자", 90, 2, 70,
+                        new StockCompanyFinancialEffect(450, 0, 0, 0), profile.growthTitle(), profile.growthLead(),
+                        "계약이 확정되면 다음 분기 매출과 생산 가동률 개선에 기여할 전망이다."),
+                event(profile, "efficiency", "생산성", POSITIVE, CONFIRMED, "회사 공시", 65, 3, 100,
+                        new StockCompanyFinancialEffect(0, -80, 0, 0), profile.efficiencyTitle(), profile.efficiencyLead(),
+                        "개선 효과는 다음 분기 영업비용률에 반영될 예정이다."),
+                event(profile, "setback", "운영위험", NEGATIVE, RUMOR, "미확인 제보", 100, 2, 55,
+                        new StockCompanyFinancialEffect(-350, 70, -80, 0), profile.setbackTitle(), profile.setbackLead(),
+                        "사실로 확인되면 매출 지연과 추가 대응 비용이 함께 발생할 수 있다."),
+                event(profile, "finance", "재무", NEGATIVE, OUTLOOK, "금융업계", 75, 2, 65,
+                        new StockCompanyFinancialEffect(-100, 40, -50, 400), profile.financeTitle(), profile.financeLead(),
+                        "투자 여력은 커지지만 이자비용과 부채비율 상승 가능성도 함께 거론된다."),
+                event(profile, "product", "신사업", POSITIVE, OUTLOOK, "산업계", 80, 2, 65,
+                        new StockCompanyFinancialEffect(250, 30, 0, 0), "신규 제품군 출시 준비",
+                        spec.description() + "의 기술을 활용한 신규 제품군을 시험하고 있다.",
+                        "출시가 예정대로 진행되면 신규 매출원이 생기지만 초기 판촉비가 발생한다."),
+                event(profile, "compliance", "규제점검", NEGATIVE, RUMOR, "업계 제보", 85, 2, 60,
+                        new StockCompanyFinancialEffect(-200, 50, -40, 0), "규제기관 자료 제출설",
+                        spec.name() + "이 최근 사업 관련 자료를 규제기관에 제출했다는 관측이 나왔다.",
+                        "정식 조사로 확인되면 판매 지연과 대응 비용이 다음 분기 실적에 반영될 수 있다.")
         );
     }
 

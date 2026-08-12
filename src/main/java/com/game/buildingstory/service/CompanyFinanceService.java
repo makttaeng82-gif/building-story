@@ -5,6 +5,7 @@ import com.game.buildingstory.domain.CompanyBondStatus;
 import com.game.buildingstory.domain.CompanyCashFlowType;
 import com.game.buildingstory.domain.CompanyComputeConstructionStatus;
 import com.game.buildingstory.domain.CompanyCustomerContractStatus;
+import com.game.buildingstory.domain.CompanyGrowthStage;
 import com.game.buildingstory.domain.CompanyMonthlySettlement;
 import com.game.buildingstory.domain.CompanyQuarterlyReport;
 import com.game.buildingstory.domain.CompanyValuationSnapshot;
@@ -17,6 +18,7 @@ import com.game.buildingstory.repo.CompanyCustomerContractRepository;
 import com.game.buildingstory.repo.CompanyQuarterlyReportRepository;
 import com.game.buildingstory.repo.CompanyServiceIncidentRepository;
 import com.game.buildingstory.repo.CompanyValuationSnapshotRepository;
+import com.game.buildingstory.repo.ListedCompanyRepository;
 import com.game.buildingstory.repo.PlayerCompanyRepository;
 import com.game.buildingstory.repo.PlayerRepository;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,10 @@ public class CompanyFinanceService {
     private final CompanyCustomerContractRepository contractRepository;
     private final CompanyServiceIncidentRepository incidentRepository;
     private final CompanyCashLedgerService cashLedgerService;
+    private final PlayerCompanyStockDividendService stockDividendService;
+    private final CompanyNewsService newsService;
+    private final CompanyListingBenefitService listingBenefitService;
+    private final ListedCompanyRepository listedCompanyRepository;
 
     public CompanyFinanceService(
             PlayerRepository playerRepository,
@@ -51,7 +57,11 @@ public class CompanyFinanceService {
             CompanyCompetitorRepository competitorRepository,
             CompanyCustomerContractRepository contractRepository,
             CompanyServiceIncidentRepository incidentRepository,
-            CompanyCashLedgerService cashLedgerService
+            CompanyCashLedgerService cashLedgerService,
+            PlayerCompanyStockDividendService stockDividendService,
+            CompanyNewsService newsService,
+            CompanyListingBenefitService listingBenefitService,
+            ListedCompanyRepository listedCompanyRepository
     ) {
         this.playerRepository = playerRepository;
         this.companyRepository = companyRepository;
@@ -63,6 +73,10 @@ public class CompanyFinanceService {
         this.contractRepository = contractRepository;
         this.incidentRepository = incidentRepository;
         this.cashLedgerService = cashLedgerService;
+        this.stockDividendService = stockDividendService;
+        this.newsService = newsService;
+        this.listingBenefitService = listingBenefitService;
+        this.listedCompanyRepository = listedCompanyRepository;
     }
 
     @Transactional
@@ -132,6 +146,7 @@ public class CompanyFinanceService {
         }
         if (rate == 0) {
             report.decideDividend(0, 0);
+            newsService.recordDividendDecision(company, report);
             return "이번 분기는 무배당으로 결정했습니다.";
         }
         if (report.getNetIncome() <= 0 || company.isOperationsSuspended()
@@ -148,15 +163,20 @@ public class CompanyFinanceService {
             return "필수 운영자금과 예정 투자금을 제외하면 배당 가능 금액이 없습니다.";
         }
         long playerReceipt = multiplyRatio(dividend, company.getPlayerShares(), company.getIssuedShares());
-        cashLedgerService.withdraw(
+        boolean withdrawn = cashLedgerService.withdraw(
                 company,
                 "dividend:" + report.getQuarterSequence(),
                 CompanyCashFlowType.FINANCING,
-                report.getQuarterSequence() + "분기 주주배당",
+                FiscalQuarter.periodText(report, player) + " 주주배당",
                 dividend
         );
+        if (!withdrawn) {
+            return "배당금 지급 처리에 실패했습니다. 거래원장을 확인해 주세요.";
+        }
         player.addCash(playerReceipt);
         report.decideDividend(rate, dividend);
+        stockDividendService.applyExDividend(company, dividend);
+        newsService.recordDividendDecision(company, report);
         return "배당 완료 · 개인 수령액 " + playerReceipt + "원";
     }
 
@@ -186,7 +206,7 @@ public class CompanyFinanceService {
             return "회사채 원금 합계는 최근 기업가치의 10%를 넘을 수 없습니다.";
         }
         int periodIndex = periodIndex(player);
-        long monthlyInterest = issueAmount * 5 / 1000;
+        long monthlyInterest = listingBenefitService.monthlyBondInterest(company, issueAmount);
         CompanyBond bond = bondRepository.save(new CompanyBond(
                 company,
                 issueAmount,
@@ -269,11 +289,11 @@ public class CompanyFinanceService {
 
     @Transactional(readOnly = true)
     public FinanceView view(PlayerCompany company, long essentialMonthlyCost) {
-        var valuation = valuationRepository.findFirstByCompanyOrderByQuarterSequenceDesc(company);
-        var reports = quarterlyRepository.findByCompanyOrderByQuarterSequenceDesc(company);
         PlayerCompany managedCompany = companyRepository.findById(company.getId()).orElseThrow();
+        var valuation = valuationRepository.findFirstByCompanyOrderByQuarterSequenceDesc(managedCompany);
+        var reports = quarterlyRepository.findByCompanyOrderByQuarterSequenceDesc(managedCompany);
         int currentPeriodIndex = periodIndex(managedCompany.getPlayer());
-        var bonds = bondRepository.findByCompanyOrderByIdDesc(company).stream()
+        var bonds = bondRepository.findByCompanyOrderByIdDesc(managedCompany).stream()
                 .map(bond -> new BondView(
                         bond.getId(),
                         bondStatusText(bond.getStatus()),
@@ -282,34 +302,88 @@ public class CompanyFinanceService {
                         Math.max(0, bond.getMaturityPeriodIndex() - currentPeriodIndex),
                         bond.getStatus() == CompanyBondStatus.ACTIVE
                 )).toList();
-        long dividendAvailable = 0;
-        boolean dividendPending = false;
-        if (!reports.isEmpty() && !reports.getFirst().isDividendDecided()) {
-            CompanyQuarterlyReport report = reports.getFirst();
-            dividendPending = report.getNetIncome() > 0 && !company.isOperationsSuspended();
-            long reserve = upcomingConstructionPayment(company) + essentialMonthlyCost * 6;
-            dividendAvailable = Math.min(
-                    Math.max(0, report.getNetIncome() / 2),
-                    Math.max(0, company.getCorporateCash() - reserve));
-        }
+        DividendPolicy dividendPolicy = dividendPolicy(managedCompany, reports, essentialMonthlyCost);
         long enterpriseValue = valuation.map(CompanyValuationSnapshot::getEnterpriseValue).orElse(0L);
-        long remainingBondCapacity = Math.max(0, enterpriseValue * 10 / 100 - outstandingPrincipal(company));
+        long remainingBondCapacity = Math.max(0, enterpriseValue * 10 / 100 - outstandingPrincipal(managedCompany));
         List<BondOption> bondOptions = BOND_ISSUE_OPTIONS.stream().sorted()
-                .map(percent -> bondOption(enterpriseValue, remainingBondCapacity, percent))
+                .map(percent -> bondOption(managedCompany, enterpriseValue, remainingBondCapacity, percent))
                 .toList();
         return new FinanceView(
                 valuation.orElse(null),
-                company.getPlayerOwnershipPercent(),
-                governanceText(company.getPlayerOwnershipPercent()),
-                governanceImpactText(company.getPlayerOwnershipPercent()),
-                governanceWorkSlotPenalty(company),
+                managedCompany.getPlayerOwnershipPercent(),
+                governanceText(managedCompany.getPlayerOwnershipPercent()),
+                governanceImpactText(managedCompany.getPlayerOwnershipPercent()),
+                governanceWorkSlotPenalty(managedCompany),
                 bonds,
-                outstandingPrincipal(company),
+                outstandingPrincipal(managedCompany),
                 remainingBondCapacity,
                 bondOptions,
-                dividendPending,
-                dividendAvailable
+                listingBenefitService.isListed(managedCompany),
+                listingBenefitService.bondMonthlyInterestBasisPoints(managedCompany),
+                dividendPolicy.decisionPending(),
+                dividendPolicy.positiveDividendAvailable(),
+                dividendPolicy.period(),
+                dividendPolicy.status(),
+                dividendPolicy.reason(),
+                dividendPolicy.amountLabel(),
+                dividendPolicy.maximumDividend(),
+                dividendPolicy.options()
         );
+    }
+
+    private DividendPolicy dividendPolicy(
+            PlayerCompany company,
+            List<CompanyQuarterlyReport> reports,
+            long essentialMonthlyCost
+    ) {
+        if (reports.isEmpty()) {
+            return new DividendPolicy(false, false, "첫 분기", "결산 대기",
+                    "확정된 분기 실적이 없어 배당을 결정할 수 없습니다.",
+                    "최대 배당 가능액", 0, List.of());
+        }
+        CompanyQuarterlyReport report = reports.getFirst();
+        String period = FiscalQuarter.periodText(report, company.getPlayer());
+        if (report.isDividendDecided()) {
+            String status = report.getDividendRate() == 0
+                    ? "무배당 결정 완료"
+                    : "배당성향 " + report.getDividendRate() + "% 결정 완료";
+            return new DividendPolicy(false, false, period, status,
+                    "최근 확정 분기의 배당 결정을 완료했습니다.",
+                    "확정 총배당금", report.getDividendAmount(), List.of());
+        }
+
+        long reserve = Math.addExact(upcomingConstructionPayment(company),
+                Math.multiplyExact(essentialMonthlyCost, 6));
+        long distributableCash = Math.max(0, company.getCorporateCash() - reserve);
+        long maximumDividend = Math.min(Math.max(0, report.getNetIncome() / 2), distributableCash);
+        String unavailableReason = null;
+        if (report.getNetIncome() <= 0) {
+            unavailableReason = "최근 확정 분기가 적자이므로 무배당만 선택할 수 있습니다.";
+        } else if (company.isOperationsSuspended()) {
+            unavailableReason = "기업 운영이 중단되어 무배당만 선택할 수 있습니다.";
+        } else if (company.getUnpaidSettlementAmount() > 0) {
+            unavailableReason = "미지급 정산금이 있어 무배당만 선택할 수 있습니다.";
+        } else if (hasMaturedUnpaidBond(company)) {
+            unavailableReason = "만기 미상환 회사채가 있어 무배당만 선택할 수 있습니다.";
+        } else if (maximumDividend <= 0) {
+            unavailableReason = "예정 투자금과 필수 운영비 6개월분을 제외하면 배당 재원이 없습니다.";
+        }
+        boolean positiveAvailable = unavailableReason == null;
+        List<DividendOption> options = DIVIDEND_RATES.stream().sorted()
+                .map(rate -> new DividendOption(
+                        rate,
+                        rate == 0 ? 0 : Math.min(report.getNetIncome() * rate / 100, distributableCash),
+                        rate == 0 || positiveAvailable
+                ))
+                .toList();
+        return new DividendPolicy(true, positiveAvailable, period,
+                positiveAvailable ? "배당 결정 필요" : "배당 제한",
+                positiveAvailable
+                        ? "순이익과 배당 가능 현금 범위에서 배당성향을 선택할 수 있습니다."
+                        : unavailableReason,
+                "최대 배당 가능액",
+                maximumDividend,
+                options);
     }
 
     /** 개인 추가 자금은 최신 주당 기업가치로 플레이어 신주를 발행하는 유상증자로 처리한다. */
@@ -321,6 +395,9 @@ public class CompanyFinanceService {
         long pricePerShare = Math.max(1, referenceValue / Math.max(1, company.getIssuedShares()));
         long newShares = Math.max(1, amount / pricePerShare);
         company.contributeCapital(amount, newShares);
+        listedCompanyRepository.findByPlayerAndStockKey(
+                        company.getPlayer(), CompanyIpoPolicy.PLAYER_COMPANY_STOCK_KEY)
+                .ifPresent(listedCompany -> listedCompany.issueFounderShares(newShares));
         return newShares;
     }
 
@@ -335,9 +412,14 @@ public class CompanyFinanceService {
         return 3;
     }
 
-    private BondOption bondOption(long enterpriseValue, long remainingCapacity, int percent) {
+    private BondOption bondOption(
+            PlayerCompany company,
+            long enterpriseValue,
+            long remainingCapacity,
+            int percent
+    ) {
         long principal = enterpriseValue * percent / 100;
-        return new BondOption(percent, principal, principal * 5 / 1000,
+        return new BondOption(percent, principal, listingBenefitService.monthlyBondInterest(company, principal),
                 principal > 0 && principal <= remainingCapacity);
     }
 
@@ -368,10 +450,39 @@ public class CompanyFinanceService {
         double growth = (report.getRecurringRevenueAtEnd() - previous.getRecurringRevenueAtEnd())
                 * 100.0 / previous.getRecurringRevenueAtEnd();
         if (growth < 0) return 2;
-        if (growth < 10) return 3;
-        if (growth < 25) return 4;
-        if (growth < 50) return 5;
-        return 6;
+        int growthMultiple = growth < 10 ? 3
+                : growth < 25 ? 4
+                : growth < 50 ? 5
+                : 6;
+        return Math.max(growthMultiple, maturityRevenueMultiple(company, report, reports));
+    }
+
+    /** 저성장 성숙기업의 가치가 분기 성장률 하나만으로 급락하지 않도록 지속 가능한 품질을 반영한다. */
+    private int maturityRevenueMultiple(
+            PlayerCompany company,
+            CompanyQuarterlyReport report,
+            List<CompanyQuarterlyReport> reports
+    ) {
+        if (company.getGrowthStage().ordinal() < CompanyGrowthStage.GROWTH.ordinal()) {
+            return 3;
+        }
+        int multiple = 4;
+        if (company.getPrototypeBenchmark() >= 400) {
+            multiple++;
+        }
+        if (report.getPaidUsersAtEnd() >= 1_000_000L) {
+            multiple++;
+        }
+        List<CompanyQuarterlyReport> recentReports = reports.stream()
+                .filter(candidate -> candidate.getQuarterSequence() <= report.getQuarterSequence())
+                .limit(2)
+                .toList();
+        boolean consecutiveProfits = recentReports.size() == 2
+                && recentReports.stream().allMatch(candidate -> candidate.getOperatingProfit() > 0);
+        if (consecutiveProfits) {
+            multiple++;
+        }
+        return multiple;
     }
 
     private int adjustmentBasisPoints(
@@ -473,8 +584,7 @@ public class CompanyFinanceService {
     }
 
     private int periodIndex(Player player) {
-        int gameYear = Math.max(0, player.getElapsedDays() - 1) / 365 + 1;
-        return (gameYear - 1) * 12 + player.getMonth() - 1;
+        return (player.getYear() - 1) * 12 + player.getMonth() - 1;
     }
 
     public record BondObligation(long interest, long principal, List<Long> dueBondIds) {
@@ -493,9 +603,32 @@ public class CompanyFinanceService {
             long outstandingPrincipal,
             long remainingBondCapacity,
             List<BondOption> bondOptions,
+            boolean listedBenefitsActive,
+            int bondMonthlyInterestBasisPoints,
             boolean dividendPending,
-            long maximumDividend
+            boolean positiveDividendAvailable,
+            String dividendPeriod,
+            String dividendStatus,
+            String dividendReason,
+            String dividendAmountLabel,
+            long maximumDividend,
+            List<DividendOption> dividendOptions
     ) {
+    }
+
+    private record DividendPolicy(
+            boolean decisionPending,
+            boolean positiveDividendAvailable,
+            String period,
+            String status,
+            String reason,
+            String amountLabel,
+            long maximumDividend,
+            List<DividendOption> options
+    ) {
+    }
+
+    public record DividendOption(int rate, long expectedAmount, boolean available) {
     }
 
     public record BondView(

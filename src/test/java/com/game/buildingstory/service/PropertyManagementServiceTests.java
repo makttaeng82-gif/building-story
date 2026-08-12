@@ -136,7 +136,7 @@ class PropertyManagementServiceTests {
     }
 
     @Test
-    void handoffRequiresSeoulUnlockAndAllSixSecretaries() {
+    void handoffRequiresCompanyPreparationAndFullyGrownAssignedSecretary() {
         Player player = playerRepository.save(new Player("manager-condition-test", "hash"));
 
         assertThat(propertyManagementService.isFeatureVisible(player)).isFalse();
@@ -147,19 +147,40 @@ class PropertyManagementServiceTests {
         assertThat(propertyManagementService.isFeatureVisible(player)).isTrue();
         assertThat(propertyManagementService.hire(player.getId(), CHEONGJU)).contains("비서 6명 고용 후");
 
-        prepareHandoff(player);
-        assertThat(propertyManagementService.isHandoffReady(player)).isTrue();
+        prepareSecretaries(player);
+        assertThat(propertyManagementService.hire(player.getId(), CHEONGJU)).contains("기업 설립 제안");
+
+        player.unlockCompanyContent();
+        OwnedSecretary secretary = ownedSecretaryRepository.findByPlayerAndSecretaryKey(player, "secretary-1").orElseThrow();
+        secretary.setProficiencyForTest(29);
+        assertThat(propertyManagementService.hire(player.getId(), CHEONGJU)).contains("숙련도와 호감도");
+
+        secretary.setProficiencyForTest(30);
+        assertThat(propertyManagementService.isHandoffReady(player, CHEONGJU)).isTrue();
+        assertThat(propertyManagementService.hire(player.getId(), CHEONGJU)).contains("채용 완료");
     }
 
     private void prepareHandoff(Player player) {
         long cashBefore = player.getCash();
         player.setReputationForTest(1_000_000);
         player.resign();
+        player.unlockCompanyContent();
         player.spendCash(player.getCash() - cashBefore);
+        prepareSecretaries(player);
+    }
+
+    private void prepareSecretaries(Player player) {
         for (int index = 1; index <= 6; index++) {
             String key = "secretary-" + index;
             if (ownedSecretaryRepository.findByPlayerAndSecretaryKey(player, key).isEmpty()) {
-                ownedSecretaryRepository.save(new OwnedSecretary(player, key, 30));
+                OwnedSecretary secretary = new OwnedSecretary(player, key, 30);
+                secretary.addAffinityExperience(10_000);
+                if (index == 1) {
+                    secretary.assignTo(CHEONGJU);
+                } else if (index == 2) {
+                    secretary.assignTo(SEJONG);
+                }
+                ownedSecretaryRepository.save(secretary);
             }
         }
     }

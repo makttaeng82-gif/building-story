@@ -101,10 +101,11 @@ public class CompanyReportingService {
 
     @Transactional(readOnly = true)
     public List<CompanyManagementReportView> reports(PlayerCompany company) {
+        PlayerCompany managedCompany = companyRepository.findById(company.getId()).orElseThrow();
         List<CompanyQuarterlyReport> reports =
-                quarterlyRepository.findByCompanyOrderByQuarterSequenceDesc(company);
+                quarterlyRepository.findByCompanyOrderByQuarterSequenceDesc(managedCompany);
         List<CompanyManagementReportView> result = new ArrayList<>(
-                reports.stream().limit(8).map(report -> view(company, report)).toList());
+                reports.stream().limit(8).map(report -> view(managedCompany, report)).toList());
         Map<Integer, List<CompanyQuarterlyReport>> olderByYear = new LinkedHashMap<>();
         reports.stream().skip(8).forEach(report ->
                 olderByYear.computeIfAbsent(gameYear(report), ignored -> new ArrayList<>()).add(report));
@@ -114,7 +115,7 @@ public class CompanyReportingService {
             if (completeAndRead) {
                 result.add(annualView(year, annualReports));
             } else {
-                annualReports.forEach(report -> result.add(view(company, report)));
+                annualReports.forEach(report -> result.add(view(managedCompany, report)));
             }
         });
         return result;
@@ -203,7 +204,7 @@ public class CompanyReportingService {
         lines.add(line("기말 법인현금", report.getClosingCash(), ""));
         return new CompanyManagementReportView(
                 report.getQuarterSequence(),
-                "기업 " + report.getQuarterSequence() + "분기",
+                FiscalQuarter.periodText(report, company.getPlayer()),
                 signedMoney(report.getOperatingProfit()),
                 signedMoney(cashChange),
                 cause,
@@ -245,7 +246,7 @@ public class CompanyReportingService {
         );
         return new CompanyManagementReportView(
                 -year,
-                "기업 " + year + "년 연간",
+                year + "년 연간",
                 signedMoney(operatingProfit),
                 signedMoney(cashChange),
                 operatingProfit >= 0 ? "연간 영업흑자" : "연간 영업적자",
@@ -255,7 +256,13 @@ public class CompanyReportingService {
     }
 
     private int gameYear(CompanyQuarterlyReport report) {
-        return report.getEndingPeriodIndex() / 12 + 1;
+        if (report.getPublishedElapsedDay() > 0) {
+            return com.game.buildingstory.domain.GameCalendar.year(
+                    Math.min(report.getPublishedElapsedDay(), report.getCompany().getPlayer().getElapsedDays()));
+        }
+        int currentMonthIndex = (report.getCompany().getPlayer().getYear() - 1) * 12
+                + report.getCompany().getPlayer().getMonth() - 1;
+        return Math.min(report.getEndingPeriodIndex(), currentMonthIndex) / 12 + 1;
     }
 
     private String primaryCause(

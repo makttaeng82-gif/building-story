@@ -89,7 +89,6 @@ public class CompanyCashLedgerService {
     }
 
     private int periodIndex(Player player) {
-        int gameYear = Math.max(0, player.getElapsedDays() - 1) / 365 + 1;
-        return (gameYear - 1) * 12 + player.getMonth() - 1;
+        return (player.getYear() - 1) * 12 + player.getMonth() - 1;
     }
 }

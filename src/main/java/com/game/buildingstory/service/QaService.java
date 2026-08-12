@@ -42,7 +42,6 @@ public class QaService {
     private final LuxuryItemCatalog luxuryItemCatalog;
     private final SecretaryTenantEventService secretaryTenantEventService;
     private final SettlementService settlementService;
-    private final CompanyTutorialService companyTutorialService;
 
     public QaService(
             PlayerRepository playerRepository,
@@ -57,8 +56,7 @@ public class QaService {
             SecretaryCatalog secretaryCatalog,
             LuxuryItemCatalog luxuryItemCatalog,
             SecretaryTenantEventService secretaryTenantEventService,
-            SettlementService settlementService,
-            CompanyTutorialService companyTutorialService
+            SettlementService settlementService
     ) {
         this.playerRepository = playerRepository;
         this.ownedBuildingRepository = ownedBuildingRepository;
@@ -73,7 +71,6 @@ public class QaService {
         this.luxuryItemCatalog = luxuryItemCatalog;
         this.secretaryTenantEventService = secretaryTenantEventService;
         this.settlementService = settlementService;
-        this.companyTutorialService = companyTutorialService;
     }
 
     public String addTestCash(long playerId) {
@@ -81,10 +78,6 @@ public class QaService {
         player.addCash(TEST_CASH_AMOUNT);
         playerRepository.save(player);
         return "테스트 현금 1조원 지급";
-    }
-
-    public String skipCompanyCommercialization(long playerId) {
-        return companyTutorialService.skipCommercializationForTest(playerId);
     }
 
     public String updateTestReputation(long playerId, int reputation) {

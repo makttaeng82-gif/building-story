@@ -8,12 +8,16 @@ public class StockLiquidityPolicy {
     private static final int MAX_MARGINAL_IMPACT_BASIS_POINTS = 800;
 
     public long capacity(StockSpec stock) {
+        return capacity(stock, stock.issuedShares());
+    }
+
+    public long capacity(StockSpec stock, long tradableShares) {
         int capacityBasisPoints = switch (stock.riskType()) {
             case SAFE -> 50;
             case NORMAL -> 35;
             case AGGRESSIVE -> 20;
         };
-        return Math.max(1L, stock.issuedShares() * capacityBasisPoints / 10_000L);
+        return Math.max(1L, Math.max(1L, tradableShares) * capacityBasisPoints / 10_000L);
     }
 
     /**

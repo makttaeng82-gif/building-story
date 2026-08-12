@@ -150,6 +150,81 @@ public class StockNewsArticle {
         this.resolved = definition.certainty() == StockNewsCertainty.CONFIRMED;
     }
 
+    /** 실제 플레이어 기업 운영에서 확정된 사건을 상장기업 뉴스로 발행한다. */
+    public StockNewsArticle(
+            Player player,
+            String eventKey,
+            String eventFamily,
+            String industry,
+            String stockKey,
+            String companyName,
+            StockNewsDirection direction,
+            String source,
+            String title,
+            String firstParagraph,
+            String secondParagraph,
+            int signedPriceImpactBasisPoints,
+            int durationRefreshes
+    ) {
+        this.player = player;
+        this.eventKey = eventKey;
+        this.eventFamily = eventFamily;
+        this.category = StockNewsCategory.COMPANY;
+        this.industry = industry;
+        this.stockKey = stockKey;
+        this.companyName = companyName;
+        this.direction = direction;
+        this.certainty = StockNewsCertainty.CONFIRMED;
+        this.source = source;
+        this.title = title;
+        this.firstParagraph = firstParagraph;
+        this.secondParagraph = secondParagraph;
+        this.publishedMonth = player.getMonth();
+        this.publishedDay = player.getDay();
+        this.publishedElapsedDays = player.getElapsedDays();
+        this.priceImpactBasisPoints = signedPriceImpactBasisPoints;
+        this.financialImpactBasisPoints = 0;
+        this.remainingPriceRefreshes = Math.max(0, durationRefreshes);
+        this.resolved = true;
+    }
+
+    /** 거래 전 후보 단계부터 노출되는 신규상장 전용 기사를 만든다. */
+    public static StockNewsArticle ipo(
+            Player player,
+            String eventKey,
+            String industry,
+            String stockKey,
+            String companyName,
+            StockNewsDirection direction,
+            String source,
+            String title,
+            String firstParagraph,
+            String secondParagraph
+    ) {
+        StockNewsArticle article = new StockNewsArticle();
+        article.player = player;
+        article.eventKey = eventKey;
+        article.eventFamily = "npc_ipo:" + stockKey;
+        article.category = StockNewsCategory.IPO;
+        article.industry = industry;
+        article.stockKey = stockKey;
+        article.companyName = companyName;
+        article.direction = direction;
+        article.certainty = StockNewsCertainty.CONFIRMED;
+        article.source = source;
+        article.title = title;
+        article.firstParagraph = firstParagraph;
+        article.secondParagraph = secondParagraph;
+        article.publishedMonth = player.getMonth();
+        article.publishedDay = player.getDay();
+        article.publishedElapsedDays = player.getElapsedDays();
+        article.priceImpactBasisPoints = 0;
+        article.financialImpactBasisPoints = 0;
+        article.remainingPriceRefreshes = 0;
+        article.resolved = true;
+        return article;
+    }
+
     private StockNewsArticle(
             Player player,
             StockNewsArticle original,
@@ -190,7 +265,7 @@ public class StockNewsArticle {
         String target = switch (original.getCategory()) {
             case MARKET -> "전체 시장";
             case INDUSTRY -> original.industry + " 업종";
-            case COMPANY -> original.companyName;
+            case COMPANY, IPO -> original.companyName;
         };
         if (confirmed) {
             return new StockNewsArticle(

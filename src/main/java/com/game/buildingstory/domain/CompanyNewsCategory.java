@@ -7,6 +7,7 @@ public enum CompanyNewsCategory {
     INFRASTRUCTURE("설비"),
     INCIDENT("사건"),
     PERFORMANCE("실적"),
+    FINANCE("재무"),
     AI_MARKET("AI시장"),
     COMPETITOR("경쟁사"),
     REGULATION("규제"),

@@ -10,7 +10,8 @@ import java.util.List;
  */
 public record CompanyExecutiveOfficeView(
         CompanyDashboardView.OperationItem operation,
-        List<DepartmentCommand> commands
+        List<DepartmentCommand> commands,
+        CompanyProfile companyProfile
 ) {
     public record DepartmentCommand(
             String departmentName,
@@ -18,6 +19,24 @@ public record CompanyExecutiveOfficeView(
             String status,
             String tone,
             String recommendation
+    ) {
+    }
+
+    /** 대표실에서 기업 자체 정보와 상장 후 주식 정보를 한 번에 확인하기 위한 화면 값이다. */
+    public record CompanyProfile(
+            String stage,
+            String foundedText,
+            String headquarters,
+            String enterpriseValue,
+            String listingStatus,
+            String currentPrice,
+            String marketCap,
+            String issuedShares,
+            String founderShares,
+            String ownership,
+            String listingDate,
+            String offerPrice,
+            boolean listed
     ) {
     }
 }

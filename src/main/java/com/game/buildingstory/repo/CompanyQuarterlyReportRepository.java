@@ -11,4 +11,10 @@ public interface CompanyQuarterlyReportRepository extends JpaRepository<CompanyQ
     List<CompanyQuarterlyReport> findByCompanyOrderByQuarterSequenceDesc(PlayerCompany company);
     Optional<CompanyQuarterlyReport> findByCompanyAndQuarterSequence(
             PlayerCompany company, int quarterSequence);
+
+    long countByCompanyAndQuarterSequenceGreaterThanAndPublishedElapsedDayLessThanEqual(
+            PlayerCompany company,
+            int quarterSequence,
+            int publishedElapsedDay
+    );
 }

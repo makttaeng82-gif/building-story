@@ -32,6 +32,7 @@ public class CompanyNewsArticle {
     private String title;
     private String source;
     private int occurredMarketMonth;
+    private Integer occurredElapsedDay;
     private Boolean unread;
 
     @jakarta.persistence.Column(length = 2000)
@@ -49,6 +50,20 @@ public class CompanyNewsArticle {
             String source,
             int occurredMarketMonth
     ) {
+        this(company, eventKey, category, title, body, source, occurredMarketMonth,
+                company.getPlayer().getElapsedDays());
+    }
+
+    public CompanyNewsArticle(
+            PlayerCompany company,
+            String eventKey,
+            CompanyNewsCategory category,
+            String title,
+            String body,
+            String source,
+            int occurredMarketMonth,
+            int occurredElapsedDay
+    ) {
         this.company = company;
         this.eventKey = eventKey;
         this.category = category;
@@ -56,6 +71,7 @@ public class CompanyNewsArticle {
         this.body = body;
         this.source = source;
         this.occurredMarketMonth = occurredMarketMonth;
+        this.occurredElapsedDay = occurredElapsedDay;
         this.unread = true;
     }
 
@@ -67,9 +83,41 @@ public class CompanyNewsArticle {
     public String getBody() { return body; }
     public String getSource() { return source; }
     public int getOccurredMarketMonth() { return occurredMarketMonth; }
+    public int getOccurredElapsedDay(
+            int establishedElapsedDay,
+            int currentElapsedDay,
+            int currentMarketMonth
+    ) {
+        if (occurredElapsedDay != null) {
+            return Math.min(currentElapsedDay, occurredElapsedDay);
+        }
+        int monthsAgo = Math.max(0, currentMarketMonth - occurredMarketMonth);
+        int estimatedDay = currentElapsedDay - monthsAgo * 30;
+        return Math.max(establishedElapsedDay, Math.min(currentElapsedDay, estimatedDay));
+    }
     public boolean isUnread() { return Boolean.TRUE.equals(unread); }
 
     public void markRead() {
         unread = false;
+    }
+
+    public void revisePublication(String title, String body, int marketMonth, int elapsedDay) {
+        this.title = title;
+        this.body = body;
+        this.occurredMarketMonth = marketMonth;
+        this.occurredElapsedDay = elapsedDay;
+    }
+
+    public void mergeUpdate(CompanyNewsArticle update) {
+        appendUpdate(update.getBody());
+        unread = isUnread() || update.isUnread();
+    }
+
+    public void appendUpdate(String updateBody) {
+        if (updateBody == null || updateBody.isBlank() || body.contains(updateBody)) {
+            return;
+        }
+        body = body + "\n\n" + updateBody;
+        unread = true;
     }
 }

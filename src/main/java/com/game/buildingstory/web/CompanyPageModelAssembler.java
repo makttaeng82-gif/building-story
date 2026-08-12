@@ -29,6 +29,11 @@ import com.game.buildingstory.service.CompanyDepartmentService;
 import com.game.buildingstory.service.CompanySecretaryService;
 import com.game.buildingstory.service.CompanyOrganizationService;
 import com.game.buildingstory.service.CompanyFinanceService;
+import com.game.buildingstory.service.CompanyIpoOverview;
+import com.game.buildingstory.service.CompanyIpoPolicy;
+import com.game.buildingstory.service.CompanyIpoRequirement;
+import com.game.buildingstory.service.CompanyIpoService;
+import com.game.buildingstory.service.CompanyFoundationEligibilityService;
 import org.springframework.stereotype.Component;
 import org.springframework.ui.Model;
 
@@ -67,6 +72,8 @@ public class CompanyPageModelAssembler {
     private final CompanySecretaryService companySecretaryService;
     private final CompanyOrganizationService companyOrganizationService;
     private final CompanyFinanceService companyFinanceService;
+    private final CompanyIpoService companyIpoService;
+    private final CompanyFoundationEligibilityService foundationEligibilityService;
 
     public CompanyPageModelAssembler(
             GameService gameService,
@@ -87,7 +94,9 @@ public class CompanyPageModelAssembler {
             CompanyDepartmentService companyDepartmentService,
             CompanySecretaryService companySecretaryService,
             CompanyOrganizationService companyOrganizationService,
-            CompanyFinanceService companyFinanceService
+            CompanyFinanceService companyFinanceService,
+            CompanyIpoService companyIpoService,
+            CompanyFoundationEligibilityService foundationEligibilityService
     ) {
         this.gameService = gameService;
         this.playerCompanyService = playerCompanyService;
@@ -108,6 +117,8 @@ public class CompanyPageModelAssembler {
         this.companySecretaryService = companySecretaryService;
         this.companyOrganizationService = companyOrganizationService;
         this.companyFinanceService = companyFinanceService;
+        this.companyIpoService = companyIpoService;
+        this.foundationEligibilityService = foundationEligibilityService;
     }
 
     public void addCompanyPageAttributes(Player player, Model model) {
@@ -139,7 +150,7 @@ public class CompanyPageModelAssembler {
         ));
         model.addAttribute("companyTopMetrics", List.of(
                 metric("최소 출자금", moneyText.format(preparation.minimumInvestment()), "개인 현금에서 이전", ""),
-                metric("관리직원", preparation.propertyManagerCount() + " / 6명", "개발 중 조건 미적용", preparation.propertyManagerCount() >= 6 ? "good" : "warn"),
+                metric("관리직원", preparation.propertyManagerCount() + " / 6명", "6개 도시 인계 필요", preparation.propertyManagerCount() >= 6 ? "good" : "warn"),
                 metric("비서 성장", preparation.readySecretaryCount() + " / 6명", "숙련도·호감도 최대", preparation.readySecretaryCount() >= 6 ? "good" : "warn")
         ));
     }
@@ -152,7 +163,8 @@ public class CompanyPageModelAssembler {
         model.addAttribute("playerCompany", company);
         model.addAttribute("companyTopMetrics", List.of(
                 metric("법인 현금", moneyText.format(company.getCorporateCash()), "교육비 차감 완료", ""),
-                metric("발행 지분", "1,000만주", "플레이어 100%", "good"),
+                metric("발행 지분", shareCountText(company.getIssuedShares()),
+                        String.format("플레이어 %.1f%%", company.getPlayerOwnershipPercent()), "good"),
                 metric("기업 단계", growthStage == null ? "설립 완료" : growthStage.getDisplayName(),
                         operational ? "제품 운영 중" : "상용화 준비",
                         operational ? "good" : "warn")
@@ -172,11 +184,15 @@ public class CompanyPageModelAssembler {
         CompanyDashboardView dashboard = operational
                 ? liveDashboard(player, company, monthlySettlements)
                 : previewDashboard();
+        var financeView = operational
+                ? companyFinanceService.view(company, companySettlementService.essentialMonthlyCost(company))
+                : null;
+        var ipoOverview = operational ? companyIpoService.overview(company) : null;
         model.addAttribute("companyDashboard", dashboard);
         model.addAttribute("companyDepartmentSlots",
                 operational ? departmentSlotUsage(company) : Map.of());
         model.addAttribute("companyExecutiveOffice",
-                operational ? executiveOffice(player, company, dashboard) : null);
+                operational ? executiveOffice(player, company, dashboard, financeView, ipoOverview) : null);
         model.addAttribute("companyWorkforceByKey", operational
                 ? workforceViews(company)
                 : Map.of());
@@ -198,15 +214,14 @@ public class CompanyPageModelAssembler {
         model.addAttribute("companyLatestSettlement", monthlySettlements.isEmpty() ? null : monthlySettlements.getFirst());
         model.addAttribute("companyQuarterlyReports", companySettlementService.quarterlyReports(company));
         model.addAttribute("companyFinance",
-                operational
-                        ? companyFinanceService.view(
-                                company, companySettlementService.essentialMonthlyCost(company))
-                        : null);
+                financeView);
+        model.addAttribute("companyIpo",
+                operational ? ipoView(company, ipoOverview) : null);
         model.addAttribute("companyGrowthProgress",
                 operational
                         ? growthProgress(company)
                         : null);
-        companyReportingModelAssembler.addAttributes(company, operational, model);
+        companyReportingModelAssembler.addAttributes(company, player, operational, model);
         if (operational) {
             var infrastructure = companyInfrastructureService.snapshot(company, player.getElapsedDays());
             model.addAttribute("companyMarket", marketView(companyMarketService.snapshot(company)));
@@ -234,6 +249,152 @@ public class CompanyPageModelAssembler {
                 .orElse("muted"));
         model.addAttribute("companyActiveMajorWorkCount", company.getActiveMajorWorkCount());
         model.addAttribute("companyMajorWorkSlotLimit", companyWorkforceService.companyMajorWorkSlotLimit(company));
+    }
+
+    private String shareCountText(long shares) {
+        if (shares % 10_000 == 0) {
+            return String.format("%,d만주", shares / 10_000);
+        }
+        return String.format("%,d주", shares);
+    }
+
+    private CompanyIpoView ipoView(PlayerCompany company, CompanyIpoOverview overview) {
+        var requirements = new java.util.ArrayList<>(overview.qualification().checks().stream()
+                .map(check -> new CompanyIpoRequirementView(
+                        requirementLabel(check.requirement()),
+                        requirementValue(check.requirement(), check.currentValue()),
+                        requirementTarget(check.requirement(), check.requiredValue()),
+                        check.met()
+                ))
+                .toList());
+        if (!overview.hasApplication()) {
+            requirements.add(new CompanyIpoRequirementView(
+                    "IPO 업무 여력",
+                    overview.workCapacityAvailable() ? "충족" : "부족",
+                    "전사·전략재무 슬롯 필수",
+                    overview.workCapacityAvailable()
+            ));
+        }
+        var options = overview.offerOptions().stream()
+                .map(option -> new CompanyIpoOfferView(
+                        option.percent(),
+                        moneyText.format(option.offerPrice()),
+                        moneyText.format(option.proceeds()),
+                        String.format("%.1f%%", option.playerOwnershipPercent()),
+                        option.newShares(),
+                        option.preservesMinimumOwnership()
+                ))
+                .toList();
+        boolean canApply = !overview.hasApplication()
+                && overview.qualification().canApply()
+                && overview.workCapacityAvailable()
+                && company.getCorporateCash() >= CompanyIpoPolicy.PREPARATION_COST
+                && !company.isOperationsSuspended();
+        return new CompanyIpoView(
+                ipoStatusLabel(overview),
+                ipoStatusTone(overview),
+                requirements,
+                options,
+                overview.selectedOfferPercent(),
+                overview.preparationMonthsCompleted(),
+                CompanyIpoPolicy.PREPARATION_MONTHS,
+                moneyText.format(overview.preparationCost()),
+                canApply,
+                overview.isPreparing() || overview.isReady(),
+                overview.isReady() && overview.qualification().canApply(),
+                overview.isListed(),
+                moneyText.format(overview.confirmedOfferPrice()),
+                moneyText.format(overview.confirmedProceeds()),
+                String.format("%.1f%%", company.getPlayerOwnershipPercent())
+        );
+    }
+
+    private String ipoStatusLabel(CompanyIpoOverview overview) {
+        if (overview.isListed()) return "상장 완료";
+        if (overview.isReady()) return overview.qualification().canApply() ? "상장 확정 가능" : "최종 재심사 대기";
+        if (overview.isPreparing()) return "상장 준비 중";
+        if (overview.status() != null) return "신청 취소";
+        return "신청 전";
+    }
+
+    private String ipoStatusTone(CompanyIpoOverview overview) {
+        if (overview.isListed() || overview.isReady()) return "good";
+        if (overview.isPreparing()) return "warn";
+        return "";
+    }
+
+    private String requirementLabel(CompanyIpoRequirement requirement) {
+        return switch (requirement) {
+            case NO_EXISTING_LISTING -> "기존 IPO 없음";
+            case GROWTH_STAGE -> "기업 단계";
+            case REPORT_HISTORY -> "분기보고 이력";
+            case PROFITABILITY -> "연속 흑자";
+            case RECURRING_REVENUE -> "월 반복매출";
+            case PAID_USERS -> "유료 이용자";
+            case BENCHMARK -> "AI 벤치마크";
+            case EQUITY_VALUE -> "기업가치";
+            case STRATEGY_FINANCE -> "전략재무 전문성";
+            case FINANCIAL_HEALTH -> "재무 건전성";
+            case NO_CRITICAL_INCIDENT -> "치명 장애 없음";
+        };
+    }
+
+    private String requirementValue(CompanyIpoRequirement requirement, long value) {
+        return switch (requirement) {
+            case NO_EXISTING_LISTING, FINANCIAL_HEALTH, NO_CRITICAL_INCIDENT -> value > 0 ? "충족" : "미충족";
+            case GROWTH_STAGE -> CompanyGrowthStage.values()[(int) Math.max(0,
+                    Math.min(value, CompanyGrowthStage.values().length - 1))].getDisplayName();
+            case REPORT_HISTORY, PROFITABILITY -> value + "개 분기";
+            case RECURRING_REVENUE, EQUITY_VALUE -> moneyText.format(value);
+            case PAID_USERS -> formatPeople(value);
+            case BENCHMARK -> value + "점";
+            case STRATEGY_FINANCE -> value + "점";
+        };
+    }
+
+    private String requirementTarget(CompanyIpoRequirement requirement, long value) {
+        return switch (requirement) {
+            case NO_EXISTING_LISTING, FINANCIAL_HEALTH, NO_CRITICAL_INCIDENT -> "필수";
+            case GROWTH_STAGE -> CompanyGrowthStage.values()[(int) value].getDisplayName() + " 이상";
+            default -> requirementValue(requirement, value) + " 이상";
+        };
+    }
+
+    public record CompanyIpoView(
+            String status,
+            String tone,
+            List<CompanyIpoRequirementView> requirements,
+            List<CompanyIpoOfferView> offerOptions,
+            int selectedOfferPercent,
+            int preparationMonthsCompleted,
+            int preparationMonthsRequired,
+            String preparationCost,
+            boolean canApply,
+            boolean canCancel,
+            boolean canConfirm,
+            boolean listed,
+            String confirmedOfferPrice,
+            String confirmedProceeds,
+            String playerOwnership
+    ) {
+    }
+
+    public record CompanyIpoRequirementView(
+            String label,
+            String current,
+            String target,
+            boolean met
+    ) {
+    }
+
+    public record CompanyIpoOfferView(
+            int percent,
+            String offerPrice,
+            String proceeds,
+            String playerOwnership,
+            long newShares,
+            boolean available
+    ) {
     }
 
     private Map<String, String> departmentSlotUsage(PlayerCompany company) {
@@ -548,8 +709,11 @@ public class CompanyPageModelAssembler {
                         "설립 " + Math.max(1, (player.getElapsedDays() - company.getEstablishedElapsedDay()) / 30 + 1) + "개월차", "서울", "플레이어"),
                 List.of(
                         metric("법인현금", moneyText.format(company.getCorporateCash()), company.isOperationsSuspended() ? "현재 잔액 · 운영중단" : "현재 잔액 · 정상 운영", company.isOperationsSuspended() ? "danger" : ""),
-                        metric(latest == null ? "월 반복매출" : "월간매출", moneyText.format(latestRevenue),
-                                latest == null ? "현재값 · 첫 정산 전" : "최근 월 확정", "good"),
+                        metric(latest == null ? "월 반복매출" : "최근 월매출", moneyText.format(latestRevenue),
+                                latest == null
+                                        ? "현재 구독 기준 · 첫 정산 전"
+                                        : "확정값 · 현재 반복매출 " + moneyText.format(company.getMonthlyRecurringRevenue()),
+                                "good"),
                         metric("영업이익",
                                 latest == null ? moneyText.format(latestProfit)
                                         : (latestProfit >= 0 ? "▲ " : "▼ ") + moneyText.format(latestProfit),
@@ -1287,7 +1451,6 @@ public class CompanyPageModelAssembler {
         if (owned.isEmpty()) {
             return secretary("미배치", type.displayName(), spec.imagePath(), "미배치", "효과 없음", "담당 비서를 배치하면 부서 고유 효과가 적용됩니다.");
         }
-        int level = owned.get().getCompanyProficiencyLevel();
         int effectPercent = companySecretaryService.effectPercent(company, type);
         String effect = switch (type) {
             case AI_DEVELOPMENT -> "제품 개발기간 " + effectPercent + "% 감소";
@@ -1297,14 +1460,15 @@ public class CompanyPageModelAssembler {
             case STRATEGY_FINANCE -> "재무 전망 오차 " + effectPercent + "% 감소";
         };
         return secretary(spec.name(), type.displayName(), spec.imagePath(),
-                "기업 숙련도 " + level + "단계 · 경력 " + owned.get().getCompanyCareerMonths() + "개월",
-                effect, "정상 운영 월마다 기업 경력이 1개월 누적됩니다.");
+                companyProficiencyText(owned.get()), effect, companyProficiencyAdvice(owned.get()));
     }
 
     private CompanyExecutiveOfficeView executiveOffice(
             Player player,
             PlayerCompany company,
-            CompanyDashboardView dashboard
+            CompanyDashboardView dashboard,
+            CompanyFinanceService.FinanceView financeView,
+            CompanyIpoOverview ipoOverview
     ) {
         var bottleneck = dashboard.departments().stream()
                 .max(java.util.Comparator.comparingInt(CompanyDashboardView.OperationItem::progressPercent));
@@ -1359,7 +1523,42 @@ public class CompanyPageModelAssembler {
                         executiveRecommendation(item.status(), item.progressPercent())
                 ))
                 .toList();
-        return new CompanyExecutiveOfficeView(operation, commands);
+        return new CompanyExecutiveOfficeView(
+                operation,
+                commands,
+                executiveCompanyProfile(player, company, financeView, ipoOverview));
+    }
+
+    private CompanyExecutiveOfficeView.CompanyProfile executiveCompanyProfile(
+            Player player,
+            PlayerCompany company,
+            CompanyFinanceService.FinanceView financeView,
+            CompanyIpoOverview ipoOverview
+    ) {
+        boolean listed = ipoOverview != null && ipoOverview.isListed();
+        var quote = listed
+                ? gameService.selectedStockQuote(player, CompanyIpoPolicy.PLAYER_COMPANY_STOCK_KEY)
+                : null;
+        long enterpriseValue = financeView == null || financeView.valuation() == null
+                ? 0
+                : financeView.valuation().getEnterpriseValue();
+        int establishedMonths = Math.max(1,
+                (player.getElapsedDays() - company.getEstablishedElapsedDay()) / 30 + 1);
+        return new CompanyExecutiveOfficeView.CompanyProfile(
+                company.getGrowthStage().getDisplayName(),
+                "설립 " + establishedMonths + "개월차",
+                "서울",
+                enterpriseValue <= 0 ? "산정 전" : moneyText.format(enterpriseValue),
+                listed ? "상장기업" : ipoStatusLabel(ipoOverview),
+                listed ? quote.currentPriceText() : "상장 전",
+                listed ? quote.marketCapText() : "상장 전",
+                shareCountText(company.getIssuedShares()),
+                shareCountText(company.getPlayerShares()),
+                String.format("%.1f%%", company.getPlayerOwnershipPercent()),
+                listed ? quote.listingDateText() : "-",
+                listed ? quote.offerPriceText() : "-",
+                listed
+        );
     }
 
     private CompanyDashboardView.Secretary chiefSecretary(
@@ -1377,15 +1576,32 @@ public class CompanyPageModelAssembler {
             return secretary("미배치", "대표실·총괄", spec.imagePath(), "미배치",
                     "효과 없음", "총괄비서가 기업에 합류하면 전사 조정 효과가 적용됩니다.");
         }
-        int level = owned.get().getCompanyProficiencyLevel();
         return secretary(
                 spec.name(),
                 "대표실·총괄",
                 spec.imagePath(),
-                "기업 숙련도 " + level + "단계 · 경력 " + owned.get().getCompanyCareerMonths() + "개월",
+                companyProficiencyText(owned.get()),
                 "전체 부서 처리능력·핵심인재 성장속도 " + effectPercent + "% 증가",
-                advice
+                companyProficiencyAdvice(owned.get()) + " " + advice
         );
+    }
+
+    private String companyProficiencyText(com.game.buildingstory.domain.OwnedSecretary secretary) {
+        int level = secretary.getCompanyProficiencyLevel();
+        if (level >= 5) {
+            return "기업 숙련도 5단계 · 경력 24/24개월";
+        }
+        return "기업 숙련도 " + level + "단계 · 경력 "
+                + secretary.getCompanyCareerMonths() + "/"
+                + secretary.getNextCompanyProficiencyCareerMonths() + "개월";
+    }
+
+    private String companyProficiencyAdvice(com.game.buildingstory.domain.OwnedSecretary secretary) {
+        if (secretary.getCompanyProficiencyLevel() >= 5) {
+            return "최대 숙련도입니다.";
+        }
+        return "다음 단계까지 정상 운영 " + secretary.getCompanyProficiencyMonthsRemaining()
+                + "개월이 필요합니다. 정상 운영 월마다 기업 경력이 1개월 누적됩니다.";
     }
 
     private String executiveCommandTarget(String departmentKey) {
@@ -1428,11 +1644,10 @@ public class CompanyPageModelAssembler {
     }
 
     private CompanyPreparationView preparation(Player player) {
-        var secretaries = gameService.ownedSecretaries(player);
-        int readySecretaries = (int) secretaries.stream()
-                .filter(secretary -> secretary.getProficiency() >= 30 && secretary.getAffinity() >= 30)
-                .count();
-        int managerCount = gameService.propertyManagers(player).size();
+        var readiness = foundationEligibilityService.status(player);
+        int satisfiedCount = (player.getCash() >= PlayerCompanyService.MINIMUM_INVESTMENT ? 1 : 0)
+                + (readiness.secretariesReady() ? 1 : 0)
+                + (readiness.propertyHandoverReady() ? 1 : 0);
 
         return new CompanyPreparationView(
                 player.getCash(),
@@ -1442,15 +1657,15 @@ public class CompanyPageModelAssembler {
                 PlayerCompanyService.AGGRESSIVE_INVESTMENT,
                 PlayerCompanyService.SECRETARY_TRAINING_COST,
                 PlayerCompanyService.ESTIMATED_MONTHLY_FIXED_COST,
-                secretaries.size(),
-                readySecretaries,
-                managerCount,
-                player.getCash() >= PlayerCompanyService.MINIMUM_INVESTMENT ? 1 : 0,
-                1,
+                readiness.ownedSecretaryCount(),
+                readiness.readySecretaryCount(),
+                readiness.propertyManagerCount(),
+                satisfiedCount,
+                3,
                 List.of(
                         new CompanyPreparationView.Requirement("설립 자금", moneyText.format(player.getCash()), "최소 1,500억원", player.getCash() >= PlayerCompanyService.MINIMUM_INVESTMENT, true),
-                        new CompanyPreparationView.Requirement("비서 성장", readySecretaries + " / 6명", "개발 중 검증 보류", true, false),
-                        new CompanyPreparationView.Requirement("부동산 인계", managerCount + " / 6명", "개발 중 검증 보류", true, false)
+                        new CompanyPreparationView.Requirement("비서 성장", readiness.readySecretaryCount() + " / 6명", "전원 숙련도·호감도 30", readiness.secretariesReady(), true),
+                        new CompanyPreparationView.Requirement("부동산 인계", readiness.readyPropertyManagerCount() + " / 6명", "6개 도시 정상 근무", readiness.propertyHandoverReady(), true)
                 )
         );
     }

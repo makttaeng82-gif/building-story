@@ -88,7 +88,7 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
             </div>
             <div class="status-card date-card">
                 <span>날짜</span>
-                <strong th:text="${player.month} + '월 ' + ${player.day} + '일'">1월 1일</strong>
+                <strong th:text="${player.currentDateText}">1년 1월 1일</strong>
                 <div class="tick-progress" aria-label="다음 날 진행률">
                     <span id="dayProgress"></span>
                 </div>
@@ -113,7 +113,8 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
         <a class="info-tab" th:if="${stockContentUnlocked}" href="/main?view=stocks" th:classappend="${viewMode == 'stocks'} ? ' active'">주식</a>
         <span class="info-tab locked" th:if="${!stockContentUnlocked}" th:text="'주식 · ' + ${stockContentStatus}">주식</span>
         <a class="info-tab" href="/info">정보</a>
-        <a class="info-tab" href="/main?view=company" th:classappend="${viewMode == 'company'} ? ' active'">기업</a>
+        <a class="info-tab" th:if="${companyContentUnlocked}" href="/main?view=company" th:classappend="${viewMode == 'company'} ? ' active'">기업</a>
+        <span class="info-tab locked" th:if="${!companyContentUnlocked}" th:text="'기업 · ' + ${companyContentStatus}">기업</span>
         <form class="tab-pause-form" method="post" action="/pause/toggle">
             <input type="hidden" name="redirectView" th:value="${viewMode}">
             <input type="hidden" name="selectedStockKey" th:if="${viewMode == 'stocks'}" th:value="${selectedStockKey}">
@@ -148,7 +149,7 @@ MainPageModelAssembler가 Model에 담은 값들을 Thymeleaf 표현식(${...})�
             </header>
             <dl>
                 <div>
-                    <dt>종합지수</dt>
+                    <dt th:text="'종합지수 · ' + ${stockMarketStatus.indexConstituentCount()} + '종목'">종합지수 · 15종목</dt>
                     <dd th:class="${stockMarketStatus.indexDirection()}"
                         th:text="${stockMarketStatus.indexValueText()} + ' · ' + ${stockMarketStatus.indexChangeText()}">1,000.00 · +0.00%</dd>
                 </div>

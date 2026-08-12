@@ -26,11 +26,27 @@
                      th:attr="data-stock-row=${stock.key()},data-stock-name=${stock.name()},data-owned-quantity=${quote.quantity()}">
                     <button class="stock-watch-button" type="button" data-stock-watch
                             th:attr="data-stock-watch-key=${stock.key()},aria-label=${stock.name()} + ' 관심종목 추가'">☆</button>
-                    <button type="button" class="stock-company-button"
-                            th:classappend="${stock.key() == selectedStockKey} ? ' selected'"
-                            th:attr="data-stock-key=${stock.key()}">
+                    <a class="stock-company-button" th:if="${stock.key() == 'player-company'}"
+                       th:classappend="${stock.key() == selectedStockKey} ? ' selected'"
+                       href="/main?view=stocks&amp;stockKey=player-company">
                         <span class="stock-list-name">
-                            <strong th:text="${stock.name()}">회사</strong>
+                            <span class="stock-list-title">
+                                <strong th:text="${stock.name()}">회사</strong>
+                                <em class="stock-owner-company-badge">내 기업</em>
+                            </span>
+                            <small th:text="${stock.industry()}">업종</small>
+                        </span>
+                        <b th:text="${quote.marketCapText()}">0원</b>
+                        <em th:classappend="${quote.changeDirection()}" th:text="${quote.changePercentText()}">0%</em>
+                    </a>
+                    <button type="button" class="stock-company-button" th:unless="${stock.key() == 'player-company'}"
+                             th:classappend="${stock.key() == selectedStockKey} ? ' selected'"
+                             th:attr="data-stock-key=${stock.key()}">
+                        <span class="stock-list-name">
+                            <span class="stock-list-title">
+                                <strong th:text="${stock.name()}">회사</strong>
+                                <em class="stock-owner-company-badge" th:if="${stock.key() == 'player-company'}">내 기업</em>
+                            </span>
                             <small th:text="${stock.industry()}">업종</small>
                         </span>
                         <b th:text="${quote.marketCapText()}">0원</b>
@@ -46,7 +62,10 @@
                 <header class="stock-detail-head">
                     <div class="stock-company-identity">
                         <span th:text="${stock.industry()} + ' · ' + ${stock.riskType().label()} + ' · β ' + ${stock.betaText()}">업종 · 위험도 · β 1.00</span>
-                        <h2 th:text="${stock.name()}">회사명</h2>
+                        <div class="stock-detail-company-title">
+                            <h2 th:text="${stock.name()}">회사명</h2>
+                            <em class="stock-owner-company-badge" th:if="${stock.key() == 'player-company'}">내 기업</em>
+                        </div>
                         <p th:text="${stock.description()}">회사 설명</p>
                     </div>
                     <div class="stock-quote-heading">
@@ -81,6 +100,7 @@
                         <polyline class="chart-index-line" points="" hidden></polyline>
                         <polyline class="chart-average-line chart-average-short" points="" hidden></polyline>
                         <polyline class="chart-average-line chart-average-long" points="" hidden></polyline>
+                        <rect class="chart-hover-band" y="24" height="220" hidden></rect>
                         <g th:each="candle : ${quote.candles()}" class="chart-candle"
                            th:classappend="(${candle.rising()} ? ' candle-up' : ' candle-down') + (${candle.visible()} ? '' : ' chart-candle-hidden')"
                            th:attr="data-elapsed-days=${candle.elapsedDays()},data-date=${candle.dateText()},data-open=${candle.openPrice()},data-high=${candle.highPrice()},data-low=${candle.lowPrice()},data-close=${candle.closePrice()},data-open-text=${candle.openPriceText()},data-high-text=${candle.highPriceText()},data-low-text=${candle.lowPriceText()},data-close-text=${candle.closePriceText()},data-change-text=${candle.changePercentText()},data-factor-text=${candle.factorText()},data-index=${candle.marketIndexBasisPoints()},data-news-id=${candle.newsArticleId()},data-news-title=${candle.newsTitle()},data-news-count=${candle.newsCount()},data-earnings=${candle.earningsEvent()},data-dividend=${candle.dividendEvent()}">
@@ -149,7 +169,7 @@
                         <div><dt>분기 매출</dt><dd th:text="${quote.quarterlyRevenueText()}">0원</dd></div>
                         <div><dt>영업이익</dt><dd th:text="${quote.operatingProfitText()}">공시 전</dd></div>
                         <div><dt>순이익</dt><dd th:class="${quote.financialDirection()}" th:text="${quote.netIncomeText()}">0원</dd></div>
-                        <div><dt>예상 대비</dt><dd th:class="${quote.earningsSurpriseDirection()}" th:text="${quote.earningsSurpriseText()}">기준 전망</dd></div>
+                        <div><dt th:text="${stock.key() == 'player-company' ? '전분기 대비' : '예상 대비'}">예상 대비</dt><dd th:class="${quote.earningsSurpriseDirection()}" th:text="${quote.earningsSurpriseText()}">기준 전망</dd></div>
                         <div><dt>주당배당</dt><dd th:text="${quote.dividendPerShareText()}">지급 전</dd></div>
                     </dl>
                 </section>
@@ -174,7 +194,7 @@
                         <header><span>EARNINGS</span><h3>최근 4분기</h3></header>
                         <div class="stock-quarter-table" th:if="${!quote.companyDetail().recentQuarters().isEmpty()}">
                             <div class="stock-quarter-row stock-quarter-header" aria-hidden="true">
-                                <span>분기</span><span>매출</span><span>영업이익</span><span>순이익</span><span>예상 대비</span>
+                                <span>분기</span><span>매출</span><span>영업이익</span><span>순이익</span><span th:text="${stock.key() == 'player-company' ? '전분기 대비' : '예상 대비'}">예상 대비</span>
                             </div>
                             <div class="stock-quarter-row" th:each="quarter : ${quote.companyDetail().recentQuarters()}">
                                 <strong th:text="${quarter.periodText()}">1년 1분기</strong>
@@ -234,8 +254,11 @@
 
         <article class="stock-news-panel" data-stock-news-panel>
             <div class="stock-news-panel-head">
-                <div><span>MARKET BRIEF</span><h3>시장 뉴스</h3></div>
-                <span th:text="${stockNewsArticles.size()} + '건'">0건</span>
+                <h3>시장 뉴스</h3>
+                <div class="stock-news-panel-actions">
+                    <button th:if="${activeNpcIpo != null}" type="button" class="stock-ipo-open" data-stock-ipo-open>공모주 청약</button>
+                    <span th:text="${stockNewsArticles.size()} + '건'">0건</span>
+                </div>
             </div>
             <div class="stock-news-filter-tabs" role="tablist" aria-label="뉴스 유형 필터">
                 <button type="button" class="active" data-stock-news-filter="all">전체</button>
@@ -261,12 +284,13 @@
 
         <article class="stock-history-panel" data-stock-history-panel>
             <div class="stock-history-head">
-                <h3>거래내역</h3>
+                <h3>거래내역 <small>최근 90일</small></h3>
                 <div class="stock-history-filter-tabs" role="tablist" aria-label="거래 유형 필터">
                     <button type="button" class="active" data-trade-filter="all">전체</button>
                     <button type="button" data-trade-filter="매수">매수</button>
                     <button type="button" data-trade-filter="매도">매도</button>
                     <button type="button" data-trade-filter="배당">배당</button>
+                    <button type="button" data-trade-filter="청약">청약</button>
                 </div>
                 <label><span class="sr-only">종목별</span><select data-trade-stock-filter>
                     <option value="all">전체 종목</option>
@@ -277,7 +301,7 @@
             <ul class="stock-trade-history" th:if="${!stockTradeHistories.isEmpty()}">
                 <li th:each="trade : ${stockTradeHistories}"
                     th:attr="data-trade-type=${trade.tradeType},data-trade-stock-key=${trade.stockKey}">
-                    <b th:text="${trade.month} + '월 ' + ${trade.day} + '일'">날짜</b>
+                    <b th:text="${trade.dateText}">1년 1월 1일</b>
                     <span th:class="${trade.tradeType == '매도' ? 'down' : 'up'}" th:text="${trade.tradeType}">구분</span>
                     <strong th:text="${trade.stockName}">종목</strong>
                     <span th:text="${trade.quantity} + '주'">수량</span>
@@ -367,6 +391,98 @@
             </form>
         </div>
     </dialog>
+
+    <dialog th:if="${activeNpcIpo != null}" class="stock-ipo-dialog" data-stock-ipo-dialog
+            th:attr="data-offer-price=${activeNpcIpo.offerPrice()},data-allocation-percent=${activeNpcIpo.expectedAllocationPercent()},data-subscription-fee=${activeNpcIpo.subscriptionFee()}">
+        <div class="stock-ipo-dialog-head">
+            <div><span>PUBLIC OFFERING</span><h2>공모주 청약</h2></div>
+            <div class="stock-ipo-dialog-actions"><span>Ⅱ 일시정지</span><button class="stock-dialog-close" type="button" data-stock-ipo-close aria-label="닫기">×</button></div>
+        </div>
+        <div class="stock-ipo-company-head">
+            <div><span th:text="${activeNpcIpo.industry()} + ' · ' + ${activeNpcIpo.riskText()}">IT · 보통</span><h3 th:text="${activeNpcIpo.companyName()}">기업명</h3><p th:text="${activeNpcIpo.description()}">기업 설명</p></div>
+            <div><span>상장 예정</span><strong th:text="${activeNpcIpo.listingDateText()}">1년 1월 1일</strong></div>
+        </div>
+        <dl class="stock-ipo-summary">
+            <div><dt>공모가</dt><dd th:text="${activeNpcIpo.offerPriceText()}">0원</dd></div>
+            <div><dt>공모 시가총액</dt><dd th:text="${activeNpcIpo.marketCapText()}">0억원</dd></div>
+            <div><dt>적정가치</dt><dd th:text="${activeNpcIpo.fairValueRangeText()}">0원 - 0원</dd></div>
+            <div><dt>수요예측</dt><dd th:text="${activeNpcIpo.demandText()} + ' · ' + ${activeNpcIpo.competitionText()}">보통</dd></div>
+        </dl>
+        <div class="stock-ipo-financials">
+            <div><span>최근 분기 매출</span><strong th:text="${activeNpcIpo.revenueText()}">0원</strong></div>
+            <div><span>영업이익</span><strong th:text="${activeNpcIpo.operatingProfitText()}">0원</strong></div>
+            <div><span>순이익</span><strong th:text="${activeNpcIpo.netIncomeText()}">0원</strong></div>
+        </div>
+        <section class="stock-ipo-decision-data">
+            <header><span>INVESTMENT CHECK</span><h3>청약 판단 지표</h3></header>
+            <dl>
+                <div><dt>매출 성장률</dt><dd th:text="${activeNpcIpo.revenueGrowthText()}">+0.0%</dd></div>
+                <div><dt>영업이익률</dt><dd th:text="${activeNpcIpo.operatingMarginText()}">0.0%</dd></div>
+                <div><dt>부채비율</dt><dd th:text="${activeNpcIpo.debtRatioText()}">0.0%</dd></div>
+                <div><dt>공모가 할인</dt><dd th:text="${activeNpcIpo.offerDiscountText()}">0.0% 할인</dd></div>
+                <div><dt>상장 직후 유통 가능</dt><dd th:text="${activeNpcIpo.tradableSharesText()}">0주 · 0.0%</dd></div>
+            </dl>
+        </section>
+        <section class="stock-ipo-quarter-section">
+            <header><span>EARNINGS TREND</span><h3>최근 4개 분기</h3></header>
+            <div class="stock-ipo-quarter-head"><span>분기</span><span>매출</span><span>영업이익</span><span>순이익</span><span>성장률</span></div>
+            <div class="stock-ipo-quarter-row" th:each="quarter : ${activeNpcIpo.recentQuarters()}">
+                <strong th:text="${quarter.periodText()}">1년 1분기</strong>
+                <span th:text="${quarter.revenueText()}">0원</span>
+                <span th:text="${quarter.operatingProfitText()}">0원</span>
+                <span th:text="${quarter.netIncomeText()}">0원</span>
+                <span th:class="${quarter.growthDirection()}" th:text="${quarter.growthText()}">0.0%</span>
+            </div>
+        </section>
+        <div th:if="${activeNpcIpo.subscribed()}" class="stock-ipo-complete">
+            <span>청약 신청 완료</span>
+            <strong th:text="${activeNpcIpo.requestedQuantity()} + '주 신청 · 예상 ' + ${activeNpcIpo.expectedAllocationQuantity()} + '주 배정'">0주 신청</strong>
+            <p th:text="'예약금 ' + ${activeNpcIpo.reservedAmountText()} + ' · 예상 환불 ' + ${activeNpcIpo.expectedRefundText()}">예약금</p>
+        </div>
+        <form th:unless="${activeNpcIpo.subscribed()}" class="stock-ipo-form" method="post"
+              th:action="@{/stocks/ipo/{key}/subscribe(key=${activeNpcIpo.stockKey()})}">
+            <label>청약 수량<input type="number" name="quantity" min="1" th:max="${activeNpcIpo.maximumRequestQuantity()}" value="1" data-stock-ipo-quantity></label>
+            <div class="stock-ipo-quick-buttons">
+                <button type="button" data-stock-ipo-percent="10">10%</button>
+                <button type="button" data-stock-ipo-percent="25">25%</button>
+                <button type="button" data-stock-ipo-percent="50">50%</button>
+                <button type="button" data-stock-ipo-percent="100">최대</button>
+            </div>
+            <dl class="stock-ipo-calculation">
+                <div><dt>최대 신청</dt><dd th:text="${activeNpcIpo.maximumRequestQuantityText()}">0주</dd></div>
+                <div><dt>예상 배정률</dt><dd th:text="${activeNpcIpo.expectedAllocationPercent()} + '%'">30%</dd></div>
+                <div><dt>예약금</dt><dd data-stock-ipo-reserved>0원</dd></div>
+                <div><dt>예상 배정</dt><dd data-stock-ipo-allocation>0주</dd></div>
+                <div><dt>예상 환불</dt><dd data-stock-ipo-refund>0원</dd></div>
+                <div><dt>수수료</dt><dd th:text="${activeNpcIpo.subscriptionFeeText()}">2만원</dd></div>
+            </dl>
+            <p>배정 수량과 환불액은 상장일에 확정됩니다. 청약 후에는 취소할 수 없습니다.</p>
+            <button type="submit" th:disabled="${activeNpcIpo.maximumRequestQuantity() <= 0}">청약하기</button>
+        </form>
+        <div class="stock-ipo-dialog-footer"><button type="button" data-stock-ipo-close>닫기</button></div>
+    </dialog>
+
+    <dialog th:if="${pendingNpcIpoResult != null}" class="stock-ipo-dialog stock-ipo-result-dialog"
+            data-stock-ipo-result-dialog
+            th:attr="data-result-read-url=@{/stocks/ipo/{key}/result/read(key=${pendingNpcIpoResult.stockKey()})}">
+        <div class="stock-ipo-dialog-head">
+            <div><span>ALLOCATION RESULT</span><h2>공모주 배정 결과</h2></div>
+            <div class="stock-ipo-dialog-actions"><span>Ⅱ 일시정지</span><button class="stock-dialog-close" type="button" data-stock-ipo-result-close aria-label="닫기">×</button></div>
+        </div>
+        <div class="stock-ipo-result-title">
+            <span th:text="${pendingNpcIpoResult.listingDateText()} + ' 상장'">상장일</span>
+            <h3 th:text="${pendingNpcIpoResult.companyName()}">기업명</h3>
+        </div>
+        <dl class="stock-ipo-summary">
+            <div><dt>청약 수량</dt><dd th:text="${pendingNpcIpoResult.requestedQuantityText()}">0주</dd></div>
+            <div><dt>배정 수량</dt><dd th:text="${pendingNpcIpoResult.allocatedQuantityText()}">0주</dd></div>
+            <div><dt>공모가</dt><dd th:text="${pendingNpcIpoResult.offerPriceText()}">0원</dd></div>
+            <div><dt>최종 매입금</dt><dd th:text="${pendingNpcIpoResult.purchaseAmountText()}">0원</dd></div>
+            <div><dt>예수금 환불</dt><dd class="up" th:text="${pendingNpcIpoResult.refundAmountText()}">0원</dd></div>
+        </dl>
+        <p class="stock-ipo-result-note">배정 주식은 보유종목에 반영됐으며, 미배정 금액은 증권 예수금으로 환불됐습니다.</p>
+        <div class="stock-ipo-dialog-footer"><button type="button" data-stock-ipo-result-close>확인</button></div>
+    </dialog>
 </section>
 
 <aside th:fragment="stockSidePanel" class="stock-record-panel">
@@ -397,16 +513,16 @@
                 <div><span th:text="${stock.industry()}">업종</span><h3 th:text="${stock.name()}">회사</h3></div>
                 <strong th:text="${quote.currentPriceText()}">0원</strong>
             </header>
-            <dl class="stock-position-summary">
+            <dl class="stock-position-summary" th:unless="${stock.key() == 'player-company'}">
                 <div><dt>보유수량</dt><dd th:text="${quote.quantity()} + '주'">0주</dd></div>
                 <div><dt>평균단가</dt><dd th:text="${quote.averagePriceText()}">0원</dd></div>
                 <div><dt>평가손익</dt><dd th:class="${quote.valuationProfit() > 0 ? 'up' : (quote.valuationProfit() < 0 ? 'down' : 'flat')}" th:text="${quote.valuationProfitText()}">0원</dd></div>
             </dl>
-            <div class="stock-order-tabs" role="tablist" aria-label="주문 유형">
+            <div class="stock-order-tabs" role="tablist" aria-label="주문 유형" th:unless="${stock.key() == 'player-company'}">
                 <button type="button" class="active" data-stock-order-tab="buy">매수</button>
                 <button type="button" data-stock-order-tab="sell">매도</button>
             </div>
-            <form class="stock-order-form active" data-stock-order-form="buy" data-stock-buy-form method="post" th:action="@{/stocks/{key}/buy(key=${stock.key()})}">
+            <form class="stock-order-form active" data-stock-order-form="buy" data-stock-buy-form method="post" th:action="@{/stocks/{key}/buy(key=${stock.key()})}" th:unless="${stock.key() == 'player-company'}">
                 <input type="hidden" name="quantity" value="1" data-stock-order-quantity>
                 <div class="stock-order-percent-head"><span>투자 비율</span><output data-stock-order-percent-output>50%</output></div>
                 <input class="stock-order-range" type="range" min="1" max="100" value="50" data-stock-order-percent aria-label="매수 비율">
@@ -423,7 +539,7 @@
                 </dl>
                 <button type="submit" data-stock-order-submit th:disabled="${screenPaused}">50% 매수</button>
             </form>
-            <form class="stock-order-form" data-stock-order-form="sell" data-stock-sell-form method="post" th:action="@{/stocks/{key}/sell(key=${stock.key()})}">
+            <form class="stock-order-form" data-stock-order-form="sell" data-stock-sell-form method="post" th:action="@{/stocks/{key}/sell(key=${stock.key()})}" th:unless="${stock.key() == 'player-company'}">
                 <input type="hidden" name="quantity" value="1" data-stock-order-quantity>
                 <div class="stock-order-percent-head"><span>매도 비율</span><output data-stock-order-percent-output>50%</output></div>
                 <input class="stock-order-range" type="range" min="1" max="100" value="50" data-stock-order-percent aria-label="매도 비율">
@@ -440,7 +556,19 @@
                 </dl>
                 <button type="submit" data-stock-order-submit th:disabled="${screenPaused || quote.quantity() <= 0}">50% 매도</button>
             </form>
-            <p class="stock-order-note" th:text="'즉시 매수 가능 ' + ${quote.liquidityText()} + ' · 대량 주문 가격 영향 · 수수료 0.25%'">유동성 안내</p>
+            <p class="stock-order-note" th:unless="${stock.key() == 'player-company'}" th:text="'즉시 매수 가능 ' + ${quote.liquidityText()} + ' · 대량 주문 가격 영향 · 수수료 0.25%'">유동성 안내</p>
+            <section class="stock-owner-company-action" th:if="${stock.key() == 'player-company'}">
+                <span>FOUNDER POSITION</span>
+                <strong>창업자 지분은 기업 경영에서 관리합니다.</strong>
+                <dl>
+                    <div><dt>상장일</dt><dd th:text="${quote.listingDateText}">1월 1일</dd></div>
+                    <div><dt>공모가</dt><dd th:text="${quote.offerPriceText}">0원</dd></div>
+                    <div><dt>창업자 보유</dt><dd th:text="${quote.founderSharesText}">0주</dd></div>
+                    <div><dt>창업자 지분가치</dt><dd th:text="${quote.founderMarketValueText}">0원</dd></div>
+                </dl>
+                <p>자기 회사 주식은 증권계좌에서 매수·매도할 수 없습니다. 기업 운영, 배당과 자본정책은 기업 화면에서 결정합니다.</p>
+                <a href="/main?view=company">기업 화면으로 이동</a>
+            </section>
         </article>
     </section>
 </aside>

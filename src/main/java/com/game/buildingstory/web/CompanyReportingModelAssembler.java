@@ -1,7 +1,9 @@
 package com.game.buildingstory.web;
 
 import com.game.buildingstory.domain.CompanyNewsArticle;
+import com.game.buildingstory.domain.GameCalendar;
 import com.game.buildingstory.domain.PlayerCompany;
+import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.service.CompanyNewsService;
 import com.game.buildingstory.service.CompanyReportingService;
 import org.springframework.stereotype.Component;
@@ -15,6 +17,8 @@ import java.util.regex.Pattern;
 /** 기업 대시보드의 뉴스, 경영보고와 재무전망 조회 모델을 조립한다. */
 @Component
 public class CompanyReportingModelAssembler {
+    private static final int PRIMARY_NEWS_LIMIT = 20;
+    private static final int TOTAL_NEWS_LIMIT = 30;
     private static final Pattern RAW_NEWS_MONEY =
             Pattern.compile("(?<![\\d,])(-?[\\d,]{5,})원");
 
@@ -32,7 +36,7 @@ public class CompanyReportingModelAssembler {
         this.moneyText = moneyText;
     }
 
-    public void addAttributes(PlayerCompany company, boolean operational, Model model) {
+    public void addAttributes(PlayerCompany company, Player player, boolean operational, Model model) {
         if (!operational) {
             model.addAttribute("companyNews", List.of());
             model.addAttribute("companyNewsCount", 0);
@@ -45,12 +49,13 @@ public class CompanyReportingModelAssembler {
         }
 
         List<CompanyNewsArticle> allNews = companyNewsService.articles(company);
-        List<CompanyNewsArticle> visibleNews = new ArrayList<>(allNews.stream().limit(20).toList());
-        allNews.stream().skip(20).filter(CompanyNewsArticle::isUnread).forEach(visibleNews::add);
-        List<CompanyNewsView> newsViews = visibleNews.stream()
+        List<CompanyNewsView> newsViews = visibleNews(allNews).stream()
                 .map(article -> new CompanyNewsView(
                         article.getId(),
-                        article.getOccurredMarketMonth() + "개월차",
+                        GameCalendar.dateText(article.getOccurredElapsedDay(
+                                company.getEstablishedElapsedDay(),
+                                player.getElapsedDays(),
+                                company.getMarketMonthsProcessed())),
                         article.getCategory().getDisplayName(),
                         formatNewsMoney(article.getTitle()),
                         formatNewsMoney(article.getBody()),
@@ -66,6 +71,17 @@ public class CompanyReportingModelAssembler {
         model.addAttribute("companyUnreadReportCount",
                 reports.stream().filter(CompanyManagementReportView::unread).count());
         model.addAttribute("companyFinancialForecast", companyReportingService.financialForecast(company));
+    }
+
+    static List<CompanyNewsArticle> visibleNews(List<CompanyNewsArticle> allNews) {
+        List<CompanyNewsArticle> visibleNews = new ArrayList<>(
+                allNews.stream().limit(PRIMARY_NEWS_LIMIT).toList());
+        allNews.stream()
+                .skip(PRIMARY_NEWS_LIMIT)
+                .filter(CompanyNewsArticle::isUnread)
+                .limit(TOTAL_NEWS_LIMIT - visibleNews.size())
+                .forEach(visibleNews::add);
+        return List.copyOf(visibleNews);
     }
 
     private String formatNewsMoney(String text) {

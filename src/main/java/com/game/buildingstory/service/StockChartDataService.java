@@ -1,11 +1,10 @@
 package com.game.buildingstory.service;
 
 import com.game.buildingstory.domain.ListedCompany;
-import com.game.buildingstory.domain.ListedCompanyQuarterlyReport;
 import com.game.buildingstory.domain.Player;
 import com.game.buildingstory.domain.StockNewsArticle;
 import com.game.buildingstory.domain.StockPriceHistory;
-import com.game.buildingstory.repo.ListedCompanyQuarterlyReportRepository;
+import com.game.buildingstory.repo.StockMarketIndexHistoryRepository;
 import com.game.buildingstory.repo.StockNewsArticleRepository;
 import com.game.buildingstory.repo.StockPriceHistoryRepository;
 import org.springframework.stereotype.Service;
@@ -31,26 +30,29 @@ public class StockChartDataService {
     private final StockCatalog stockCatalog;
     private final StockMarketIndexCalculator marketIndexCalculator;
     private final StockPriceHistoryRepository priceRepository;
+    private final StockMarketIndexHistoryRepository indexRepository;
     private final StockNewsArticleRepository newsRepository;
-    private final ListedCompanyQuarterlyReportRepository reportRepository;
+    private final StockFinancialDataService financialDataService;
 
     public StockChartDataService(
             StockCatalog stockCatalog,
             StockMarketIndexCalculator marketIndexCalculator,
             StockPriceHistoryRepository priceRepository,
+            StockMarketIndexHistoryRepository indexRepository,
             StockNewsArticleRepository newsRepository,
-            ListedCompanyQuarterlyReportRepository reportRepository
+            StockFinancialDataService financialDataService
     ) {
         this.stockCatalog = stockCatalog;
         this.marketIndexCalculator = marketIndexCalculator;
         this.priceRepository = priceRepository;
+        this.indexRepository = indexRepository;
         this.newsRepository = newsRepository;
-        this.reportRepository = reportRepository;
+        this.financialDataService = financialDataService;
     }
 
     /** 기존 현재가를 앵커로 보존하면서 그 앞에 약 2년의 5일봉을 채운다. */
     public void ensureInitialHistory(Player player) {
-        for (StockSpec stock : stockCatalog.all()) {
+        for (StockSpec stock : stockCatalog.initial()) {
             long existingCount = priceRepository.countByPlayerAndStockKey(player, stock.key());
             if (existingCount >= INITIAL_HISTORY_CANDLES) {
                 continue;
@@ -68,16 +70,20 @@ public class StockChartDataService {
         List<StockPriceHistory> selectedHistory = priceRepository
                 .findByPlayerAndStockKeyOrderByElapsedDaysAscIdAsc(player, stock.key());
         Map<Integer, Long> indexByDay = marketIndexByDay(player);
-        List<StockNewsArticle> relevantNews = newsRepository.findTop20ByPlayerOrderByPublishedElapsedDaysDescIdDesc(player).stream()
+        int firstChartDay = selectedHistory.isEmpty()
+                ? player.getElapsedDays()
+                : selectedHistory.getFirst().getElapsedDays();
+        List<StockNewsArticle> relevantNews = newsRepository
+                .findByPlayerAndPublishedElapsedDaysGreaterThanEqualOrderByPublishedElapsedDaysDescIdDesc(
+                        player, firstChartDay).stream()
                 .filter(article -> appliesTo(article, stock))
                 .sorted(Comparator.comparingInt(StockNewsArticle::getPublishedElapsedDays))
                 .toList();
-        List<ListedCompanyQuarterlyReport> reports = company == null
-                ? List.of()
-                : reportRepository.findByListedCompanyOrderByFiscalPeriodIndexDesc(company).stream()
-                        .filter(report -> !report.isBaselineHistory())
-                        .sorted(Comparator.comparingInt(ListedCompanyQuarterlyReport::getPublishedElapsedDay))
-                        .toList();
+        List<StockFinancialSnapshot.Quarter> reports = financialDataService
+                .reportEvents(player, stock, company).stream()
+                .filter(report -> report.publishedElapsedDay() > 0 || report.dividendElapsedDay() > 0)
+                .sorted(Comparator.comparingInt(StockFinancialSnapshot.Quarter::publishedElapsedDay))
+                .toList();
 
         List<StockChartPoint> result = new ArrayList<>(selectedHistory.size());
         int previousDay = Integer.MIN_VALUE;
@@ -87,9 +93,14 @@ public class StockChartDataService {
                     .filter(article -> article.getPublishedElapsedDays() > startDay
                             && article.getPublishedElapsedDays() <= price.getElapsedDays())
                     .toList();
-            List<ListedCompanyQuarterlyReport> candleReports = reports.stream()
-                    .filter(report -> report.getPublishedElapsedDay() > startDay
-                            && report.getPublishedElapsedDay() <= price.getElapsedDays())
+            List<StockFinancialSnapshot.Quarter> candleReports = reports.stream()
+                    .filter(report -> report.publishedElapsedDay() > startDay
+                            && report.publishedElapsedDay() <= price.getElapsedDays())
+                    .toList();
+            List<StockFinancialSnapshot.Quarter> candleDividends = reports.stream()
+                    .filter(report -> report.dividendPerShare() > 0
+                            && report.dividendElapsedDay() > startDay
+                            && report.dividendElapsedDay() <= price.getElapsedDays())
                     .toList();
             StockNewsArticle headline = candleNews.isEmpty() ? null : candleNews.get(candleNews.size() - 1);
             result.add(new StockChartPoint(
@@ -99,7 +110,7 @@ public class StockChartDataService {
                     headline == null ? "" : headline.getTitle(),
                     candleNews.size(),
                     !candleReports.isEmpty(),
-                    candleReports.stream().anyMatch(report -> report.getDividendPerShare() > 0)
+                    !candleDividends.isEmpty()
             ));
             previousDay = price.getElapsedDays();
         }
@@ -178,19 +189,23 @@ public class StockChartDataService {
                                 HashMap::new
                         )
                 ));
-        return pricesByDay.entrySet().stream().collect(Collectors.toMap(
+        Map<Integer, Long> result = pricesByDay.entrySet().stream().collect(Collectors.toMap(
                 Map.Entry::getKey,
-                entry -> marketIndexCalculator.calculate(stockCatalog.all(), entry.getValue()),
+                entry -> marketIndexCalculator.calculate(stockCatalog.initial(), entry.getValue()),
                 (first, ignored) -> first,
                 LinkedHashMap::new
         ));
+        // 시장 개방 전 합성 구간은 초기 종목으로 계산하고, 실제 플레이 구간은 저장된 체인링크 지수를 사용한다.
+        indexRepository.findByPlayerOrderByElapsedDaysAscIdAsc(player)
+                .forEach(history -> result.put(history.getElapsedDays(), history.getIndexBasisPoints()));
+        return result;
     }
 
     private boolean appliesTo(StockNewsArticle article, StockSpec stock) {
         return switch (article.getCategory()) {
             case MARKET -> true;
             case INDUSTRY -> stock.industry().equals(article.getIndustry());
-            case COMPANY -> stock.key().equals(article.getStockKey());
+            case COMPANY, IPO -> stock.key().equals(article.getStockKey());
         };
     }
 

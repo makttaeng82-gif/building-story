@@ -341,6 +341,15 @@ public class ListedCompany {
         marketParticipantShares = Math.addExact(marketParticipantShares, quantity);
     }
 
+    /** 상장 후 플레이어 유상증자로 발행된 신주를 창업자 보유분과 총발행주식에 함께 반영한다. */
+    public void issueFounderShares(long quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("신규 창업자 주식 수는 1주 이상이어야 합니다.");
+        }
+        issuedShares = Math.addExact(issuedShares, quantity);
+        founderShares = Math.addExact(founderShares, quantity);
+    }
+
     public boolean hasConservedShares(long personalPlayerShares) {
         try {
             return accountedShares(personalPlayerShares) == issuedShares;

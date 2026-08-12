@@ -84,11 +84,18 @@ public class CompanyProductProjectService {
                 .findByCompanyAndDepartmentType(company, CompanyDepartmentType.AI_DEVELOPMENT)
                 .orElseThrow();
         var load = workforceService.departmentLoad(company, development);
+        if (load.availableSlots() <= 0) {
+            return "AI개발팀 주요 업무 슬롯이 부족함";
+        }
         int maximumAdditionalWorkload = Math.max(0,
                 (int) Math.floor(load.capacity() * 1.30) - load.totalWorkload());
         int assignedWorkload = Math.min(MAXIMUM_MONTHLY_ASSIGNMENT, maximumAdditionalWorkload);
         if (assignedWorkload <= 0) {
             return "AI개발팀 업무 여유가 없어 프로젝트를 시작할 수 없음";
+        }
+        if (!workforceService.canReserveMajorWork(
+                company, CompanyDepartmentType.AI_DEVELOPMENT, assignedWorkload)) {
+            return "회사의 동시 주요 업무 슬롯이 부족함";
         }
 
         workforceService.reserveMajorWork(company, CompanyDepartmentType.AI_DEVELOPMENT, assignedWorkload);

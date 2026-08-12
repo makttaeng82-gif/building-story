@@ -122,6 +122,7 @@ public class ListedCompanyFinancialService {
         ensureBaselineHistory(player);
         int fiscalPeriodIndex = FiscalQuarter.currentPeriodIndex(player) - 1;
         List<ListedCompany> companiesToSettle = listedCompanyRepository.findByPlayer(player).stream()
+                .filter(company -> financialCatalog.supports(company.getStockKey()))
                 .filter(company -> company.getLatestSettledFiscalPeriod() < fiscalPeriodIndex)
                 .filter(company -> !reportRepository.existsByListedCompanyAndFiscalPeriodIndex(company, fiscalPeriodIndex))
                 .toList();
@@ -156,6 +157,10 @@ public class ListedCompanyFinancialService {
      */
     public void ensureBaselineHistory(Player player) {
         for (ListedCompany company : listedCompanyRepository.findByPlayer(player)) {
+            // 플레이어 기업 등 동적 종목은 실제 기업 분기보고서를 사용하므로 NPC 기준실적을 만들지 않는다.
+            if (!financialCatalog.supports(company.getStockKey())) {
+                continue;
+            }
             List<ListedCompanyQuarterlyReport> reports = reportRepository
                     .findByListedCompanyOrderByFiscalPeriodIndexDesc(company);
             if (reports.size() < 4) {

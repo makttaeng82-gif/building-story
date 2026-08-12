@@ -12,6 +12,8 @@ public interface StockNewsArticleRepository extends JpaRepository<StockNewsArtic
 
     Optional<StockNewsArticle> findByIdAndPlayer(long id, Player player);
 
+    boolean existsByPlayerAndEventKey(Player player, String eventKey);
+
     List<StockNewsArticle> findByPlayerAndPublishedElapsedDaysGreaterThanEqualOrderByPublishedElapsedDaysDescIdDesc(
             Player player,
             int elapsedDays

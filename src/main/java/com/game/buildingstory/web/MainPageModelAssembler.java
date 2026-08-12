@@ -33,6 +33,7 @@ public class MainPageModelAssembler {
         // 화면 렌더링 전에 필요한 상태를 먼저 준비한다. 예: 매물이 없으면 생성, 주식 unlock 예약, 비서 이벤트 평가.
         gameService.ensureOffers(player);
         gameService.ensureStockUnlockSchedule(player);
+        gameService.ensureCompanyUnlockSchedule(player);
         gameService.evaluateSecretaryTenantEvents(player);
         var loans = gameService.loans(player);
         // 아래 attribute 이름은 Thymeleaf 템플릿에서 ${player}, ${offers}처럼 직접 참조된다.
@@ -64,15 +65,18 @@ public class MainPageModelAssembler {
         model.addAttribute("propertyManagerMonthlySalary", gameService.propertyManagerMonthlySalary());
         model.addAttribute("propertyManagerSalaryDue", propertyManager == null ? 0L : gameService.propertyManagerSalaryDue(propertyManager));
         model.addAttribute("propertyManagerFeatureVisible", gameService.propertyManagerFeatureVisible(player));
-        model.addAttribute("propertyManagerHandoffReady", gameService.propertyManagerHandoffReady(player));
+        model.addAttribute("propertyManagerHandoffReady", gameService.propertyManagerHandoffReady(player, player.getCurrentCity()));
+        model.addAttribute("propertyManagerHandoffStatus", gameService.propertyManagerHandoffStatusText(player, player.getCurrentCity()));
         model.addAttribute("secretarySpecs", gameService.secretarySpecs());
         model.addAttribute("secretaryTenantEvents", gameService.secretaryTenantEvents(player));
         model.addAttribute("secretaryOffer", null);
         model.addAttribute("luxuryItems", gameService.luxuryItems());
         model.addAttribute("giftItems", gameService.giftItems());
-        model.addAttribute("stockSpecs", gameService.stockSpecs());
+        model.addAttribute("stockSpecs", gameService.stockSpecs(player));
         model.addAttribute("stockContentUnlocked", gameService.stockContentUnlocked(player));
         model.addAttribute("stockContentStatus", gameService.stockContentStatusText(player));
+        model.addAttribute("companyContentUnlocked", gameService.companyContentUnlocked(player));
+        model.addAttribute("companyContentStatus", gameService.companyContentStatusText(player));
         if ("stocks".equals(viewMode)) {
             gameService.ensureStockMarketInitialized(player);
             var stockQuotes = gameService.stockListQuotes(player);
@@ -91,6 +95,8 @@ public class MainPageModelAssembler {
             model.addAttribute("stockNewsArticles", gameService.stockNewsArticles(player));
             model.addAttribute("stockTradeHistories", gameService.stockTradeHistories(player));
             model.addAttribute("stockHoldingSummary", gameService.stockHoldingSummary(player, stockQuotes));
+            model.addAttribute("activeNpcIpo", gameService.activeNpcIpoSubscription(player).orElse(null));
+            model.addAttribute("pendingNpcIpoResult", gameService.pendingNpcIpoResult(player).orElse(null));
         } else {
             model.addAttribute("stockQuotes", List.of());
         }

@@ -45,13 +45,14 @@ public class ListedCompanyService {
         Map<String, Long> personalShares = ownedStockRepository.findByPlayer(player).stream()
                 .collect(Collectors.toMap(OwnedStock::getStockKey, OwnedStock::getQuantity));
 
-        stockCatalog.all().stream()
+        stockCatalog.initial().stream()
                 .filter(stock -> !companies.containsKey(stock.key()))
                 .map(stock -> createInitialCompany(player, stock, personalShares.getOrDefault(stock.key(), 0L)))
                 .forEach(listedCompanyRepository::save);
 
         listedCompanyRepository.findByPlayer(player).stream()
-                .filter(company -> !company.isFinancialInitialized())
+                .filter(company -> !company.isFinancialInitialized()
+                        && stockCatalog.find(company.getStockKey()).isPresent())
                 .forEach(company -> initializeFinancialState(player, company));
     }
 
@@ -63,6 +64,34 @@ public class ListedCompanyService {
 
     public ListedCompany requireCompany(Player player, String stockKey) {
         return listedCompanyRepository.findByPlayerAndStockKey(player, stockKey).orElseThrow();
+    }
+
+    /** 상장 전 재무 이력을 준비할 신규 NPC 기업을 만든다. 종목 화면 노출은 별도 상장 상태가 결정한다. */
+    public ListedCompany createNpcCandidate(Player player, StockSpec stock) {
+        return listedCompanyRepository.findByPlayerAndStockKey(player, stock.key())
+                .orElseGet(() -> listedCompanyRepository.save(createNpcCandidateCompany(player, stock)));
+    }
+
+    private ListedCompany createNpcCandidateCompany(Player player, StockSpec stock) {
+        int founderPercent = switch (stock.riskType()) {
+            case SAFE -> 45;
+            case NORMAL -> 50;
+            case AGGRESSIVE -> 55;
+        };
+        int institutionalPercent = switch (stock.riskType()) {
+            case SAFE -> 25;
+            case NORMAL -> 20;
+            case AGGRESSIVE -> 15;
+        };
+        long founderShares = stock.issuedShares() * founderPercent / 100;
+        long institutionalShares = stock.issuedShares() * institutionalPercent / 100;
+        long marketShares = stock.issuedShares() - founderShares - institutionalShares;
+        ListedCompany company = new ListedCompany(
+                player, stock.key(), stock.issuedShares(), founderShares,
+                institutionalShares, marketShares, 0, 0
+        );
+        initializeFinancialState(player, company);
+        return company;
     }
 
     private ListedCompany createInitialCompany(Player player, StockSpec stock, long personalPlayerShares) {
